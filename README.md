@@ -165,6 +165,33 @@ Trigger a new deploy (push a commit or use **Deployments → Retry deploy**).
 
 ---
 
+## 📱 Building the Android App
+
+WeatherNow includes a Capacitor wrapper allowing it to run natively on Android devices. This creates a standalone local app utilizing the same web codebase but restyled for mobile.
+
+### Prerequisites
+- Node.js & npm installed
+- [Android Studio](https://developer.android.com/studio) installed
+
+### Compilation Steps
+
+1. **Build the Assets**
+   Using PowerShell, navigate to the `android_app` folder and run the build script. This copies the latest web code into the app's internal bundle and syncs the Capacitor project:
+   ```powershell
+   cd android_app
+   .\build.ps1
+   ```
+
+2. **Open in Android Studio**
+   Open Android Studio and select **Open** (or File > Open). Navigate to the `android_app/android` directory in your repository and open it.
+
+3. **Build the APK**
+   Wait for Android Studio to finish its Gradle sync. Then simply go to:
+   - **Build > Build Bundle(s) / APK(s) > Build APK(s)**
+   - Alternatively, plug in your Android device and click the **Run** (▶) button to install it directly to your phone.
+
+---
+
 ## 🎵 Music Setup
 
 | Method | When to use |
