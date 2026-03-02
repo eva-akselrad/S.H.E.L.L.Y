@@ -1,4 +1,4 @@
-# WeatherNow 🌤
+# THIS BRANCH WILL NOT BE UPDATED AND IS OUTDATED IF YOU HAVE ISSUES WITH IT I WILL NOT FIX THEM you are welcome to send PRs in but i will not be fixing any code in here myself
 
 A modern, real-time weather client inspired by WeatherStar 4000. Vanilla HTML/CSS/JS, NOAA weather data, IEM NEXRAD radar, animated background music, TTS severe weather alerts, and admin announcements.
 
