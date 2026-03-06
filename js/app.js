@@ -67,6 +67,7 @@
             { id: 'slide-pollen', display: 'pollen', label: 'POLLEN' },
             { id: 'slide-radar', display: 'radar', label: 'RADAR' },
             { id: 'slide-alerts', display: 'alerts', label: 'ALERTS' },
+            { id: 'slide-customforecast', display: 'customforecast', label: 'CUSTOM FORECAST' },
         ];
 
         slideIds = allSlides.filter(s => active.includes(s.display));
@@ -120,6 +121,15 @@
         if (target.display === 'alerts') {
             const alerts = WeatherAPI.getAlerts();
             if (!alerts.length) {
+                setTimeout(() => goToSlide((idx + 1) % slideIds.length), 50);
+                return;
+            }
+        }
+
+        // Custom Forecast slide – skip if no periods have been published
+        if (target.display === 'customforecast') {
+            const cf = WeatherAPI.getData()?.customForecast;
+            if (!cf?.periods?.length) {
                 setTimeout(() => goToSlide((idx + 1) % slideIds.length), 50);
                 return;
             }

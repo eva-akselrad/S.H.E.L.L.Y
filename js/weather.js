@@ -397,12 +397,14 @@ const WeatherAPI = (() => {
     }
     async function fetchAll() {
         if (!currentLat) throw new Error('No location set');
-        const [raw, aq, alerts] = await Promise.all([
+        const [raw, aq, alerts, cf] = await Promise.all([
             fetchWeather(currentLat, currentLon),
             fetchAirQuality(currentLat, currentLon),
-            fetchAlerts(currentLat, currentLon)
+            fetchAlerts(currentLat, currentLon),
+            fetch('/api/custom-forecast', { cache: 'no-store' }).then(r => r.ok ? r.json() : { periods: [], updatedAt: null }).catch(() => ({ periods: [], updatedAt: null }))
         ]);
         weatherData = processData(raw, aq);
+        weatherData.customForecast = cf;
         alertsData = alerts;
         return { weather: weatherData, alerts: alertsData };
     }
