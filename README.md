@@ -144,7 +144,7 @@ Name it `WEATHERNOW_KV` and note the **Namespace ID**.
 
 #### 3 · Bind KV to your Pages project
 
-After the first deploy:  
+After the first deploy:  (note: The reason is called weather now is i don't feel like updating the references in the code and my cf client GPU are welcome to put in a pr to change it)
 **Pages project → Settings → Functions → KV namespace bindings → Add binding**
 
 | Variable name       | KV namespace     |
