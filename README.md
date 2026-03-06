@@ -12,6 +12,7 @@ A modern, real-time weather client inspired by WeatherStar 4000. Vanilla HTML/CS
 - Background music (server playlist auto-loaded + folder picker fallback)
 - Text-to-speech severe weather alerts with music ducking
 - **Admin panel** — push info/warning/emergency banners or full-screen popups to every display
+- **Custom Forecast** — publish a hand-crafted forecast slide targeted by map area, ZIP code, or county
 - **Push notifications** — subscribe on any device, receive alerts even in the background
 - **PWA** — installable on iOS, Android, and desktop; works offline with last-loaded data cached
 - Multiple themes, kiosk/fullscreen mode
@@ -75,6 +76,32 @@ Navigate to `/admin.html` on any device on the same network.
 | **Types** | Info · Warning · Emergency (emergency pulses like NWS alerts) |
 | **Duration** | Manual dismiss or auto-dismiss after 15 s – 10 min |
 | **Security** | Password set via `ADMIN_PASSWORD` env var |
+
+---
+
+## 🗺 Custom Forecast & Location Targeting
+
+Admins can publish a hand-crafted forecast that appears as a dedicated slide on every weather display. The forecast can be restricted to a specific geographic area so that only viewers in that area see it.
+
+### Building a forecast
+
+1. Open the admin panel (`/admin.html`) and scroll to **Custom Forecast**.
+2. Click **＋ Add Forecast Period** and fill in one or more periods (name is required; all other fields are optional).
+3. Configure a **Target Area** (see below).
+4. Click **📡 PUBLISH FORECAST**.
+
+To remove the forecast from all displays, click **Clear Forecast**.
+
+### Target Area modes
+
+| Mode | How it works |
+|------|-------------|
+| 🌍 **All Viewers** | Default — the slide appears on every display regardless of location. |
+| 📍 **Map Area** | Click the interactive map to drop a center pin, then enter a radius in miles. Viewers within that circle see the slide. |
+| 🏷 **ZIP Codes** | Enter a comma-separated list of 5-digit US ZIP codes. The slide appears only for viewers whose location reverse-geocodes to one of those ZIPs. |
+| 🗺 **Counties** | Enter comma-separated county names with state abbreviation (e.g. `Jefferson County CO, Cook County IL`). The slide appears only for viewers in a matching county. |
+
+> **How location is resolved:** When a viewer sets their location (search, GPS, or IP), the display silently reverse-geocodes their coordinates via Nominatim to obtain a ZIP code and county. This information is used to evaluate Map Area, ZIP, and County targeting entirely on the client — no personal data is sent to the admin server.
 
 ---
 
