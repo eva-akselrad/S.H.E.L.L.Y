@@ -77,6 +77,48 @@ Navigate to `/admin.html` on any device on the same network.
 | **Duration** | Manual dismiss or auto-dismiss after 15 s – 10 min |
 | **Security** | Password set via `ADMIN_PASSWORD` env var |
 
+### Markdown support
+
+All admin messages (banners, popups), custom forecast descriptions, and release notes support **Markdown** formatting. Use it to add emphasis, lists, links, or code to any message.
+
+#### Example admin message (popup)
+
+> **Title:** ⚠️ Scheduled Maintenance  
+> **Text:**
+> ```markdown
+> The weather display will be **offline for ~10 minutes** tonight at *11:00 PM*.
+>
+> During this window:
+> - Data refresh will be paused
+> - Push notifications may be delayed
+>
+> No action is required on your part. Thank you for your patience!
+> ```
+
+#### Example custom forecast period description
+
+> **Period name:** Tonight  
+> **Description:**
+> ```markdown
+> Partly cloudy with a **30% chance of showers** after midnight.
+> Winds **SW 10–15 mph**, gusting to *25 mph* near the coast.
+> Stay weather-aware — [NWS discussion](https://forecast.weather.gov) updated hourly.
+> ```
+
+#### Example release notes
+
+> **Version:** v2.3.0  
+> **Notes:**
+> ```markdown
+> ## What's New
+>
+> - **Custom Forecast** descriptions now render **Markdown** — bold, italics, lists, and links all work.
+> - Release notes history in the admin panel also renders Markdown.
+> - Fixed a bug where the radar slide would briefly flash on slow connections.
+>
+> > Upgrade by pulling the latest image: `docker compose pull && docker compose up -d`
+> ```
+
 ---
 
 ## 🗺 Custom Forecast & Location Targeting

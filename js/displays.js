@@ -240,7 +240,7 @@ const Displays = (() => {
             card.innerHTML = `
               <div class="day-name">${esc(p.name || '')}</div>
               <div class="day-icon">${esc(p.icon || '🌤')}</div>
-              ${p.desc ? `<div class="day-desc">${esc(p.desc)}</div>` : ''}
+              ${p.desc ? `<div class="day-desc markdown-body">${(typeof marked !== 'undefined' ? marked.parse(p.desc, { breaks: true }) : esc(p.desc))}</div>` : ''}
               ${hiLoHtml}
               ${p.precip ? `<div class="day-precip">💧 ${esc(String(p.precip))}%</div>` : ''}
               ${p.wind ? `<div class="day-wind">💨 ${esc(p.wind)}</div>` : ''}

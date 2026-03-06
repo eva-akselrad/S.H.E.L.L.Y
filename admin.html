@@ -1309,7 +1309,7 @@
                     div.innerHTML = `
                         <div class="rn-version">${note.version ? esc(note.version) : 'note'}</div>
                         <div class="rn-body">
-                            <div class="rn-notes">${esc(note.notes)}</div>
+                            <div class="rn-notes markdown-body">${typeof marked !== 'undefined' ? marked.parse(note.notes, { breaks: true }) : esc(note.notes)}</div>
                             <div class="rn-meta">${new Date(note.created).toLocaleString()}</div>
                         </div>
                         <button class="amsg-del" data-id="${note.id}">✕ Delete</button>
