@@ -1,23 +1,20 @@
 /* ════════════════════════════════════════════════════════════════
-   radar.js – Leaflet map with NEXRAD radar via IEM WMS
-   
-   Why WMS instead of tile cache:
-   - Tile cache (IEM + NOAA) returns 404s or HTML error pages (ORB-blocked)
-   - WMS protocol always returns proper image/png content-type
-   - L.tileLayer.wms handles coordinate conversion automatically
-   - IEM WMS supports TIME parameter for animated frames
+   radar.js – Leaflet map with animated radar via RainViewer API
 
-   Animation approach: single WMS layer whose TIME parameter is updated
-   via setParams() on every frame step.  setParams() calls redraw()
-   internally, which removes stale tiles and re-fetches with the new TIME
-   value.  This is more reliable than the multi-layer opacity-toggle
-   pattern, which can silently stall if the browser or the WMS server
-   returns cached tiles that are identical across adjacent time steps.
+   Why RainViewer instead of IEM WMS:
+   - IEM nexrad-n0q WMS ignores the TIME parameter and always returns
+     the current composite, so all animation frames were identical.
+   - setParams()+redraw() re-fetches tiles on every 700ms step; WMS
+     tiles take 1-3 s to load so the overlay was perpetually blank.
+   - RainViewer's public API returns Unix-timestamped tile cache paths
+     (no API key required).  Each frame has a unique URL so the browser
+     fetches and caches distinct images, and the opacity-toggle
+     animation is smooth because tiles are pre-loaded in the background.
    ════════════════════════════════════════════════════════════════ */
 
 const RadarMap = (() => {
   let map = null;
-  let frames = []; // [{dt}]  – timestamps only, no per-frame layer
+  let frames = []; // [{dt, layer}]
   let currentFrame = 0;
   let animating = true;
   let animTimer = null;
@@ -25,88 +22,79 @@ const RadarMap = (() => {
   let pendingLat = null;
   let pendingLon = null;
   let refreshTimer = null;
-  let radarLayer = null; // single WMS layer; TIME param updated each step
 
   const FRAME_COUNT = 6;
-  const FRAME_MIN = 5; // minutes between radar scans
   const ANIM_INTERVAL = 700; // ms per animation step
-  const WMS_OPACITY = 0.7;
+  const RADAR_OPACITY = 0.7;
 
-  // IEM WMS endpoints (NEXRAD composite base reflectivity)
-  const WMS_URL =
-    "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi";
-  const WMS_LAYER = "nexrad-n0q";
+  // RainViewer public API – no key required
+  const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
+  // Tile URL template filled in per-frame from the API response
+  // path = e.g. "/v2/radar/1699999800"
+  // color 2 = classic colorized, smooth+snow flags = 1_1
+  const RV_TILE = (path) =>
+    `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/2/1_1.png`;
 
-  // ── Generate UTC timestamps ────────────────────────────────────
-  // IEM WMS accepts ISO 8601 strings: 2024-01-01T00:00:00Z
-  function makeTimes() {
-    const now = Date.now();
-    // Round to previous 5-min mark, then back extra 15 min for propagation lag
-    const base =
-      Math.floor(now / (FRAME_MIN * 60_000)) * (FRAME_MIN * 60_000) -
-      15 * 60_000;
-    const times = [];
-    for (let i = FRAME_COUNT - 1; i >= 0; i--) {
-      times.push(new Date(base - i * FRAME_MIN * 60_000));
+  // ── Fetch available radar frames from RainViewer ───────────────
+  async function fetchRainViewerFrames() {
+    try {
+      const resp = await fetch(RV_API);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const past = data.radar?.past ?? [];
+      return past.slice(-FRAME_COUNT);
+    } catch (e) {
+      console.warn("RainViewer fetch failed:", e);
+      return [];
     }
-    return times;
   }
 
-  function isoZ(d) {
-    return d.toISOString().replace(/\.\d{3}Z$/, "Z");
-  }
-
-  // ── Create (or recreate) the single WMS radar layer ──────────
-  function makeWmsLayer(dt) {
-    return L.tileLayer.wms(WMS_URL, {
-      layers: WMS_LAYER,
-      format: "image/png",
-      transparent: true,
-      version: "1.1.1",
-      uppercase: true, // send TIME=, LAYERS=, etc. per OGC spec
-      time: isoZ(dt),
-      opacity: WMS_OPACITY,
+  // ── Build a tile layer for one RainViewer frame ───────────────
+  function makeRVLayer(path) {
+    return L.tileLayer(RV_TILE(path), {
+      tileSize: 256,
+      opacity: 0, // hidden until showFrame makes it visible
       zIndex: 200,
       attribution:
-        '<a href="https://www.mesonet.agron.iastate.edu/" target="_blank">IEM/NEXRAD</a>',
+        '<a href="https://rainviewer.com" target="_blank">RainViewer</a>',
     });
   }
 
-  // ── Build animation frame list and (re)create the radar layer ─
-  function buildFrames() {
-    // Remove the existing radar layer, if any
-    if (radarLayer) {
-      map.removeLayer(radarLayer);
-      radarLayer = null;
-    }
+  // ── Build all animation frames ─────────────────────────────────
+  async function buildFrames() {
+    // Remove old radar layers
+    frames.forEach((f) => {
+      if (map.hasLayer(f.layer)) map.removeLayer(f.layer);
+    });
     frames = [];
 
-    const times = makeTimes();
-    times.forEach((dt) => frames.push({ dt }));
+    const rvFrames = await fetchRainViewerFrames();
+    if (!rvFrames.length) {
+      console.warn("No radar frames available from RainViewer");
+      return;
+    }
+
+    rvFrames.forEach(({ time, path }) => {
+      const layer = makeRVLayer(path);
+      layer.addTo(map);
+      frames.push({ dt: new Date(time * 1000), layer });
+    });
 
     currentFrame = frames.length - 1;
-
-    // Create a single WMS layer at the latest frame's time
-    radarLayer = makeWmsLayer(frames[currentFrame].dt);
-    radarLayer.addTo(map);
-
+    showFrame(currentFrame);
     buildDots();
     updateTimestamp();
     if (animating) startAnimation();
   }
 
   // ── Show one frame ────────────────────────────────────────────
-  // Calls setParams() which merges the new TIME into wmsParams and
-  // calls redraw(), ensuring tiles are re-fetched for each step.
   function showFrame(idx) {
     if (!frames.length) return;
     idx = ((idx % frames.length) + frames.length) % frames.length;
+    frames.forEach((f, i) =>
+      f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0),
+    );
     currentFrame = idx;
-
-    if (radarLayer) {
-      radarLayer.setParams({ time: isoZ(frames[idx].dt) });
-    }
-
     updateTimestamp();
     updateDots();
 
