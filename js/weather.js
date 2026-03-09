@@ -537,7 +537,7 @@ const WeatherAPI = (() => {
     function processSPCOutlook(spcData, lat, lon) {
         const RISK_META = {
             null:   { label: 'No Risk',   color: '#3a3a3a', pct: 0 },
-            TSTM:   { label: 'T\'Storm',  color: '#2e7d32', pct: 14 },
+            TSTM:   { label: 'T-Storm',   color: '#2e7d32', pct: 14 },
             MRGL:   { label: 'Marginal',  color: '#4caf50', pct: 28 },
             SLGT:   { label: 'Slight',    color: '#cddc39', pct: 46 },
             ENH:    { label: 'Enhanced',  color: '#ff9800', pct: 62 },
@@ -611,9 +611,9 @@ const WeatherAPI = (() => {
     async function fetchAll() {
         if (!currentLat) throw new Error('No location set');
 
-        // Nearby cities power both the Travel Forecast and Regional slides,
-        // adapting automatically to the user's current position.
-        const [raw, aq, alerts, cf, nearbyCities, spcRaw] = await Promise.all([
+        // nearbyCities → Regional Obs/Forecast slides (position-dependent)
+        // travelCities → Travel Forecast slide (fixed well-known cities)
+        const [raw, aq, alerts, cf, nearbyCities, travelCities, spcRaw] = await Promise.all([
             fetchWeather(currentLat, currentLon),
             fetchAirQuality(currentLat, currentLon),
             fetchAlerts(currentLat, currentLon),
@@ -621,14 +621,16 @@ const WeatherAPI = (() => {
                 .then(r => r.ok ? r.json() : { periods: [], updatedAt: null })
                 .catch(() => ({ periods: [], updatedAt: null })),
             fetchNearbyCities(currentLat, currentLon, 8).catch(() => []),
+            fetchTravelCities(
+                typeof DEFAULT_TRAVEL_CITIES !== 'undefined' ? DEFAULT_TRAVEL_CITIES : []
+            ).catch(() => []),
             fetchSPCOutlook().catch(() => ({ day1: null, day2: null, day3: null })),
         ]);
 
         weatherData = processData(raw, aq);
         weatherData.customForecast = cf;
-        // Both travel and regional slides share the same nearby-city dataset
         weatherData.nearbyCities = nearbyCities;
-        weatherData.travelCities = nearbyCities;
+        weatherData.travelCities = travelCities;
         weatherData.spcOutlook = processSPCOutlook(spcRaw, currentLat, currentLon);
         alertsData = alerts;
         return { weather: weatherData, alerts: alertsData };

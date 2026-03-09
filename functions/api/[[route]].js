@@ -318,7 +318,7 @@ export async function onRequest({ request, env }) {
         const spcUrl = `https://www.spc.noaa.gov/products/outlook/${file}`;
         try {
             const upstream = await fetch(spcUrl, {
-                headers: { 'User-Agent': 'SHELLY-WeatherClient/1.0 (weather display)' },
+                headers: { 'User-Agent': 'S.H.E.L.L.Y.-WeatherClient/1.0 (weather display)' },
                 signal: AbortSignal.timeout(10000),
             });
             if (!upstream.ok) {

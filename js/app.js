@@ -16,6 +16,7 @@
     let progressStart = 0;
     let progressDuration = 0;
     let locationSet = false;
+    let scrollRaf = null; // requestAnimationFrame handle for autoscroll
 
     const DEFAULT_LOCATION = 'New York, NY';
 
@@ -96,8 +97,123 @@
         });
     }
 
+    // ── Auto-scroll ────────────────────────────────────────────────
+    // Each slide that can overflow declares a primary scrollable container.
+    // When a slide becomes active its container is smoothly scrolled so all
+    // content is shown without user interaction.  The scroll resets to the
+    // top/left when the slide is swapped out.
+    const SCROLL_MAP = {
+        'slide-hourly':        { id: 'hourly-container',   dir: 'x' },
+        'slide-extended':      { id: 'extended-container', dir: 'y' },
+        'slide-observations':  { id: 'obs-grid',           dir: 'y' },
+        'slide-alerts':        { id: 'alerts-container',   dir: 'y' },
+        'slide-travel':        { id: 'travel-container',   dir: 'y' },
+        'slide-regional-obs':  { id: 'regional-obs-grid',  dir: 'y' },
+        'slide-regional-fcst': { id: 'regional-fcst-grid', dir: 'y' },
+        'slide-spc':           { id: 'spc-container',      dir: 'y' },
+    };
+
+    /** Stop any running autoscroll animation and reset the previous container. */
+    function stopAutoScroll() {
+        if (scrollRaf !== null) {
+            cancelAnimationFrame(scrollRaf);
+            scrollRaf = null;
+        }
+    }
+
+    /**
+     * Start a smooth autoscroll for the given slide element.
+     * - 2 s initial pause so the viewer sees the beginning of the content.
+     * - Scrolls at 40 px/s.
+     * - At the end: 1.5 s pause, then jumps back to start and repeats.
+     * - Skips silently if the container has no overflow.
+     * - Pauses on mouse-enter, resumes on mouse-leave (kiosk-friendly).
+     */
+    function startAutoScroll(slideEl) {
+        stopAutoScroll();
+        if (!slideEl) return;
+
+        const entry = SCROLL_MAP[slideEl.id];
+        if (!entry) return;
+
+        const container = document.getElementById(entry.id);
+        if (!container) return;
+
+        const isX = entry.dir === 'x';
+        const PX_PER_S = 40;
+        const INITIAL_DELAY_MS = 2000;
+        const END_PAUSE_MS = 1500;
+
+        // Reset position immediately when slide activates
+        container.scrollLeft = 0;
+        container.scrollTop = 0;
+
+        let paused = false;
+        let delayRemaining = INITIAL_DELAY_MS;
+        let lastTs = null;
+        let waitingAtEnd = false;
+
+        function animate(ts) {
+            if (paused) { scrollRaf = requestAnimationFrame(animate); return; }
+            if (!lastTs) lastTs = ts;
+            const dt = ts - lastTs;
+            lastTs = ts;
+
+            if (delayRemaining > 0) {
+                delayRemaining -= dt;
+                scrollRaf = requestAnimationFrame(animate);
+                return;
+            }
+
+            if (waitingAtEnd) {
+                scrollRaf = requestAnimationFrame(animate);
+                return;
+            }
+
+            const px = (PX_PER_S * dt) / 1000;
+            if (isX) {
+                const maxScroll = container.scrollWidth - container.clientWidth;
+                if (maxScroll <= 2) return; // nothing to scroll
+                container.scrollLeft = Math.min(container.scrollLeft + px, maxScroll);
+                if (container.scrollLeft >= maxScroll - 1) {
+                    waitingAtEnd = true;
+                    setTimeout(() => {
+                        container.scrollLeft = 0;
+                        delayRemaining = 800;
+                        lastTs = null;
+                        waitingAtEnd = false;
+                    }, END_PAUSE_MS);
+                }
+            } else {
+                const maxScroll = container.scrollHeight - container.clientHeight;
+                if (maxScroll <= 2) return; // nothing to scroll
+                container.scrollTop = Math.min(container.scrollTop + px, maxScroll);
+                if (container.scrollTop >= maxScroll - 1) {
+                    waitingAtEnd = true;
+                    setTimeout(() => {
+                        container.scrollTop = 0;
+                        delayRemaining = 800;
+                        lastTs = null;
+                        waitingAtEnd = false;
+                    }, END_PAUSE_MS);
+                }
+            }
+
+            scrollRaf = requestAnimationFrame(animate);
+        }
+
+        // Pause on hover so users can read without the content sliding away
+        container.addEventListener('mouseenter', () => { paused = true; }, { passive: true });
+        container.addEventListener('mouseleave', () => { paused = false; lastTs = null; }, { passive: true });
+
+        scrollRaf = requestAnimationFrame(animate);
+    }
+
     // ── Slide transitions ──────────────────────────────────────────
     function showSlide(idx) {
+        // Stop any running autoscroll before transitioning
+        stopAutoScroll();
+
         // Hide all visible slides
         document.querySelectorAll('.slide.active').forEach(s => {
             s.classList.add('slide-exit');
@@ -110,7 +226,11 @@
         const el = document.getElementById(target.id);
         if (!el) return;
         el.classList.remove('hidden', 'slide-exit');
-        setTimeout(() => el.classList.add('active'), 20);
+        setTimeout(() => {
+            el.classList.add('active');
+            // Begin autoscroll once the slide has finished its enter animation
+            startAutoScroll(el);
+        }, 20);
 
         currentSlide = idx;
         updateDots();
