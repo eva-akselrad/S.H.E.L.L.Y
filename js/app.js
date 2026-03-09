@@ -515,7 +515,7 @@
             return counties.some(c => {
                 // Exact match on the full "County Name ST" token
                 const adminToken = c.toLowerCase().trim();
-                return viewerToken === adminToken || viewerToken.startsWith(adminToken + ' ') || adminToken.startsWith(viewerToken + ' ');
+                return viewerToken === adminToken;
             });
         }
 
