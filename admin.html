@@ -519,6 +519,11 @@
             word-break: break-word;
         }
 
+        /* When .rn-notes is used with rendered markdown (.markdown-body),
+           use normal whitespace handling to avoid extra vertical spacing. */
+        .markdown-body.rn-notes {
+            white-space: normal;
+        }
         .rn-meta {
             font-size: .65rem;
             color: var(--muted);
