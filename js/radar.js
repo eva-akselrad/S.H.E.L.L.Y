@@ -6,11 +6,18 @@
    - WMS protocol always returns proper image/png content-type
    - L.tileLayer.wms handles coordinate conversion automatically
    - IEM WMS supports TIME parameter for animated frames
+
+   Animation approach: single WMS layer whose TIME parameter is updated
+   via setParams() on every frame step.  setParams() calls redraw()
+   internally, which removes stale tiles and re-fetches with the new TIME
+   value.  This is more reliable than the multi-layer opacity-toggle
+   pattern, which can silently stall if the browser or the WMS server
+   returns cached tiles that are identical across adjacent time steps.
    ════════════════════════════════════════════════════════════════ */
 
 const RadarMap = (() => {
   let map = null;
-  let frames = []; // [{time, layer}]
+  let frames = []; // [{dt}]  – timestamps only, no per-frame layer
   let currentFrame = 0;
   let animating = true;
   let animTimer = null;
@@ -18,6 +25,7 @@ const RadarMap = (() => {
   let pendingLat = null;
   let pendingLon = null;
   let refreshTimer = null;
+  let radarLayer = null; // single WMS layer; TIME param updated each step
 
   const FRAME_COUNT = 6;
   const FRAME_MIN = 5; // minutes between radar scans
@@ -48,47 +56,57 @@ const RadarMap = (() => {
     return d.toISOString().replace(/\.\d{3}Z$/, "Z");
   }
 
-  // ── Build WMS layer for a given time ──────────────────────────
+  // ── Create (or recreate) the single WMS radar layer ──────────
   function makeWmsLayer(dt) {
     return L.tileLayer.wms(WMS_URL, {
       layers: WMS_LAYER,
       format: "image/png",
       transparent: true,
       version: "1.1.1",
+      uppercase: true, // send TIME=, LAYERS=, etc. per OGC spec
       time: isoZ(dt),
-      opacity: 0, // hidden by default; shown via showFrame
+      opacity: WMS_OPACITY,
       zIndex: 200,
       attribution:
         '<a href="https://www.mesonet.agron.iastate.edu/" target="_blank">IEM/NEXRAD</a>',
     });
   }
 
-  // ── Build all animation frames ─────────────────────────────────
+  // ── Build animation frame list and (re)create the radar layer ─
   function buildFrames() {
-    // Remove old radar layers
-    frames.forEach((f) => map.removeLayer(f.layer));
+    // Remove the existing radar layer, if any
+    if (radarLayer) {
+      map.removeLayer(radarLayer);
+      radarLayer = null;
+    }
     frames = [];
 
     const times = makeTimes();
-    times.forEach((dt) => {
-      const layer = makeWmsLayer(dt);
-      layer.addTo(map);
-      frames.push({ dt, layer });
-    });
+    times.forEach((dt) => frames.push({ dt }));
 
     currentFrame = frames.length - 1;
-    showFrame(currentFrame);
+
+    // Create a single WMS layer at the latest frame's time
+    radarLayer = makeWmsLayer(frames[currentFrame].dt);
+    radarLayer.addTo(map);
+
     buildDots();
     updateTimestamp();
     if (animating) startAnimation();
   }
 
   // ── Show one frame ────────────────────────────────────────────
+  // Calls setParams() which merges the new TIME into wmsParams and
+  // calls redraw(), ensuring tiles are re-fetched for each step.
   function showFrame(idx) {
     if (!frames.length) return;
     idx = ((idx % frames.length) + frames.length) % frames.length;
-    frames.forEach((f, i) => f.layer.setOpacity(i === idx ? WMS_OPACITY : 0));
     currentFrame = idx;
+
+    if (radarLayer) {
+      radarLayer.setParams({ time: isoZ(frames[idx].dt) });
+    }
+
     updateTimestamp();
     updateDots();
 
