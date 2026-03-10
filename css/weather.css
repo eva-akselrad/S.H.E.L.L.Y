@@ -2528,14 +2528,54 @@ body.kiosk-mode #music-controls {
     flex: 1;
     min-height: 0;
     position: relative;
+    background: #0d1117; /* dark fallback when tiles haven't loaded yet */
 }
 
-/* Disable Leaflet attribution clutter */
+/* Force Leaflet's own background pane to dark */
+.ws4k-map-container .leaflet-container {
+    background: #0d1117 !important;
+}
+
+/* Attribution: barely visible so it doesn't clutter */
 .ws4k-map-container .leaflet-control-attribution {
     font-size: 0.55rem;
-    opacity: 0.4;
-    background: rgba(0, 0, 0, 0.5) !important;
-    color: #888 !important;
+    opacity: 0.35;
+    background: rgba(0, 0, 0, 0.55) !important;
+    color: #666 !important;
+}
+
+/* Map title/badge overlay */
+.ws4k-map-title-bar {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.ws4k-map-title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-accent);
+    text-shadow: 0 0 12px rgba(0, 0, 0, 0.9), 1px 1px 0 #000;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.ws4k-map-badge {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 /* City markers */
@@ -2547,12 +2587,14 @@ body.kiosk-mode #music-controls {
 
 .ws4k-marker-name {
     display: block;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    color: #fff;
-    text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
+    color: #e2e8f0;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 3px;
+    padding: 1px 4px;
     white-space: nowrap;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
     letter-spacing: 0.02em;
 }
 
@@ -2565,19 +2607,19 @@ body.kiosk-mode #music-controls {
 
 .ws4k-marker-temp {
     font-family: var(--font-display);
-    font-size: 1.45rem;
+    font-size: 1.55rem;
     font-weight: 900;
-    color: var(--text-accent);
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.8);
+    color: #fbbf24;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 1), 0 0 10px rgba(0, 0, 0, 0.9);
     line-height: 1;
     letter-spacing: -0.02em;
 }
 
 .ws4k-marker-icon {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     line-height: 1;
     display: inline-block;
-    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.8));
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.9));
 }
 
 /* ── SPC Outlook Chart ────────────────────────────────────────── */
@@ -2585,21 +2627,59 @@ body.kiosk-mode #music-controls {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 20px 28px 16px;
-    gap: 14px;
+    padding: 24px 36px 20px;
+    gap: 20px;
     overflow: hidden;
     background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    --spc-day-col: 195px; /* width of the day-name column; keep in sync */
 }
 
-/* Scale legend row at top */
-.ws4k-spc-scale {
+/* Title row */
+.ws4k-spc-heading {
     display: flex;
-    margin-left: 130px;
-    height: 30px;
-    border-radius: 6px 6px 0 0;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    align-items: baseline;
+    gap: 14px;
     flex-shrink: 0;
+}
+
+.ws4k-spc-heading-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.1rem, 3vw, 1.8rem);
+    font-weight: 900;
+    color: var(--text-accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ws4k-spc-heading-sub {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Scale legend row — aligns with bar tracks */
+.ws4k-spc-scale-wrapper {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.ws4k-spc-scale-spacer {
+    width: var(--spc-day-col);
+    flex-shrink: 0;
+}
+
+.ws4k-spc-scale {
+    flex: 1;
+    display: flex;
+    height: 36px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .ws4k-spc-band {
@@ -2607,25 +2687,26 @@ body.kiosk-mode #music-controls {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.5rem;
+    font-size: 0.65rem;
     font-weight: 800;
     font-family: var(--font-mono);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: rgba(0, 0, 0, 0.85);
-    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    letter-spacing: 0.05em;
+    color: rgba(0, 0, 0, 0.9);
+    border-right: 1px solid rgba(0, 0, 0, 0.25);
 }
 
 .ws4k-spc-band:last-child {
     border-right: none;
 }
 
-/* Day rows */
+/* Day rows — packed together, no giant gaps */
 .ws4k-spc-days {
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-evenly;
+    justify-content: center;
+    gap: 18px;
 }
 
 .ws4k-spc-day-row {
@@ -2636,17 +2717,17 @@ body.kiosk-mode #music-controls {
 
 .ws4k-spc-day-name {
     font-family: var(--font-display);
-    font-size: clamp(1rem, 2.8vw, 1.7rem);
+    font-size: clamp(1.2rem, 2.6vw, 1.8rem);
     font-weight: 700;
     color: var(--text-primary);
-    width: 114px;
+    min-width: var(--spc-day-col);
     flex-shrink: 0;
     letter-spacing: 0.04em;
 }
 
 .ws4k-spc-bar-track {
     flex: 1;
-    height: 54px;
+    height: 76px;
     background: var(--bg-card2);
     border-radius: 6px;
     overflow: hidden;
@@ -2654,46 +2735,53 @@ body.kiosk-mode #music-controls {
     border: 1px solid var(--border);
 }
 
-/* Subtle scale gradient visible in empty part of track — populated via JS */
+/* No gradient overlay — removed to keep chart clean */
 .ws4k-spc-bar-track::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--spc-track-grad, transparent);
-    pointer-events: none;
+    display: none;
 }
 
 .ws4k-spc-bar {
     height: 100%;
-    min-width: 6px;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    padding: 0 14px;
+    justify-content: center;
+    padding: 0 16px;
     position: relative;
     z-index: 1;
     border-radius: 6px;
     transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ws4k-spc-bar-text {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: rgba(0, 0, 0, 0.85);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
+/* Active risk bar: colored fill */
+.ws4k-spc-bar-active {
+    /* width set inline; background set inline */
 }
 
-/* No-risk placeholder */
-.ws4k-spc-norisk {
+/* No-risk bar: full-width muted fill with centered label */
+.ws4k-spc-bar-norisk {
+    width: 100% !important;
+    background: rgba(80, 87, 100, 0.35) !important;
+    border: 1px solid rgba(120, 130, 150, 0.2);
+}
+
+.ws4k-spc-bar-text {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: clamp(0.75rem, 1.5vw, 1rem);
+    font-weight: 800;
+    color: rgba(0, 0, 0, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    text-shadow: none;
+}
+
+.ws4k-spc-norisk-text {
+    font-family: var(--font-mono);
+    font-size: clamp(0.75rem, 1.5vw, 1rem);
+    font-weight: 700;
     color: var(--text-secondary);
-    padding-left: 14px;
-    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
 }
 
 /* ════════════════════════════════════════════════════════════════

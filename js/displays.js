@@ -330,10 +330,12 @@ const Displays = (() => {
             keyboard: false,
         });
 
-        // CartoDB Dark Matter — dark grey map that matches the app theme
+        // CartoDB Dark Matter — dark grey map that matches the app theme.
+        // Note: plain {z}/{x}/{y}.png — no {r} retina placeholder since
+        // L.tileLayer does not resolve {r} automatically and it causes 404s.
         L.tileLayer(
-            'https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png',
-            { maxZoom: 10, subdomains: 'abcd' }
+            'https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}.png',
+            { maxZoom: 10, subdomains: 'abcd', crossOrigin: 'anonymous' }
         ).addTo(map);
 
         return map;
@@ -423,15 +425,20 @@ const Displays = (() => {
         );
 
         const footer = el('regional-fcst-footer');
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const dayName = tomorrow.toLocaleDateString('en-US', { weekday: 'long' });
+
+        // Update the map overlay title with the forecast day
+        const mapTitle = el('regional-fcst-map-title');
+        if (mapTitle) mapTitle.textContent = `Forecast for ${dayName}`;
+
         if (footer && data.conditions) {
             const c = data.conditions;
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const dayName = tomorrow.toLocaleDateString('en-US', { weekday: 'long' });
             const extra = c.windChill !== '--'
                 ? `Wind Chill: ${c.windChill}`
                 : c.heatIndex !== '--' ? `Heat Index: ${c.heatIndex}` : '';
-            footer.textContent = `Forecast for ${dayName}   \u2022   Temp: ${c.temp}   \u2022   ${extra}`.replace(/\s*\u2022\s*$/, '').trim();
+            footer.textContent = `${dayName}   \u2022   Temp: ${c.temp}   \u2022   ${extra}`.replace(/\s*\u2022\s*$/, '').trim();
         }
     }
 
@@ -450,66 +457,60 @@ const Displays = (() => {
             return;
         }
 
-        // Risk-level metadata — order matters (ascending severity).
-        // The pct values drive BOTH the bar widths AND the CSS gradient stops
-        // on .ws4k-spc-bar-track::after (set via custom properties below).
+        // Risk-level metadata — ascending severity order
         const RISK = [
-            { key: null,   pct: 0,   label: 'No Thunderstorm Risk', color: 'transparent' },
-            { key: 'TSTM', pct: 14,  label: 'T-Storm',              color: '#607d8b' },
-            { key: 'MRGL', pct: 28,  label: 'Marginal',             color: '#4caf50' },
-            { key: 'SLGT', pct: 46,  label: 'Slight',               color: '#cddc39' },
-            { key: 'ENH',  pct: 62,  label: 'Enhanced',             color: '#ff9800' },
-            { key: 'MDT',  pct: 78,  label: 'Moderate',             color: '#f44336' },
-            { key: 'HIGH', pct: 100, label: 'High',                 color: '#e91e63' },
+            { key: null,   pct: 0,   label: 'No Risk',   color: null },
+            { key: 'TSTM', pct: 14,  label: 'T-Storm',   color: '#607d8b' },
+            { key: 'MRGL', pct: 28,  label: 'Marginal',  color: '#4caf50' },
+            { key: 'SLGT', pct: 46,  label: 'Slight',    color: '#cddc39' },
+            { key: 'ENH',  pct: 62,  label: 'Enhanced',  color: '#ff9800' },
+            { key: 'MDT',  pct: 78,  label: 'Moderate',  color: '#f44336' },
+            { key: 'HIGH', pct: 100, label: 'High',      color: '#e91e63' },
         ];
 
-        // Sync the ::after gradient stops with the RISK pct values so there
-        // is a single source of truth — no magic numbers duplicated in CSS.
-        const gradStops = RISK.slice(1).map((r, i) => {
-            const prev = RISK[i]; // previous entry (starts at index 0 = null)
-            const col = r.color;
-            return `rgba(${hexToRgb(col)},0.12) ${prev.pct}%, rgba(${hexToRgb(col)},0.12) ${r.pct}%`;
-        }).join(', ');
-        container.style.setProperty('--spc-track-grad', `linear-gradient(to right, ${gradStops})`);
-
-        // Build scale legend bands (skip "no risk")
+        // Scale legend bands (skip the null/no-risk entry)
         const scaleBands = RISK.slice(1).map(r =>
-            `<div class="ws4k-spc-band" style="background:${r.color}">${r.label.split(' ')[0]}</div>`
+            `<div class="ws4k-spc-band" style="background:${r.color}">${r.label}</div>`
         ).join('');
 
-        // Build day rows — store target width in data-w so the animation
-        // can safely zero-out inline style first and then restore.
+        // Build day rows
         const dayRows = spc.days.map(day => {
             const meta = RISK.find(r => r.key === day.risk) || RISK[0];
-            const targetPct = meta.pct;
-            const barContent = targetPct > 0
-                ? `<span class="ws4k-spc-bar-text">${esc(day.riskLabel)}</span>`
-                : '';
-            const noRiskLabel = targetPct === 0
-                ? `<div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 14px"><span class="ws4k-spc-norisk">No Risk</span></div>`
-                : '';
+            const isNoRisk = meta.pct === 0;
+
+            const barHtml = isNoRisk
+                ? `<div class="ws4k-spc-bar ws4k-spc-bar-norisk">
+                     <span class="ws4k-spc-norisk-text">No Thunderstorm Risk</span>
+                   </div>`
+                : `<div class="ws4k-spc-bar ws4k-spc-bar-active" data-w="${meta.pct}"
+                        style="width:0%;background:${meta.color}">
+                     <span class="ws4k-spc-bar-text">${esc(day.riskLabel || meta.label)}</span>
+                   </div>`;
 
             return `
               <div class="ws4k-spc-day-row">
                 <span class="ws4k-spc-day-name">${esc(day.dayName)}</span>
-                <div class="ws4k-spc-bar-track">
-                  <div class="ws4k-spc-bar" data-w="${targetPct}" style="width:0%;background:${meta.color}">${barContent}</div>
-                  ${noRiskLabel}
-                </div>
+                <div class="ws4k-spc-bar-track">${barHtml}</div>
               </div>`;
         }).join('');
 
         container.innerHTML = `
-          <div class="ws4k-spc-scale">${scaleBands}</div>
+          <div class="ws4k-spc-heading">
+            <span class="ws4k-spc-heading-title">SPC Outlook</span>
+            <span class="ws4k-spc-heading-sub">Convective Forecast</span>
+          </div>
+          <div class="ws4k-spc-scale-wrapper">
+            <div class="ws4k-spc-scale-spacer"></div>
+            <div class="ws4k-spc-scale">${scaleBands}</div>
+          </div>
           <div class="ws4k-spc-days">${dayRows}</div>`;
 
-        // Animate bars: they start at width:0% (set in innerHTML above).
-        // After the browser has painted the initial 0% state, expand to target.
+        // Animate active bars: start at 0% → expand to target after paint
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                container.querySelectorAll('.ws4k-spc-bar').forEach(b => {
-                    const targetW = b.dataset.w;
-                    if (targetW) b.style.width = `${targetW}%`;
+                container.querySelectorAll('.ws4k-spc-bar-active').forEach(b => {
+                    const w = b.dataset.w;
+                    if (w) b.style.width = `${w}%`;
                 });
             });
         });
