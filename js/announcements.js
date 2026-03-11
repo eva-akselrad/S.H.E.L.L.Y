@@ -1,5 +1,6 @@
 /* ════════════════════════════════════════════════════════════════
    announcements.js – Polls /api/messages and shows banners/popups
+   Also polls /api/armageddon for system-wide override state
    ════════════════════════════════════════════════════════════════ */
 
 const Announcements = (() => {
@@ -7,6 +8,7 @@ const Announcements = (() => {
     let lastId = 0;
     let pollTimer = null;
     const POLL_MS = 5000;
+    let armageddonActive = false;
 
     // ── TTS helper ────────────────────────────────────────────────
     function speakMessage(msg) {
@@ -224,12 +226,57 @@ const Announcements = (() => {
         } catch { /* ok */ }
     }
 
+    // ── Armageddon mode (system-wide override) ────────────────────
+    async function pollArmageddon() {
+        try {
+            const resp = await fetch('/api/armageddon', { cache: 'no-store' });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.active && !armageddonActive) {
+                showArmageddonOverlay(data);
+                armageddonActive = true;
+            } else if (!data.active && armageddonActive) {
+                removeArmageddonOverlay();
+                armageddonActive = false;
+            }
+        } catch { /* ok */ }
+    }
+
+    function showArmageddonOverlay(data) {
+        removeArmageddonOverlay(); // ensure no duplicate
+        const overlay = document.createElement('div');
+        overlay.id = 'armageddon-overlay';
+        overlay.className = 'armageddon-overlay';
+
+        let parsedBody = escHtml(data.text);
+        if (typeof marked !== 'undefined') {
+            parsedBody = marked.parse(data.text, { breaks: true });
+        }
+
+        overlay.innerHTML = `
+            <div class="armageddon-inner">
+                <div class="armageddon-icon">☢️</div>
+                ${data.title ? `<div class="armageddon-title">${escHtml(data.title)}</div>` : ''}
+                <div class="armageddon-body markdown-body">${parsedBody}</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('armageddon-visible'));
+    }
+
+    function removeArmageddonOverlay() {
+        const overlay = document.getElementById('armageddon-overlay');
+        if (overlay) overlay.remove();
+    }
+
     // ── Init ──────────────────────────────────────────────────────
     function init() {
         // Don't poll if opened as a local file — admin API won't be there
         if (window.location.protocol === 'file:') return;
         poll();
+        pollArmageddon();
         pollTimer = setInterval(poll, POLL_MS);
+        setInterval(pollArmageddon, POLL_MS);
     }
 
     return { init };

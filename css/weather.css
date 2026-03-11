@@ -1122,6 +1122,78 @@ body {
     background: #f59e0b;
 }
 
+/* ── Armageddon Mode Overlay ──────────────────────────────────── */
+.armageddon-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 0, 0, 0.97);
+    padding: 32px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: all;
+    animation: armageddon-pulse-bg 2s ease-in-out infinite;
+}
+
+.armageddon-overlay.armageddon-visible {
+    opacity: 1;
+}
+
+@keyframes armageddon-pulse-bg {
+    0%, 100% { background: rgba(10, 0, 0, 0.97); }
+    50%       { background: rgba(40, 0, 0, 0.97); }
+}
+
+.armageddon-inner {
+    max-width: 720px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.armageddon-icon {
+    font-size: 4rem;
+    animation: armageddon-spin 4s linear infinite;
+    filter: drop-shadow(0 0 20px rgba(239, 68, 68, 0.8));
+}
+
+@keyframes armageddon-spin {
+    0%   { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.armageddon-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #ef4444;
+    text-shadow: 0 0 30px rgba(239, 68, 68, 0.7);
+    animation: armageddon-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes armageddon-glow {
+    from { text-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+    to   { text-shadow: 0 0 50px rgba(239, 68, 68, 1), 0 0 80px rgba(239, 68, 68, 0.4); }
+}
+
+.armageddon-body {
+    font-size: clamp(1rem, 2.5vw, 1.4rem);
+    line-height: 1.7;
+    color: #fca5a5;
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: center;
+}
+
 /* ── Slide Viewport ───────────────────────────────────────────── */
 .slide-viewport {
     flex: 1;

@@ -105,6 +105,10 @@ let releaseNoteId = 1;
 let customForecasts = [];  // array of { id, label, periods, targeting, updatedAt }
 let customForecastId = 1;
 
+// Armageddon mode – when set, overrides the entire display with a single message
+// Shape: { title, text, type } or null when inactive
+let armageddonState = null;
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
 
 // ── Rate limiter (admin routes) ────────────────────────────────
@@ -120,6 +124,10 @@ app.use('/api/announce', adminLimiter);
 app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
+app.use('/api/armageddon', (req, res, next) => {
+    if (req.method === 'GET') return next();
+    return adminLimiter(req, res, next);
+});
 app.use('/api/custom-forecast', (req, res, next) => {
     if (req.method === 'GET') {
         return next();
@@ -200,12 +208,35 @@ app.delete('/api/messages', (req, res) => {
     res.json({ ok: true });
 });
 
+// ── GET /api/armageddon ────────────────────────────────────────
+// Public – display clients poll this to check override state
+app.get('/api/armageddon', (req, res) => {
+    res.json(armageddonState ? { active: true, ...armageddonState } : { active: false });
+});
+
+// ── POST /api/armageddon ───────────────────────────────────────
+// Body: { title, text, type }
+app.post('/api/armageddon', (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const { title = '', text, type = 'emergency' } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+    armageddonState = { title: title.trim(), text: text.trim(), type };
+    console.log('[Admin] Armageddon mode ACTIVATED');
+    res.json({ ok: true, ...armageddonState });
+});
+
+// ── DELETE /api/armageddon ─────────────────────────────────────
+app.delete('/api/armageddon', (req, res) => {
+    if (!checkAuth(req, res)) return;
+    armageddonState = null;
+    console.log('[Admin] Armageddon mode deactivated');
+    res.json({ ok: true });
+});
+
 // ── GET /api/push/vapid-key ─────────────────────────────────────
 app.get('/api/push/vapid-key', (_, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
-
-// ── GET /api/push/count (admin) ────────────────────────────────
 app.get('/api/push/count', (req, res) => {
     if (!checkAuth(req, res)) return;
     res.json({ count: pushSubscriptions.length });

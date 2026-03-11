@@ -870,6 +870,38 @@
             </div>
         </div>
 
+        <!-- Armageddon Mode -->
+        <div class="card" id="armageddon-card" style="border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.05)">
+            <div class="card-title" style="color:#f87171">☢️ Armageddon Mode</div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                Overrides the entire display with a full-screen message that <strong style="color:#f87171">cannot be dismissed by viewers</strong>.
+                Only the admin can deactivate it. Use for critical emergencies only.
+            </p>
+            <div id="armageddon-status-bar" style="display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:#fca5a5">
+                <span style="font-size:1.3em">🔴</span>
+                <strong>ACTIVE:</strong>
+                <span id="armageddon-active-text" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            </div>
+            <div class="field-group">
+                <label>Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                <input type="text" id="arm-title" placeholder="e.g. SYSTEM OVERRIDE" maxlength="80" />
+            </div>
+            <div class="field-group">
+                <label>Message</label>
+                <textarea id="arm-text" rows="3" placeholder="Enter the override message to display on all screens…"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+                <button class="send-btn" id="arm-activate-btn"
+                    style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b)">
+                    ☢️ ACTIVATE ARMAGEDDON MODE
+                </button>
+                <button class="clear-all-btn" id="arm-deactivate-btn" style="flex:none;display:none">
+                    ✕ Deactivate
+                </button>
+            </div>
+            <div id="arm-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+        </div>
+
         <!-- Release Notes -->
         <div class="card">
             <div class="card-title">📝 Release Notes</div>
@@ -1101,6 +1133,10 @@
                 document.getElementById('push-test-btn').addEventListener('click', sendTestPush);
                 document.getElementById('push-clear-btn').addEventListener('click', clearPushSubs);
 
+                // Armageddon mode
+                document.getElementById('arm-activate-btn').addEventListener('click', activateArmageddon);
+                document.getElementById('arm-deactivate-btn').addEventListener('click', deactivateArmageddon);
+
                 // Release Notes
                 document.getElementById('rn-post-btn').addEventListener('click', postReleaseNote);
                 document.getElementById('rn-clear-all-btn').addEventListener('click', clearAllReleaseNotes);
@@ -1123,7 +1159,8 @@
                 loadPushCount();
                 loadReleaseNotes();
                 loadCustomForecast();
-                pollTimer = setInterval(() => { loadMessages(); loadPushCount(); }, 5000);
+                loadArmageddonState();
+                pollTimer = setInterval(() => { loadMessages(); loadPushCount(); loadArmageddonState(); }, 5000);
                 setInterval(checkHealth, 15000);
             }
 
@@ -1266,6 +1303,81 @@
                 fb.style.color = 'var(--muted)';
                 fb.textContent = 'Use the KV dashboard or redeploy to clear subscriptions manually.';
                 setTimeout(() => fb.textContent = '', 6000);
+            }
+
+            // ── Armageddon Mode ─────────────────────────────────────────
+            async function loadArmageddonState() {
+                try {
+                    const r = await fetch(`${API}/armageddon`, { headers: { 'x-admin-password': adminPassword } });
+                    const data = await r.json();
+                    renderArmageddonState(data);
+                } catch { /* ignore */ }
+            }
+
+            function renderArmageddonState(data) {
+                const statusBar = document.getElementById('armageddon-status-bar');
+                const activeText = document.getElementById('armageddon-active-text');
+                const activateBtn = document.getElementById('arm-activate-btn');
+                const deactivateBtn = document.getElementById('arm-deactivate-btn');
+                const card = document.getElementById('armageddon-card');
+
+                if (data.active) {
+                    statusBar.style.display = 'flex';
+                    activeText.textContent = (data.title ? `${data.title}: ` : '') + data.text;
+                    activateBtn.style.display = 'none';
+                    deactivateBtn.style.display = '';
+                    card.style.background = 'rgba(239,68,68,0.12)';
+                    card.style.borderColor = 'rgba(239,68,68,0.7)';
+                } else {
+                    statusBar.style.display = 'none';
+                    activateBtn.style.display = '';
+                    deactivateBtn.style.display = 'none';
+                    card.style.background = 'rgba(239,68,68,0.05)';
+                    card.style.borderColor = 'rgba(239,68,68,0.4)';
+                }
+            }
+
+            async function activateArmageddon() {
+                const text = document.getElementById('arm-text').value.trim();
+                if (!text) { armFeedback('⚠ Please enter a message.', '#f59e0b'); return; }
+                const btn = document.getElementById('arm-activate-btn');
+                btn.disabled = true;
+                try {
+                    const r = await fetch(`${API}/armageddon`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        body: JSON.stringify({
+                            title: document.getElementById('arm-title').value.trim(),
+                            text,
+                            type: 'emergency'
+                        })
+                    });
+                    if (!r.ok) throw new Error();
+                    armFeedback('☢️ Armageddon mode ACTIVE!', '#ef4444');
+                    loadArmageddonState();
+                } catch {
+                    armFeedback('⚠ Failed to activate.', '#ef4444');
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function deactivateArmageddon() {
+                if (!confirm('Deactivate Armageddon mode? The display will return to normal.')) return;
+                try {
+                    await fetch(`${API}/armageddon`, { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
+                    armFeedback('✓ Armageddon mode deactivated.', '#22c55e');
+                    loadArmageddonState();
+                } catch {
+                    armFeedback('⚠ Failed to deactivate.', '#ef4444');
+                }
+            }
+
+            function armFeedback(msg, color) {
+                const fb = document.getElementById('arm-feedback');
+                fb.style.color = color;
+                fb.textContent = msg;
+                setTimeout(() => { fb.textContent = ''; }, 6000);
             }
 
             // ── Release Notes ──────────────────────────────────────────
