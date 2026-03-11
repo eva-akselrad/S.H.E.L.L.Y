@@ -32,9 +32,9 @@ const RadarMap = (() => {
   const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
   // Tile URL template filled in per-frame from the API response
   // path = e.g. "/v2/radar/1699999800"
-  // color 2 = classic colorized, smooth+snow flags = 1_1
+  // color 6 = RAINBOW @ SELEX-SI (primarily green for light/moderate precip), smooth+snow flags = 1_1
   const RV_TILE = (path) =>
-    `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/2/1_1.png`;
+    `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/6/1_1.png`;
 
   // ── Fetch available radar frames from RainViewer ───────────────
   async function fetchRainViewerFrames() {
@@ -218,9 +218,9 @@ const RadarMap = (() => {
     const icon = L.divIcon({
       html: `<div style="
                 width:12px;height:12px;
-                background:var(--accent,#3b82f6);
+                background:#22c55e;
                 border:3px solid #fff;border-radius:50%;
-                box-shadow:0 0 10px rgba(59,130,246,.9);
+                box-shadow:0 0 10px rgba(34,197,94,.9);
             "></div>`,
       className: "",
       iconSize: [12, 12],

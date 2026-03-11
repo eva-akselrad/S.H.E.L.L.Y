@@ -842,6 +842,9 @@ body {
     z-index: 9;
     position: relative;
     flex-shrink: 0;
+    height: 2.5rem;
+    max-height: 2.5rem;
+    overflow: hidden;
     animation: alert-pulse 1.5s infinite;
 }
 
@@ -873,6 +876,9 @@ body {
 .admin-announce-banner {
     display: flex;
     align-items: center;
+    height: 2.5rem;
+    max-height: 2.5rem;
+    overflow: hidden;
     gap: 12px;
     padding: 8px 16px;
     z-index: 9;
@@ -1007,6 +1013,7 @@ body {
 .announce-popup-inner {
     max-width: 560px;
     width: 100%;
+    max-height: 85vh;
     border-radius: 16px;
     border: 1px solid;
     padding: 32px;
@@ -1014,6 +1021,8 @@ body {
     transform: scale(0.9) translateY(30px);
     transition: opacity 0.35s ease, transform 0.35s ease;
     box-shadow: 0 30px 100px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
 }
 
 .announce-popup.popup-visible .announce-popup-inner {
@@ -1095,6 +1104,26 @@ body {
     line-height: 1.65;
     color: var(--text-primary);
     opacity: 0.9;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 4px;
+    /* Scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.announce-popup-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.announce-popup-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.announce-popup-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
 }
 
 /* Auto-dismiss timer bar */
@@ -1120,6 +1149,100 @@ body {
 
 .announce-popup-warning .announce-popup-timer-bar {
     background: #f59e0b;
+}
+
+/* ── Armageddon Mode Overlay ──────────────────────────────────── */
+.armageddon-overlay {
+    --arm-color: #ef4444;
+    --arm-bg:    rgba(10, 0, 0, 0.97);
+    --arm-bg2:   rgba(40, 0, 0, 0.97);
+    --arm-glow:  rgba(239, 68, 68, 0.8);
+
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--arm-bg);
+    padding: 32px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: all;
+    overflow: hidden;
+}
+
+/* Pulsing brightness effect — works with any background colour */
+.armageddon-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.04);
+    animation: armageddon-flash 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.armageddon-overlay.armageddon-visible {
+    opacity: 1;
+}
+
+@keyframes armageddon-flash {
+    0%, 100% { opacity: 0; }
+    50%       { opacity: 1; }
+}
+
+.armageddon-inner {
+    max-width: 720px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    position: relative; /* above ::before pseudo-element */
+}
+
+.armageddon-icon {
+    font-size: 4rem;
+    animation: armageddon-spin 4s linear infinite;
+    filter: drop-shadow(0 0 20px var(--arm-glow));
+}
+
+@keyframes armageddon-spin {
+    0%   { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.armageddon-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.8rem);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--arm-color);
+    animation: armageddon-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes armageddon-glow {
+    from { text-shadow: 0 0 20px var(--arm-glow); }
+    to   { text-shadow: 0 0 50px var(--arm-glow), 0 0 80px var(--arm-glow); }
+}
+
+.armageddon-body {
+    font-size: clamp(1rem, 2.5vw, 1.4rem);
+    line-height: 1.7;
+    color: #fca5a5;
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: center;
+}
+
+.armageddon-countdown {
+    font-size: clamp(0.75rem, 1.8vw, 1rem);
+    color: var(--arm-color);
+    opacity: 0.7;
+    letter-spacing: 0.04em;
 }
 
 /* ── Slide Viewport ───────────────────────────────────────────── */
@@ -2272,26 +2395,75 @@ body.kiosk-mode #pwa-guide-modal {
 }
 
 /* ── Detailed Observations (dense grid) ───────────────────────── */
+/* ── Detailed Observations (section-grouped grid) ─────────────── */
 .obs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     height: calc(100% - 80px);
     overflow-y: auto;
-    align-content: start;
+    padding-right: 4px;
+}
+
+.obs-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.obs-section-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.obs-section-conditions .obs-section-header {
+    color: #93c5fd;
+    border-color: #3b82f6;
+}
+
+.obs-section-wind .obs-section-header {
+    color: #a5f3c1;
+    border-color: #22c55e;
+}
+
+.obs-section-precip .obs-section-header {
+    color: #7dd3fc;
+    border-color: #0ea5e9;
+}
+
+.obs-section-almanac .obs-section-header {
+    color: #fde68a;
+    border-color: #f59e0b;
+}
+
+.obs-section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
 }
 
 .obs-card {
     background: var(--grad-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 14px 16px;
+    padding: 10px 14px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    transition: border-color 0.2s, transform 0.2s, background 0.2s;
+    gap: 10px;
+    transition: border-color 0.2s, transform 0.15s, background 0.2s;
     animation: fadeSlideIn 0.35s ease both;
 }
+
+.obs-section-conditions .obs-card { border-left: 2px solid rgba(59, 130, 246, 0.4); }
+.obs-section-wind .obs-card       { border-left: 2px solid rgba(34, 197, 94, 0.4); }
+.obs-section-precip .obs-card     { border-left: 2px solid rgba(14, 165, 233, 0.4); }
+.obs-section-almanac .obs-card    { border-left: 2px solid rgba(245, 158, 11, 0.4); }
 
 .obs-card:hover {
     border-color: var(--accent);
@@ -2300,19 +2472,26 @@ body.kiosk-mode #pwa-guide-modal {
 }
 
 .obs-icon {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     flex-shrink: 0;
     line-height: 1;
-    filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.3));
+    filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.3));
+}
+
+.obs-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 
 .obs-label {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    flex: 1;
     line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
@@ -2321,47 +2500,12 @@ body.kiosk-mode #pwa-guide-modal {
 
 .obs-value {
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-accent);
-    text-align: right;
     white-space: nowrap;
-}
-
-.obs-card:nth-child(1) {
-    animation-delay: 0.02s;
-}
-
-.obs-card:nth-child(2) {
-    animation-delay: 0.04s;
-}
-
-.obs-card:nth-child(3) {
-    animation-delay: 0.06s;
-}
-
-.obs-card:nth-child(4) {
-    animation-delay: 0.08s;
-}
-
-.obs-card:nth-child(5) {
-    animation-delay: 0.10s;
-}
-
-.obs-card:nth-child(6) {
-    animation-delay: 0.12s;
-}
-
-.obs-card:nth-child(7) {
-    animation-delay: 0.14s;
-}
-
-.obs-card:nth-child(8) {
-    animation-delay: 0.16s;
-}
-
-.obs-card:nth-child(n+9) {
-    animation-delay: 0.18s;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ── Precipitation Chart ──────────────────────────────────────── */
@@ -2943,8 +3087,8 @@ body.kiosk-mode #pwa-guide-modal {
         grid-template-columns: 1fr;
     }
 
-    /* Observations: 2-col on medium mobile */
-    .obs-grid {
+    /* Observations: keep auto-fill grid, just tighter on medium mobile */
+    .obs-section-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
@@ -3071,13 +3215,13 @@ body.kiosk-mode #pwa-guide-modal {
     }
 
     /* On very small screens, single-column observations for max readability */
-    .obs-grid {
+    .obs-section-grid {
         grid-template-columns: 1fr;
     }
 
     /* Make obs cards more compact in single-column layout */
     .obs-card {
-        padding: 10px 12px;
+        padding: 8px 12px;
     }
 
     .obs-icon {

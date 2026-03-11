@@ -25,6 +25,7 @@ const KV_MESSAGES_KEY = 'messages';
 const KV_SUBSCRIPTIONS_KEY = 'push_subscriptions';
 const KV_RELEASE_NOTES_KEY = 'release_notes';
 const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
+const KV_ARMAGEDDON_KEY = 'armageddon';
 
 // ── Helpers ────────────────────────────────────────────────────────
 async function getMessages(env) {
@@ -55,6 +56,17 @@ async function getCustomForecasts(env) {
 }
 async function saveCustomForecasts(env, forecasts) {
     await env.WEATHERNOW_KV.put(KV_CUSTOM_FORECAST_KEY, JSON.stringify(forecasts));
+}
+
+async function getArmageddonState(env) {
+    return (await env.WEATHERNOW_KV.get(KV_ARMAGEDDON_KEY, 'json')) ?? null;
+}
+async function saveArmageddonState(env, state) {
+    if (state === null) {
+        await env.WEATHERNOW_KV.delete(KV_ARMAGEDDON_KEY);
+    } else {
+        await env.WEATHERNOW_KV.put(KV_ARMAGEDDON_KEY, JSON.stringify(state));
+    }
 }
 
 function checkAuth(request, env) {
@@ -166,6 +178,21 @@ export async function onRequest({ request, env }) {
         const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
         const msgs = await getMessages(env);
         return json(msgs.filter(m => m.id > since));
+    }
+
+    // ── Poll (combined messages + armageddon in one request) ────
+    if (path === '/api/poll' && method === 'GET') {
+        const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
+        const [msgs, armageddon] = await Promise.all([getMessages(env), getArmageddonState(env)]);
+        let armState = armageddon;
+        if (armState?.expiresAt && Date.now() > armState.expiresAt) {
+            await saveArmageddonState(env, null);
+            armState = null;
+        }
+        return json({
+            messages: msgs.filter(m => m.id > since),
+            armageddon: armState ? { active: true, ...armState } : { active: false },
+        });
     }
 
     if (path === '/api/verify' && method === 'GET') {
@@ -326,6 +353,39 @@ export async function onRequest({ request, env }) {
     if (path === '/api/custom-forecast' && method === 'DELETE') {
         if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await saveCustomForecasts(env, []);
+        return json({ ok: true });
+    }
+
+    // ── Armageddon ───────────────────────────────────────────────
+    // GET is public; POST/DELETE require auth.
+    if (path === '/api/armageddon' && method === 'GET') {
+        let state = await getArmageddonState(env);
+        if (state?.expiresAt && Date.now() > state.expiresAt) {
+            await saveArmageddonState(env, null);
+            state = null;
+        }
+        return json(state ? { active: true, ...state } : { active: false });
+    }
+
+    if (path === '/api/armageddon' && method === 'POST') {
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        let body;
+        try { body = await request.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }
+        const { title = '', text, type = 'emergency', duration = 0 } = body;
+        if (!text?.trim()) return json({ error: 'text is required' }, 400);
+        const durationMs = Math.max(0, parseInt(duration) || 0) * 60 * 1000;
+        const state = {
+            title: title.trim(), text: text.trim(), type,
+            activatedAt: Date.now(),
+            expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
+        };
+        await saveArmageddonState(env, state);
+        return json({ ok: true, ...state });
+    }
+
+    if (path === '/api/armageddon' && method === 'DELETE') {
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        await saveArmageddonState(env, null);
         return json({ ok: true });
     }
 
