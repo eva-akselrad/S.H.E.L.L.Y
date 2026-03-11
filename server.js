@@ -315,9 +315,10 @@ app.get('/api/custom-forecast', (_, res) => {
 // Add a new forecast (or replace one with same label if label provided)
 app.post('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { periods = [], targeting = { mode: 'all' }, label = '' } = req.body;
+    const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = req.body;
+    const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
     if (!periods.length) return res.status(400).json({ error: 'periods required' });
-    // If a label is given and a forecast with that label already exists, replace it
+    // If a non-empty label is given and a forecast with that label already exists, replace it
     const existing = label ? customForecasts.findIndex(c => c.label === label) : -1;
     const entry = { id: existing >= 0 ? customForecasts[existing].id : customForecastId++, label, periods, targeting, updatedAt: Date.now() };
     if (existing >= 0) {

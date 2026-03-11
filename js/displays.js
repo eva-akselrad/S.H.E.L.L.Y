@@ -277,7 +277,7 @@ const Displays = (() => {
         });
 
         const updatedEl = el('customforecast-updated');
-        if (updatedEl) {
+        if (updatedEl && all.length) {
             const latest = all.reduce((a, b) => ((a?.updatedAt ?? 0) > (b?.updatedAt ?? 0) ? a : b), all[0]);
             if (latest?.updatedAt) {
                 updatedEl.textContent = `Updated: ${new Date(latest.updatedAt).toLocaleString()}`;

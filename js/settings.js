@@ -100,7 +100,9 @@ const Settings = (() => {
         document.documentElement.requestFullscreen?.().catch(() => { });
         // Autoplay music if the option is enabled
         if (document.getElementById('kiosk-autoplay-music')?.checked) {
-            if (typeof MusicPlayer !== 'undefined') MusicPlayer.play();
+            if (typeof MusicPlayer !== 'undefined') {
+                try { MusicPlayer.play(); } catch { /* autoplay may be blocked by browser policy */ }
+            }
         }
     }
 
