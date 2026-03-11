@@ -25,6 +25,7 @@ const KV_MESSAGES_KEY = 'messages';
 const KV_SUBSCRIPTIONS_KEY = 'push_subscriptions';
 const KV_RELEASE_NOTES_KEY = 'release_notes';
 const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
+const KV_ARMAGEDDON_KEY = 'armageddon';
 
 // ── Helpers ────────────────────────────────────────────────────────
 async function getMessages(env) {
@@ -55,6 +56,17 @@ async function getCustomForecasts(env) {
 }
 async function saveCustomForecasts(env, forecasts) {
     await env.WEATHERNOW_KV.put(KV_CUSTOM_FORECAST_KEY, JSON.stringify(forecasts));
+}
+
+async function getArmageddonState(env) {
+    return (await env.WEATHERNOW_KV.get(KV_ARMAGEDDON_KEY, 'json')) ?? null;
+}
+async function saveArmageddonState(env, state) {
+    if (state === null) {
+        await env.WEATHERNOW_KV.delete(KV_ARMAGEDDON_KEY);
+    } else {
+        await env.WEATHERNOW_KV.put(KV_ARMAGEDDON_KEY, JSON.stringify(state));
+    }
 }
 
 function checkAuth(request, env) {
@@ -326,6 +338,30 @@ export async function onRequest({ request, env }) {
     if (path === '/api/custom-forecast' && method === 'DELETE') {
         if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await saveCustomForecasts(env, []);
+        return json({ ok: true });
+    }
+
+    // ── Armageddon ───────────────────────────────────────────────
+    // GET is public; POST/DELETE require auth.
+    if (path === '/api/armageddon' && method === 'GET') {
+        const state = await getArmageddonState(env);
+        return json(state ? { active: true, ...state } : { active: false });
+    }
+
+    if (path === '/api/armageddon' && method === 'POST') {
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        let body;
+        try { body = await request.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }
+        const { title = '', text, type = 'emergency' } = body;
+        if (!text?.trim()) return json({ error: 'text is required' }, 400);
+        const state = { title: title.trim(), text: text.trim(), type };
+        await saveArmageddonState(env, state);
+        return json({ ok: true, ...state });
+    }
+
+    if (path === '/api/armageddon' && method === 'DELETE') {
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        await saveArmageddonState(env, null);
         return json({ ok: true });
     }
 
