@@ -1308,7 +1308,7 @@
             // ── Armageddon Mode ─────────────────────────────────────────
             async function loadArmageddonState() {
                 try {
-                    const r = await fetch(`${API}/armageddon`, { headers: { 'x-admin-password': adminPassword } });
+                    const r = await fetch(`${API}/armageddon`);
                     const data = await r.json();
                     renderArmageddonState(data);
                 } catch { /* ignore */ }

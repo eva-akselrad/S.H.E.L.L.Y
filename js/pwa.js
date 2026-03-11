@@ -16,9 +16,10 @@
 
     // ── Cookie helpers (install prompt throttle) ─────────────────
     const PROMPT_COOKIE = 'pwa-prompt-dismissed';
+    const PROMPT_COOKIE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     function setPromptCookie() {
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
+        const expires = new Date(Date.now() + PROMPT_COOKIE_DURATION_MS).toUTCString();
         document.cookie = `${PROMPT_COOKIE}=1; expires=${expires}; path=/; SameSite=Lax`;
     }
 

@@ -209,8 +209,6 @@ const Announcements = (() => {
         if (bodyEl) {
             scrollTimer = setTimeout(() => {
                 if (bodyEl.scrollHeight > bodyEl.clientHeight) {
-                    const scrollDuration = (bodyEl.scrollHeight - bodyEl.clientHeight) * 30; // ~30 ms/px
-                    bodyEl.style.scrollBehavior = 'smooth';
                     const step = () => {
                         if (!overlay.isConnected) return;
                         bodyEl.scrollTop += 1;
