@@ -506,11 +506,11 @@
         });
     }
 
-    // ── Auto-refresh every 5 minutes ──────────────────────────────
+    // ── Auto-refresh every 10 minutes ─────────────────────────────
     function startAutoRefresh() {
         setInterval(() => {
             if (locationSet) fetchAndRender(false);
-        }, 5 * 60 * 1000);
+        }, 10 * 60 * 1000);
     }
 
     // ── Settings callbacks ─────────────────────────────────────────

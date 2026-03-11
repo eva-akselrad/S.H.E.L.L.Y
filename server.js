@@ -363,6 +363,9 @@ app.delete('/api/release-notes', adminLimiter, (req, res) => {
 // ── Custom Forecast ───────────────────────────────────────────
 // Returns array of all custom forecasts
 app.get('/api/custom-forecast', (_, res) => {
+    // Short public cache — display clients refresh every 10 min anyway.
+    // Use stale-while-revalidate so the browser reuses the cached response.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(customForecasts);
 });
 
@@ -403,6 +406,11 @@ app.delete('/api/custom-forecast', adminLimiter, (req, res) => {
 
 // ── GET /api/spc-outlook?day=1|2|3 ───────────────────────────
 // Proxies SPC categorical outlook GeoJSON to avoid browser CORS restrictions.
+// In-memory TTL cache (15 min) so repeated client refreshes don't hammer SPC.
+// The cache is permanently bounded to 3 entries (days 1, 2, 3) — no cleanup needed.
+const spcCache = {}; // { [day]: { data, expiresAt } }
+const SPC_TTL_MS = 15 * 60 * 1000;
+
 app.get('/api/spc-outlook', async (req, res) => {
     const day = req.query.day || '1';
     const validFiles = {
@@ -413,6 +421,13 @@ app.get('/api/spc-outlook', async (req, res) => {
     const file = validFiles[day];
     if (!file) return res.status(400).json({ error: 'Invalid day parameter. Use 1, 2, or 3.' });
 
+    // Serve from cache if fresh
+    const cached = spcCache[day];
+    if (cached && Date.now() < cached.expiresAt) {
+        res.setHeader('Cache-Control', 'public, max-age=900');
+        return res.json(cached.data);
+    }
+
     const url = `https://www.spc.noaa.gov/products/outlook/${file}`;
     try {
         const upstream = await fetch(url, {
@@ -420,13 +435,24 @@ app.get('/api/spc-outlook', async (req, res) => {
             signal: AbortSignal.timeout(10000),
         });
         if (!upstream.ok) {
+            // On upstream error, serve stale cache if available
+            if (cached) {
+                res.setHeader('Cache-Control', 'public, max-age=900');
+                return res.json(cached.data);
+            }
             return res.status(502).json({ error: `SPC returned ${upstream.status}` });
         }
         const data = await upstream.json();
-        res.setHeader('Cache-Control', 'public, max-age=900'); // 15-minute cache
+        spcCache[day] = { data, expiresAt: Date.now() + SPC_TTL_MS };
+        res.setHeader('Cache-Control', 'public, max-age=900');
         res.json(data);
     } catch (err) {
         console.error('[SPC] Proxy error:', err.message);
+        // Serve stale cache rather than returning an error
+        if (cached) {
+            res.setHeader('Cache-Control', 'public, max-age=900');
+            return res.json(cached.data);
+        }
         res.status(502).json({ error: 'Failed to fetch SPC outlook data' });
     }
 });
