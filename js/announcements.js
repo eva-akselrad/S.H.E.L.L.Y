@@ -9,6 +9,9 @@ const Announcements = (() => {
     const POLL_MS = 10000;   // 10 s — was two separate 5 s loops (24 req/min → 6 req/min)
     let armageddonActive = false;
     let armageddonVersion = null; // tracks activatedAt to detect updates while active
+    const shownMsgIds = new Set(); // message IDs already displayed — prevents re-showing on re-poll
+    let musicWasPlaying = false;  // tracks whether music was playing before ESTOP muted it
+    let estopTtsTimer = null;     // pending TTS timeout — cancelled if ESTOP is cleared early
 
     // ── TTS helper ────────────────────────────────────────────────
     function speakMessage(msg) {
@@ -160,8 +163,16 @@ const Announcements = (() => {
 
             // Handle new messages (filtered by location targeting)
             messages.forEach(msg => {
-                lastId = Math.max(lastId, msg.id);
+                // Already shown — just keep lastId current so it stays out of future polls
+                if (shownMsgIds.has(msg.id)) {
+                    lastId = Math.max(lastId, msg.id);
+                    return;
+                }
+                // Location check: skip WITHOUT advancing lastId so the message is re-evaluated
+                // on the next poll once the viewer's location has finished loading
                 if (!isMessageForMe(msg)) return;
+                lastId = Math.max(lastId, msg.id);
+                shownMsgIds.add(msg.id);
                 playAlertSound(msg.type);
                 show(msg);
                 speakMessage(msg);
@@ -350,7 +361,8 @@ const Announcements = (() => {
 
     function showArmageddonOverlay(data) {
         removeArmageddonOverlay(); // ensure no duplicate
-        // Stop music and play ESTOP alert sound
+        // Remember whether music was playing before stopping it
+        musicWasPlaying = typeof MusicPlayer !== 'undefined' && MusicPlayer.isPlaying;
         if (typeof MusicPlayer !== 'undefined') MusicPlayer.pause();
         playESTOPSound();
         const theme = ARM_THEME[data.type] || ARM_THEME.emergency;
@@ -395,12 +407,37 @@ const Announcements = (() => {
             };
             tick();
         }
+
+        // Speak the ESTOP message after the siren finishes (~3.2 s)
+        if ('speechSynthesis' in window && data.text) {
+            estopTtsTimer = setTimeout(() => {
+                estopTtsTimer = null;
+                window.speechSynthesis.cancel();
+                const utterText = (data.title ? `${data.title}. ` : 'Emergency Alert. ') + data.text;
+                const utt = new SpeechSynthesisUtterance(utterText);
+                utt.rate = 1.1;
+                utt.pitch = 1.1;
+                // Reuse saved voice preference if available
+                const voices = window.speechSynthesis.getVoices();
+                const saved = localStorage.getItem('ttsVoice');
+                if (saved) utt.voice = voices.find(v => v.name === saved) || null;
+                window.speechSynthesis.speak(utt);
+            }, 3200); // after siren finishes (~8 cycles × 0.36 s)
+        }
     }
 
     function removeArmageddonOverlay() {
         if (armCountdownRAF) { clearTimeout(armCountdownRAF); armCountdownRAF = null; }
+        // Cancel any pending or in-progress TTS from ESTOP
+        if (estopTtsTimer) { clearTimeout(estopTtsTimer); estopTtsTimer = null; }
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         const overlay = document.getElementById('armageddon-overlay');
         if (overlay) overlay.remove();
+        // Resume music only if it was playing when ESTOP was activated
+        if (musicWasPlaying && typeof MusicPlayer !== 'undefined') {
+            MusicPlayer.play();
+        }
+        musicWasPlaying = false;
     }
 
     // ── Init ──────────────────────────────────────────────────────

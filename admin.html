@@ -2002,7 +2002,8 @@
 
             function setTargetingMode(mode) {
                 fcTargetMode = mode;
-                document.querySelectorAll('.fc-target-tab').forEach(t => t.classList.toggle('active', t.dataset.tmode === mode));
+                // Only target forecast tabs ([data-tmode]); message tabs use [data-msgmode]
+                document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(t => t.classList.toggle('active', t.dataset.tmode === mode));
                 ['all', 'radius', 'zips', 'counties'].forEach(m => {
                     const el = document.getElementById(`fc-target-${m}`);
                     if (el) el.style.display = m === mode ? '' : 'none';
