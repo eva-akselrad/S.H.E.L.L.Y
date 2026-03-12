@@ -1099,6 +1099,41 @@ body {
     color: var(--text-primary);
 }
 
+/* Acknowledge button footer */
+.announce-popup-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16px;
+}
+
+.announce-popup-ack {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 8px 22px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.announce-popup-ack:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.announce-popup-ack:disabled {
+    cursor: default;
+    opacity: 0.75;
+}
+
+.announce-popup-ack.acked {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.5);
+    background: rgba(74, 222, 128, 0.1);
+}
+
 .announce-popup-body {
     font-size: 1rem;
     line-height: 1.65;
