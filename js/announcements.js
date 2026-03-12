@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   announcements.js – Polls /api/poll (combined messages + armageddon)
+   announcements.js – Polls /api/poll (combined messages + ESTOP state)
    ════════════════════════════════════════════════════════════════ */
 
 const Announcements = (() => {
@@ -9,6 +9,8 @@ const Announcements = (() => {
     const POLL_MS = 10000;   // 10 s — was two separate 5 s loops (24 req/min → 6 req/min)
     let armageddonActive = false;
     let armageddonVersion = null; // tracks activatedAt to detect updates while active
+    let musicWasPlaying = false;  // tracks whether music was playing before ESTOP muted it
+    let estopTtsTimer = null;     // pending TTS timeout — cancelled if ESTOP is cleared early
 
     // ── TTS helper ────────────────────────────────────────────────
     function speakMessage(msg) {
@@ -84,22 +86,94 @@ const Announcements = (() => {
     }
 
 
-    // ── Combined poll: messages + armageddon in one request ───────
+    // ── Location targeting helper (mirrors app.js isInForecastArea) ─
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 3958.8;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function isMessageForMe(msg) {
+        const t = msg.targeting;
+        if (!t || t.mode === 'all') return true;
+        if (typeof WeatherAPI === 'undefined') return true;
+        const loc = WeatherAPI.getLocation();
+        if (!loc?.lat) return true; // no location known → show by default
+
+        if (t.mode === 'radius') {
+            const c = t.center;
+            const r = parseFloat(t.radiusMiles);
+            if (!c?.lat || !c?.lon || !r) return true;
+            return haversineDistance(loc.lat, loc.lon, c.lat, c.lon) <= r;
+        }
+        if (t.mode === 'zips') {
+            const zips = (t.zips || []).map(z => String(z).trim()).filter(Boolean);
+            if (!zips.length) return true;
+            const details = WeatherAPI.getLocationDetails?.();
+            if (!details?.zip) return true;
+            return zips.includes(String(details.zip).trim());
+        }
+        if (t.mode === 'counties') {
+            const counties = (t.counties || []).map(c => c.trim().toLowerCase()).filter(Boolean);
+            if (!counties.length) return true;
+            const details = WeatherAPI.getLocationDetails?.();
+            if (!details?.county) return true;
+            const viewerCounty = details.county.toLowerCase();
+            return counties.some(c => viewerCounty.includes(c) || c.includes(viewerCounty));
+        }
+        return true;
+    }
+
+    // ── ESTOP alert sound (EAS-style dual-tone siren) ─────────────
+    function playESTOPSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const pulseMs = 0.18;
+            const freqA = 853, freqB = 960;
+            const numCycles = 8; // ~3 s of alternating dual-tone pulses
+            // Alternating dual-tone pulses mimicking EAS attention signal
+            for (let i = 0; i < numCycles; i++) {
+                [freqA, freqB].forEach((freq, fi) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'square';
+                    osc.frequency.value = freq;
+                    const s = ctx.currentTime + i * pulseMs * 2 + fi * pulseMs;
+                    gain.gain.setValueAtTime(0, s);
+                    gain.gain.linearRampToValueAtTime(0.3, s + 0.01);
+                    gain.gain.setValueAtTime(0.3, s + pulseMs - 0.01);
+                    gain.gain.linearRampToValueAtTime(0, s + pulseMs);
+                    osc.start(s); osc.stop(s + pulseMs + 0.02);
+                });
+            }
+        } catch { /* AudioContext not supported */ }
+    }
+
+    // ── Combined poll: messages + ESTOP state in one request ──────
     async function pollAll() {
         try {
             const resp = await fetch(`/api/poll?since=${lastId}`, { cache: 'no-store' });
             if (!resp.ok) return;
             const { messages, armageddon } = await resp.json();
 
-            // Handle new messages
+            // Handle new messages (filtered by location targeting)
             messages.forEach(msg => {
+                // lastId only advances for messages that are actually shown.
+                // Location-filtered messages (isMessageForMe → false) are skipped without
+                // advancing lastId so they're re-evaluated on future polls as location loads.
+                // mode:'all' and unknown-location always return true from isMessageForMe.
+                if (!isMessageForMe(msg)) return;
                 lastId = Math.max(lastId, msg.id);
                 playAlertSound(msg.type);
                 show(msg);
                 speakMessage(msg);
             });
 
-            // Handle armageddon state changes
+            // Handle ESTOP state changes
             if (armageddon.active) {
                 const ver = armageddon.activatedAt;
                 if (!armageddonActive || ver !== armageddonVersion) {
@@ -264,7 +338,7 @@ const Announcements = (() => {
         } catch { /* ok */ }
     }
 
-    // ── Armageddon overlay (type-themed) ──────────────────────────
+    // ── ESTOP overlay (type-themed) ───────────────────────────────
     const ARM_THEME = {
         tornado:      { icon: '🌪️', color: '#ef4444', bg: 'rgba(10,0,0,0.97)',  bg2: 'rgba(40,0,0,0.97)',   glow: 'rgba(239,68,68,0.8)' },
         hurricane:    { icon: '🌀', color: '#a855f7', bg: 'rgba(5,0,15,0.97)',   bg2: 'rgba(20,0,40,0.97)',  glow: 'rgba(168,85,247,0.8)' },
@@ -282,6 +356,10 @@ const Announcements = (() => {
 
     function showArmageddonOverlay(data) {
         removeArmageddonOverlay(); // ensure no duplicate
+        // Remember whether music was playing before stopping it
+        musicWasPlaying = typeof MusicPlayer !== 'undefined' && MusicPlayer.isPlaying;
+        if (typeof MusicPlayer !== 'undefined') MusicPlayer.pause();
+        playESTOPSound();
         const theme = ARM_THEME[data.type] || ARM_THEME.emergency;
 
         const overlay = document.createElement('div');
@@ -324,12 +402,37 @@ const Announcements = (() => {
             };
             tick();
         }
+
+        // Speak the ESTOP message after the siren finishes (~3.2 s)
+        if ('speechSynthesis' in window && data.text) {
+            estopTtsTimer = setTimeout(() => {
+                estopTtsTimer = null;
+                window.speechSynthesis.cancel();
+                const utterText = (data.title ? `${data.title}. ` : 'Emergency Alert. ') + data.text;
+                const utt = new SpeechSynthesisUtterance(utterText);
+                utt.rate = 1.1;
+                utt.pitch = 1.1;
+                // Reuse saved voice preference if available
+                const voices = window.speechSynthesis.getVoices();
+                const saved = localStorage.getItem('ttsVoice');
+                if (saved) utt.voice = voices.find(v => v.name === saved) || null;
+                window.speechSynthesis.speak(utt);
+            }, 3200); // after siren finishes (~8 cycles × 0.36 s)
+        }
     }
 
     function removeArmageddonOverlay() {
         if (armCountdownRAF) { clearTimeout(armCountdownRAF); armCountdownRAF = null; }
+        // Cancel any pending or in-progress TTS from ESTOP
+        if (estopTtsTimer) { clearTimeout(estopTtsTimer); estopTtsTimer = null; }
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         const overlay = document.getElementById('armageddon-overlay');
         if (overlay) overlay.remove();
+        // Resume music only if it was playing when ESTOP was activated
+        if (musicWasPlaying && typeof MusicPlayer !== 'undefined') {
+            MusicPlayer.play();
+        }
+        musicWasPlaying = false;
     }
 
     // ── Init ──────────────────────────────────────────────────────
