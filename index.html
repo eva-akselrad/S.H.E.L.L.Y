@@ -133,6 +133,24 @@
             </div>
         </section>
 
+        <!-- Ambient Soundscapes -->
+        <section class="settings-section">
+            <h3>🌧 Ambient Soundscapes</h3>
+            <p class="hint-text">Plays weather-matched ambient audio (rain, storm, wind) alongside your music.</p>
+            <div class="toggle-row">
+                <span>Enable ambient sounds</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="ambient-toggle" checked />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="range-row">
+                <span>🔈</span>
+                <input type="range" id="ambient-volume-slider" min="0" max="100" value="35" step="1" />
+                <span>🔊</span>
+            </div>
+        </section>
+
         <!-- Alerts TTS -->
         <section class="settings-section">
             <h3>🚨 Alert Announcements</h3>
@@ -563,6 +581,7 @@
     <script src="js/cities.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/music.js"></script>
+    <script src="js/ambient.js"></script>
     <script src="js/weather.js"></script>
     <script src="js/alerts.js"></script>
     <script src="js/radar.js"></script>

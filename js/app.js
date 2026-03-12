@@ -350,11 +350,16 @@
                 weather.customForecasts = weather.customForecasts.filter(cf => isInForecastArea(cf.targeting));
             }
 
+            // Update ambient soundscape to match current weather conditions
+            if (typeof AmbientPlayer !== 'undefined') {
+                AmbientPlayer.update(weather.conditions);
+            }
+
             // Render all displays
             Displays.renderAll(
                 weather, alerts,
                 loc.lat, loc.lon,
-                alert => AlertsManager.announceOne(alert, MusicPlayer.duck, MusicPlayer.unduck)
+                alert => AlertsManager.announceOne(alert, duckAll, unduckAll)
             );
 
             // Show/hide alert banner
@@ -363,8 +368,8 @@
             // Announce new alerts with TTS
             AlertsManager.announceNew(
                 alerts,
-                MusicPlayer.duck,
-                MusicPlayer.unduck
+                duckAll,
+                unduckAll
             );
 
             // Update location display
@@ -382,6 +387,17 @@
             if (locationStatus) locationStatus.textContent = '⚠ Failed to load weather data.';
             hideLoadingSlide();
         }
+    }
+
+    // ── Duck/unduck both music and ambient simultaneously ──────────
+    function duckAll() {
+        if (typeof MusicPlayer !== 'undefined') MusicPlayer.duck();
+        if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.duck();
+    }
+
+    function unduckAll() {
+        if (typeof MusicPlayer !== 'undefined') MusicPlayer.unduck();
+        if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.unduck();
     }
 
     function showLoadingSlide() {

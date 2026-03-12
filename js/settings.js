@@ -17,6 +17,7 @@ const Settings = (() => {
         bindUnitToggle();
         bindSpeedSlider();
         bindAlertToggles();
+        bindAmbientControls();
         loadFromStorage();
     }
 
@@ -182,9 +183,13 @@ const Settings = (() => {
             if (typeof AlertsManager === 'undefined') return;
             if (ttsStatus) ttsStatus.textContent = '🔊 Speaking test alert...';
             AlertsManager.testAlert(
-                () => { if (typeof MusicPlayer !== 'undefined') MusicPlayer.duck(); },
+                () => {
+                    if (typeof MusicPlayer !== 'undefined') MusicPlayer.duck();
+                    if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.duck();
+                },
                 () => {
                     if (typeof MusicPlayer !== 'undefined') MusicPlayer.unduck();
+                    if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.unduck();
                     if (ttsStatus) ttsStatus.textContent = '✓ Test complete';
                     setTimeout(() => { if (ttsStatus) ttsStatus.textContent = ''; }, 3000);
                 }
@@ -203,13 +208,31 @@ const Settings = (() => {
             if (ttsStatus) ttsStatus.textContent = '🌤 Reading conditions...';
             AlertsManager.testConditions(
                 text,
-                () => { if (typeof MusicPlayer !== 'undefined') MusicPlayer.duck(); },
+                () => {
+                    if (typeof MusicPlayer !== 'undefined') MusicPlayer.duck();
+                    if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.duck();
+                },
                 () => {
                     if (typeof MusicPlayer !== 'undefined') MusicPlayer.unduck();
+                    if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.unduck();
                     if (ttsStatus) ttsStatus.textContent = '✓ Done';
                     setTimeout(() => { if (ttsStatus) ttsStatus.textContent = ''; }, 3000);
                 }
             );
+        });
+    }
+
+    // ── Ambient soundscape controls ────────────────────────────────
+    function bindAmbientControls() {
+        document.getElementById('ambient-toggle')?.addEventListener('change', e => {
+            if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.setEnabled(e.target.checked);
+            saveToStorage();
+        });
+
+        document.getElementById('ambient-volume-slider')?.addEventListener('input', e => {
+            const val = e.target.value / 100;
+            if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.setVolume(val);
+            saveToStorage();
         });
     }
 
@@ -230,7 +253,9 @@ const Settings = (() => {
             duck: document.getElementById('duck-toggle')?.checked ?? true,
             shuffle: document.getElementById('shuffle-toggle')?.checked ?? true,
             kioskAutoplayMusic: document.getElementById('kiosk-autoplay-music')?.checked ?? false,
-            suppressedTtsTypes: suppressedTypes
+            suppressedTtsTypes: suppressedTypes,
+            ambientEnabled: document.getElementById('ambient-toggle')?.checked ?? true,
+            ambientVolume: document.getElementById('ambient-volume-slider')?.value || 35
         };
     }
 
@@ -291,6 +316,18 @@ const Settings = (() => {
 
             const kioskAutoplayT = document.getElementById('kiosk-autoplay-music');
             if (kioskAutoplayT && state.kioskAutoplayMusic !== undefined) kioskAutoplayT.checked = state.kioskAutoplayMusic;
+
+            // Restore ambient soundscape settings
+            const ambientToggle = document.getElementById('ambient-toggle');
+            const ambientVolSlider = document.getElementById('ambient-volume-slider');
+            if (ambientToggle && state.ambientEnabled !== undefined) {
+                ambientToggle.checked = state.ambientEnabled;
+                if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.setEnabled(state.ambientEnabled);
+            }
+            if (ambientVolSlider && state.ambientVolume !== undefined) {
+                ambientVolSlider.value = state.ambientVolume;
+                if (typeof AmbientPlayer !== 'undefined') AmbientPlayer.setVolume(state.ambientVolume / 100);
+            }
 
             // Restore suppressed alert types
             if (state.suppressedTtsTypes) {
