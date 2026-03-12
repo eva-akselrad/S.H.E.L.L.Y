@@ -400,57 +400,68 @@ const WeatherAPI = (() => {
     }
 
     /**
-     * Fetch minimal current + 2-day forecast for a single lat/lon.
-     * Returns { temp, hi, lo, icon, desc, weatherCode, isDay }
-     */
-    async function fetchCityWeather(lat, lon) {
-        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
-        const windU = useFahrenheit ? 'mph' : 'kmh';
-        const params = new URLSearchParams({
-            latitude: lat, longitude: lon,
-            current: 'temperature_2m,weather_code,is_day',
-            daily: 'temperature_2m_max,temperature_2m_min,weather_code',
-            temperature_unit: units,
-            wind_speed_unit: windU,
-            timezone: 'auto',
-            forecast_days: 2,
-        });
-        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
-        if (!resp.ok) throw new Error('City weather fetch failed');
-        const data = await resp.json();
-        const c = data.current;
-        const d = data.daily;
-        const isDay = c.is_day === 1;
-        const wx = wmoToWeather(c.weather_code, isDay);
-        const wxTomorrow = wmoToWeather(d.weather_code?.[1] ?? d.weather_code?.[0], true);
-        return {
-            temp: fmtTemp(c.temperature_2m),
-            tempRaw: c.temperature_2m,
-            hi: fmtTemp(d.temperature_2m_max[0]),
-            lo: fmtTemp(d.temperature_2m_min[0]),
-            tomorrowHi: fmtTemp(d.temperature_2m_max[1] ?? d.temperature_2m_max[0]),
-            tomorrowIcon: wxTomorrow.emoji,
-            tomorrowDesc: wxTomorrow.desc,
-            icon: wx.emoji,
-            desc: wx.desc,
-            weatherCode: c.weather_code,
-            isDay,
-        };
-    }
-
-    /**
-     * Fetch weather for a list of city objects { name, state, lat, lon }.
-     * Returns array of { name, state, lat, lon, ...weatherData } in parallel.
+     * Fetch weather for a list of city objects { name, state, lat, lon } in a SINGLE
+     * Open-Meteo batch request instead of N individual requests.
+     * Returns array of { name, state, lat, lon, ...weatherData } in the same order.
      */
     async function fetchTravelCities(cities) {
-        const results = await Promise.allSettled(
-            cities.map(city =>
-                fetchCityWeather(city.lat, city.lon).then(wx => ({ ...city, ...wx, error: false }))
-            )
-        );
-        return results.map((r, i) =>
-            r.status === 'fulfilled' ? r.value : { ...cities[i], error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' }
-        );
+        if (!cities.length) return [];
+
+        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
+        const windU  = useFahrenheit ? 'mph' : 'kmh';
+
+        // Open-Meteo accepts comma-separated lat/lon arrays for batch requests
+        const params = new URLSearchParams({
+            latitude:         cities.map(c => c.lat).join(','),
+            longitude:        cities.map(c => c.lon).join(','),
+            current:          'temperature_2m,weather_code,is_day',
+            daily:            'temperature_2m_max,temperature_2m_min,weather_code',
+            temperature_unit: units,
+            wind_speed_unit:  windU,
+            timezone:         'auto',
+            forecast_days:    2,
+        });
+
+        try {
+            const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+            if (!resp.ok) throw new Error('Batch city fetch failed');
+            // Open-Meteo returns an array for multiple locations, a plain object for one.
+            // Normalise to array so the cities.map() below can always use results[i].
+            const raw = await resp.json();
+            const results = Array.isArray(raw) ? raw : [raw];
+
+            return cities.map((city, i) => {
+                try {
+                    const data = results[i];
+                    if (!data) throw new Error('missing');
+                    const c = data.current;
+                    const d = data.daily;
+                    const isDay = c.is_day === 1;
+                    const wx          = wmoToWeather(c.weather_code, isDay);
+                    const wxTomorrow  = wmoToWeather(d.weather_code?.[1] ?? d.weather_code?.[0], true);
+                    return {
+                        ...city,
+                        error:       false,
+                        temp:        fmtTemp(c.temperature_2m),
+                        tempRaw:     c.temperature_2m,
+                        hi:          fmtTemp(d.temperature_2m_max[0]),
+                        lo:          fmtTemp(d.temperature_2m_min[0]),
+                        tomorrowHi:  fmtTemp(d.temperature_2m_max[1] ?? d.temperature_2m_max[0]),
+                        tomorrowIcon: wxTomorrow.emoji,
+                        tomorrowDesc: wxTomorrow.desc,
+                        icon:        wx.emoji,
+                        desc:        wx.desc,
+                        weatherCode: c.weather_code,
+                        isDay,
+                    };
+                } catch {
+                    return { ...city, error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' };
+                }
+            });
+        } catch {
+            // Graceful fallback: mark all cities as errored
+            return cities.map(city => ({ ...city, error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' }));
+        }
     }
 
     /**
@@ -470,12 +481,15 @@ const WeatherAPI = (() => {
     /**
      * Fetch SPC categorical outlook for Days 1–3 via local proxy.
      * Returns { day1, day2, day3 } where each is a GeoJSON FeatureCollection or null.
+     * Performs three separate requests (one per day); relies on the server's
+     * Cache-Control headers (max-age=900) to avoid hitting SPC upstream on every
+     * refresh cycle.
      */
     async function fetchSPCOutlook() {
         const days = ['1', '2', '3'];
         const results = await Promise.allSettled(
             days.map(d =>
-                fetch(`/api/spc-outlook?day=${d}`, { cache: 'no-store' })
+                fetch(`/api/spc-outlook?day=${d}`)
                     .then(r => r.ok ? r.json() : null)
                     .catch(() => null)
             )
@@ -617,9 +631,9 @@ const WeatherAPI = (() => {
             fetchWeather(currentLat, currentLon),
             fetchAirQuality(currentLat, currentLon),
             fetchAlerts(currentLat, currentLon),
-            fetch('/api/custom-forecast', { cache: 'no-store' })
-                .then(r => r.ok ? r.json() : { periods: [], updatedAt: null })
-                .catch(() => ({ periods: [], updatedAt: null })),
+            fetch('/api/custom-forecast')
+                .then(r => r.ok ? r.json() : [])
+                .catch(() => []),
             fetchNearbyCities(currentLat, currentLon, 8).catch(() => []),
             fetchTravelCities(
                 typeof DEFAULT_TRAVEL_CITIES !== 'undefined' ? DEFAULT_TRAVEL_CITIES : []
@@ -628,7 +642,7 @@ const WeatherAPI = (() => {
         ]);
 
         weatherData = processData(raw, aq);
-        weatherData.customForecast = cf;
+        weatherData.customForecasts = Array.isArray(cf) ? cf : (cf?.periods?.length ? [cf] : []);
         weatherData.nearbyCities = nearbyCities;
         weatherData.travelCities = travelCities;
         weatherData.spcOutlook = processSPCOutlook(spcRaw, currentLat, currentLon);

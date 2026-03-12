@@ -14,6 +14,20 @@
     const PUSH_KEY_URL = '/api/push/vapid-key';
     const PUSH_SUB_URL = '/api/push/subscribe';
 
+    // ── Cookie helpers (install prompt throttle) ─────────────────
+    const PROMPT_COOKIE = 'pwa-prompt-dismissed';
+    const PROMPT_COOKIE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    function setPromptCookie() {
+        const expires = new Date(Date.now() + PROMPT_COOKIE_DURATION_MS).toUTCString();
+        const secureAttr = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `${PROMPT_COOKIE}=1; expires=${expires}; path=/; SameSite=Lax${secureAttr}`;
+    }
+
+    function hasPromptCookie() {
+        return document.cookie.split(';').some(c => c.trim().startsWith(`${PROMPT_COOKIE}=`));
+    }
+
     // ── 1. Register Service Worker ──────────────────────────────
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -34,17 +48,17 @@
         || window.navigator.standalone === true;
 
     if (!isStandalone) {
-        // Chromium: capture the prompt
+        // Chromium: capture the prompt (skip if already dismissed today)
         window.addEventListener('beforeinstallprompt', e => {
             e.preventDefault();
             deferredInstallPrompt = e;
-            showInstallBanner();
+            if (!hasPromptCookie()) showInstallBanner();
         });
 
-        // If no prompt fires after 3 s, show a manual guide
+        // If no prompt fires after 3 s, show a manual guide (skip if dismissed today)
         window.addEventListener('load', () => {
             setTimeout(() => {
-                if (!deferredInstallPrompt && !guideShown) {
+                if (!deferredInstallPrompt && !guideShown && !hasPromptCookie()) {
                     showBrowserGuide();
                 }
             }, 3000);
@@ -52,6 +66,7 @@
     }
 
     function showInstallBanner() {
+        if (document.body.classList.contains('kiosk-mode')) return;
         const banner = getOrCreateBanner();
         banner.classList.remove('pwa-hidden');
     }
@@ -85,10 +100,14 @@
             const { outcome } = await deferredInstallPrompt.userChoice;
             console.log('[PWA] Install outcome:', outcome);
             deferredInstallPrompt = null;
+            setPromptCookie();
             hideBanner();
         });
 
-        document.getElementById('pwa-dismiss-btn').addEventListener('click', hideBanner);
+        document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
+            setPromptCookie();
+            hideBanner();
+        });
 
         return banner;
     }
@@ -103,6 +122,7 @@
 
     function showBrowserGuide() {
         if (guideShown || isStandalone) return;
+        if (document.body.classList.contains('kiosk-mode')) return;
         guideShown = true;
 
         let instructions = '';
@@ -136,7 +156,7 @@
         `;
         document.body.appendChild(modal);
 
-        const close = () => modal.remove();
+        const close = () => { setPromptCookie(); modal.remove(); };
         document.getElementById('pwa-guide-close').addEventListener('click', close);
         document.getElementById('pwa-guide-ok').addEventListener('click', close);
 
