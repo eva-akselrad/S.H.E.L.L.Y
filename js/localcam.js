@@ -17,10 +17,14 @@ const LocalCam = (() => {
 
     function el(id) { return document.getElementById(id); }
 
-    // Return a cache-busted image URL from the normalized camera object
+    // Return a cache-busted image URL from the normalized camera object.
+    // Uses '&t=' when the URL already contains a query string (e.g. the
+    // /api/cam-proxy?url=... proxy URL) so the parameter is appended correctly.
     function buildImageUrl(cam) {
         const base = cam?.imageUrl || '';
-        return base ? `${base}?t=${Date.now()}` : '';
+        if (!base) return '';
+        const sep = base.includes('?') ? '&' : '?';
+        return `${base}${sep}t=${Date.now()}`;
     }
 
     // Build a human-readable location title from the normalized camera object

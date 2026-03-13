@@ -7,6 +7,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { Readable } = require('stream');
 const webPush = require('web-push');
 const rateLimit = require('express-rate-limit');
 
@@ -449,10 +450,12 @@ app.get('/api/spc-outlook', async (req, res) => {
 });
 
 // ── GET /api/local-cam?lat=X&lon=Y ───────────────────────────
-// Finds the nearest webcam using the OpenStreetMap Overpass API.
+// Finds the nearest *working* webcam using the OpenStreetMap Overpass API.
 // Fully FOSS — no API key required, no per-day request cap.
-// Webcam nodes in OSM carry a "contact:webcam" tag with a live image URL.
 // Uses an expanding-radius search so the closest cam is always returned.
+// Each candidate URL is validated server-side before being returned so the
+// browser never gets sent a dead or unreachable URL.
+// Images are served via /api/cam-proxy to avoid HTTPS mixed-content issues.
 // In-memory TTL cache (10 min) keyed by rounded coordinates.
 const camCache = {}; // { [key]: { data, expiresAt } }
 const CAM_TTL_MS = 10 * 60 * 1000;
@@ -485,6 +488,32 @@ async function queryOverpassCams(lat, lon, radiusMeters) {
     return Array.isArray(data.elements) ? data.elements : [];
 }
 
+// Verify that a URL actually delivers an image (HEAD then GET fallback).
+// Returns true only for 2xx responses with an image content-type.
+async function validateCamUrl(url) {
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+
+    const signal = AbortSignal.timeout(5000);
+    try {
+        // Try HEAD first (cheap); some servers reject HEAD so fall back to GET
+        let r = await fetch(url, { method: 'HEAD', signal, redirect: 'follow' });
+        if (r.status === 405 || r.status === 501) {
+            r = await fetch(url, { method: 'GET', signal, redirect: 'follow' });
+        }
+        if (!r.ok) return false;
+        const ct = r.headers.get('content-type') || '';
+        return ct.startsWith('image/');
+    } catch {
+        return false;
+    }
+}
+
 app.get('/api/local-cam', async (req, res) => {
     const lat = parseFloat(req.query.lat);
     const lon = parseFloat(req.query.lon);
@@ -509,23 +538,40 @@ app.get('/api/local-cam', async (req, res) => {
             elements = await queryOverpassCams(lat, lon, 500000);
         }
 
-        // Keep only nodes that actually carry a webcam URL, sort by distance,
-        // then return just the single nearest one.
-        const nearest = elements
+        // Sort candidates by distance, try up to 10 nearest to find one whose
+        // URL is actually reachable and serves an image.
+        const candidates = elements
             .filter(n => n.tags && n.tags['contact:webcam'])
             .map(n => ({
                 title: n.tags.name || n.tags.operator || 'Webcam',
-                imageUrl: n.tags['contact:webcam'],
+                rawUrl: n.tags['contact:webcam'],
                 distanceM: haversineMeters(lat, lon, n.lat, n.lon),
                 location: {
                     city: n.tags['addr:city'] || n.tags['addr:town'] || n.tags['addr:village'] || '',
                     region: n.tags['addr:state'] || n.tags['addr:country'] || '',
                 },
             }))
-            .sort((a, b) => a.distanceM - b.distanceM)[0];
+            .sort((a, b) => a.distanceM - b.distanceM)
+            .slice(0, 10);
 
-        const cameras = nearest
-            ? [{ title: nearest.title, imageUrl: nearest.imageUrl, location: nearest.location }]
+        let workingCam = null;
+        for (const cam of candidates) {
+            console.log(`[LocalCam] Checking ${cam.rawUrl} …`);
+            if (await validateCamUrl(cam.rawUrl)) {
+                workingCam = cam;
+                break;
+            }
+            console.log(`[LocalCam] Skipping unreachable/non-image URL: ${cam.rawUrl}`);
+        }
+
+        // Return a proxy URL so the browser never has to fetch HTTP content
+        // directly (avoids mixed-content blocks on HTTPS deployments).
+        const cameras = workingCam
+            ? [{
+                title: workingCam.title,
+                imageUrl: `/api/cam-proxy?url=${encodeURIComponent(workingCam.rawUrl)}`,
+                location: workingCam.location,
+            }]
             : [];
         const result = { cameras };
         camCache[cacheKey] = { data: result, expiresAt: Date.now() + CAM_TTL_MS };
@@ -538,6 +584,55 @@ app.get('/api/local-cam', async (req, res) => {
             return res.json(cached.data);
         }
         res.json({ cameras: [] });
+    }
+});
+
+// ── GET /api/cam-proxy?url=... ────────────────────────────────
+// Proxies a webcam still image through the server so the browser always
+// receives content over HTTPS regardless of whether the upstream URL is
+// HTTP or HTTPS. This prevents mixed-content blocks on HTTPS deployments.
+app.get('/api/cam-proxy', async (req, res) => {
+    const url = req.query.url;
+    if (!url) return res.status(400).json({ error: 'Missing url parameter' });
+
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return res.status(400).json({ error: 'Invalid URL' });
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only http/https URLs are supported' });
+    }
+
+    try {
+        const upstream = await fetch(url, {
+            signal: AbortSignal.timeout(10000),
+            headers: {
+                'User-Agent': 'S.H.E.L.L.Y.-WeatherClient/1.0 (weather display; contact:admin@shelly.local)',
+            },
+            redirect: 'follow',
+        });
+
+        if (!upstream.ok) {
+            return res.status(502).json({ error: `Upstream returned ${upstream.status}` });
+        }
+
+        const ct = upstream.headers.get('content-type') || '';
+        if (!ct.startsWith('image/')) {
+            return res.status(502).json({ error: 'Upstream did not return an image' });
+        }
+
+        res.setHeader('Content-Type', ct);
+        // 55 s: just under the client's 60 s refresh interval so each poll
+        // gets a fresh upstream fetch without hammering the camera server.
+        res.setHeader('Cache-Control', 'public, max-age=55');
+        // Stream the response body directly to avoid buffering large images
+        Readable.fromWeb(upstream.body).pipe(res);
+    } catch (err) {
+        console.error('[CamProxy] Fetch error:', err.message);
+        res.status(502).json({ error: 'Failed to fetch webcam image' });
     }
 });
 
