@@ -629,43 +629,6 @@ const Displays = (() => {
         }
     }
 
-    // ── Seasonal Outlook ───────────────────────────────────────────
-    function renderSeasonal(data) {
-        const container = el('seasonal-container');
-        if (!container) return;
-        const months = data.seasonal;
-        if (!months || !months.length) {
-            container.innerHTML = '<div class="no-alerts">🌐 Seasonal forecast data unavailable.</div>';
-            return;
-        }
-
-        // Compute temperature range for heat-bar scaling
-        const allHi = months.map(m => m.hiRaw).filter(v => v != null);
-        const allLo = months.map(m => m.loRaw).filter(v => v != null);
-        const tempMin = allLo.length ? Math.min(...allLo) : 0;
-        const tempMax = allHi.length ? Math.max(...allHi) : 1;
-        const tempRange = tempMax - tempMin || 1;
-
-        container.innerHTML = months.map(m => {
-            const hiPct = m.hiRaw != null ? Math.round(((m.hiRaw - tempMin) / tempRange) * 100) : 0;
-            const loPct = m.loRaw != null ? Math.round(((m.loRaw - tempMin) / tempRange) * 100) : 0;
-            const barW = Math.max(hiPct - loPct, 2);
-            return `
-              <div class="seasonal-card">
-                <div class="seasonal-month">${esc(m.month)}</div>
-                <div class="seasonal-temp-bar-wrap">
-                  <div class="seasonal-temp-bar" style="left:${loPct}%;width:${barW}%"></div>
-                </div>
-                <div class="seasonal-hi-lo">
-                  <span class="seasonal-hi">${esc(m.hi)}</span>
-                  <span class="seasonal-lo">${esc(m.lo)}</span>
-                </div>
-                <div class="seasonal-precip">🌧 ${esc(m.precip)}</div>
-                <div class="seasonal-wind">💨 ${esc(m.wind)}</div>
-              </div>`;
-        }).join('');
-    }
-
     // ── Render all ─────────────────────────────────────────────────
     function renderAll(weatherData, alerts, lat, lon, onTTS) {
         renderConditions(weatherData);
@@ -682,7 +645,6 @@ const Displays = (() => {
         renderRegionalObs(weatherData);
         renderRegionalFcst(weatherData);
         renderSPCOutlook(weatherData);
-        renderSeasonal(weatherData);
         updateTicker(weatherData, 'CONDITIONS');
     }
 
@@ -691,7 +653,6 @@ const Displays = (() => {
         renderPrecipChart, renderAlmanac, renderAirQuality,
         renderRadar, renderAlerts, renderCustomForecast, updateTicker,
         renderTravel, renderRegionalObs, renderRegionalFcst, renderSPCOutlook,
-        renderSeasonal,
         onRegionalObsVisible, onRegionalFcstVisible,
     };
 })();

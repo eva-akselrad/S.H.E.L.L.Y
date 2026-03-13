@@ -517,81 +517,6 @@ const WeatherAPI = (() => {
     }
 
     /**
-     * Fetch long-range seasonal outlook from Open-Meteo seasonal forecast API.
-     * Returns the raw API response or null on failure.
-     */
-    async function fetchSeasonalForecast(lat, lon) {
-        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
-        const precU = useFahrenheit ? 'inch' : 'mm';
-        const params = new URLSearchParams({
-            latitude: lat, longitude: lon,
-            monthly: [
-                'temperature_2m_max', 'temperature_2m_min',
-                'precipitation_sum', 'wind_speed_10m_max'
-            ].join(','),
-            temperature_unit: units,
-            precipitation_unit: precU,
-            timezone: 'auto',
-            forecast_months: 6,
-        });
-        try {
-            const resp = await fetch(`https://seasonal-api.open-meteo.com/v1/seasonal?${params}`);
-            if (!resp.ok) return null;
-            return resp.json();
-        } catch { return null; }
-    }
-
-    /**
-     * Process raw Open-Meteo seasonal forecast data into monthly outlook objects.
-     * Averages ensemble members when present (keys follow pattern variable_memberNN).
-     */
-    function processSeasonalForecast(seasonal) {
-        if (!seasonal?.monthly?.time?.length) return null;
-        const m = seasonal.monthly;
-        const times = m.time;
-
-        // Compute ensemble mean for a given base variable name
-        function ensembleMean(varName) {
-            const memberKeys = Object.keys(m).filter(k => k.startsWith(varName + '_member'));
-            if (memberKeys.length) {
-                return times.map((_, i) => {
-                    const vals = memberKeys.map(k => m[k][i]).filter(v => v != null);
-                    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-                });
-            }
-            return m[varName] ? [...m[varName]] : null;
-        }
-
-        const hiArr = ensembleMean('temperature_2m_max');
-        const loArr = ensembleMean('temperature_2m_min');
-        const precipArr = ensembleMean('precipitation_sum');
-        const windArr = ensembleMean('wind_speed_10m_max');
-        const windU = useFahrenheit ? 'mph' : 'km/h';
-
-        return times.map((t, i) => {
-            // Open-Meteo seasonal API returns 'YYYY-MM' format; handle both that
-            // and 'YYYY-MM-DD' gracefully by taking only the first 7 characters.
-            const monthStr = String(t).slice(0, 7);
-            const dt = new Date(monthStr + '-01T12:00:00');
-            return {
-                month: !isNaN(dt)
-                    ? dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                    : monthStr,
-                hi: hiArr?.[i] != null ? fmtTemp(hiArr[i]) : '--',
-                lo: loArr?.[i] != null ? fmtTemp(loArr[i]) : '--',
-                hiRaw: hiArr?.[i] ?? null,
-                loRaw: loArr?.[i] ?? null,
-                precip: precipArr?.[i] != null
-                    ? `${precipArr[i].toFixed(1)} ${useFahrenheit ? 'in' : 'mm'}`
-                    : '--',
-                wind: windArr?.[i] != null
-                    ? `${Math.round(windArr[i])} ${windU}`
-                    : '--',
-            };
-        });
-    }
-
-    /**
      * Point-in-ring test (ray casting, GeoJSON coordinate order: [lon, lat]).
      */
     function pointInRing(lon, lat, ring) {
@@ -717,7 +642,7 @@ const WeatherAPI = (() => {
 
         // nearbyCities → Regional Obs/Forecast slides (position-dependent)
         // travelCities → Travel Forecast slide (fixed well-known cities)
-        const [raw, aq, alerts, cf, nearbyCities, travelCities, spcRaw, seasonalRaw] = await Promise.all([
+        const [raw, aq, alerts, cf, nearbyCities, travelCities, spcRaw] = await Promise.all([
             fetchWeather(currentLat, currentLon),
             fetchAirQuality(currentLat, currentLon),
             fetchAlerts(currentLat, currentLon),
@@ -729,7 +654,6 @@ const WeatherAPI = (() => {
                 typeof DEFAULT_TRAVEL_CITIES !== 'undefined' ? DEFAULT_TRAVEL_CITIES : []
             ).catch(() => []),
             fetchSPCOutlook().catch(() => ({ day1: null, day2: null, day3: null })),
-            fetchSeasonalForecast(currentLat, currentLon).catch(() => null),
         ]);
 
         weatherData = processData(raw, aq);
@@ -737,7 +661,6 @@ const WeatherAPI = (() => {
         weatherData.nearbyCities = nearbyCities;
         weatherData.travelCities = travelCities;
         weatherData.spcOutlook = processSPCOutlook(spcRaw, currentLat, currentLon);
-        weatherData.seasonal = processSeasonalForecast(seasonalRaw);
         alertsData = alerts;
         return { weather: weatherData, alerts: alertsData };
     }
