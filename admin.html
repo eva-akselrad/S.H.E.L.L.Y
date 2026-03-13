@@ -452,6 +452,35 @@
             color: var(--danger);
         }
 
+        .amsg-ack-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .amsg-ack-bar {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .amsg-ack-bar-fill {
+            height: 100%;
+            background: #22c55e;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .amsg-ack-label {
+            font-size: .65rem;
+            color: var(--muted);
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
         .no-msgs {
             color: var(--muted);
             font-size: .85rem;
@@ -1310,6 +1339,7 @@
             const API = '/api';
             let adminPassword = '';
             let pollTimer = null;
+            let pushSubCount = 0;
 
             // ── Login ──────────────────────────────────────────────────────
             const loginScreen = document.getElementById('login-screen');
@@ -1477,6 +1507,12 @@
                     const div = document.createElement('div');
                     div.className = 'active-msg';
                     const badge = { info: 'info', warning: 'warning', emergency: 'emergency' }[msg.type] || 'info';
+                    const ackCount = msg.ackCount || 0;
+                    const total = pushSubCount || 0;
+                    const pct = total > 0 ? Math.min(100, Math.round(ackCount / total * 100)) : 0;
+                    const ackLabel = total > 0 && ackCount <= total
+                        ? `${ackCount} / ${total} subscriber${total !== 1 ? 's' : ''} acknowledged`
+                        : `${ackCount} acknowledged`;
                     div.innerHTML = `
                 <span class="amsg-badge amsg-badge-${badge}">${msg.type}</span>
                 <div class="amsg-body">
@@ -1488,6 +1524,11 @@
                         ${msg.duration ? `${msg.duration}s` : 'Manual dismiss'} ·
                         ${new Date(msg.created).toLocaleTimeString()}
                     </div>
+                    ${msg.display === 'popup' ? `
+                    <div class="amsg-ack-row">
+                        <div class="amsg-ack-bar"><div class="amsg-ack-bar-fill" style="width:${pct}%"></div></div>
+                        <span class="amsg-ack-label">${ackLabel}</span>
+                    </div>` : ''}
                 </div>
                 <button class="amsg-del" data-id="${msg.id}">✕ Delete</button>
             `;
@@ -1531,6 +1572,7 @@
                     const r = await fetch(`${API}/push/count`, { headers: { 'x-admin-password': adminPassword } });
                     if (r.ok) {
                         const { count } = await r.json();
+                        pushSubCount = count;
                         const el = document.getElementById('push-sub-count');
                         if (el) el.textContent = `${count} subscriber${count !== 1 ? 's' : ''}`;
                     }

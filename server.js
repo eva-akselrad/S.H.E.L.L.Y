@@ -109,6 +109,10 @@ let customForecastId = 1;
 // Shape: { title, text, type, activatedAt, expiresAt } or null when inactive
 let armageddonState = null;
 
+// Acknowledgements: tracks which visitor IDs have acknowledged each message
+// Map<msgId, Set<visitorId>>
+const acknowledgements = new Map();
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
 
 // ── Rate limiter (admin routes) ────────────────────────────────
@@ -138,7 +142,10 @@ function checkAuth(req, res) {
 // ── GET /api/messages?since=ID ─────────────────────────────────
 app.get('/api/messages', (req, res) => {
     const since = parseInt(req.query.since) || 0;
-    res.json(messages.filter(m => m.id > since));
+    res.json(messages.filter(m => m.id > since).map(m => ({
+        ...m,
+        ackCount: acknowledgements.get(m.id)?.size || 0,
+    })));
 });
 
 // ── GET /api/poll?since=ID ─────────────────────────────────────
@@ -198,11 +205,28 @@ app.post('/api/announce', async (req, res) => {
     res.json(msg);
 });
 
+// ── POST /api/messages/:id/acknowledge ────────────────────────
+// Public – no admin auth required. Body: { visitorId: string }
+app.post('/api/messages/:id/acknowledge', (req, res) => {
+    const id = parseInt(req.params.id);
+    const { visitorId } = req.body;
+    if (!visitorId || typeof visitorId !== 'string' || visitorId.length > 128 || !/^[\w\-]+$/.test(visitorId)) {
+        return res.status(400).json({ error: 'visitorId required' });
+    }
+    if (!messages.find(m => m.id === id)) return res.status(404).json({ error: 'not found' });
+    if (!acknowledgements.has(id)) acknowledgements.set(id, new Set());
+    acknowledgements.get(id).add(visitorId);
+    const ackCount = acknowledgements.get(id).size;
+    console.log(`[Ack] Message ${id}: ${ackCount} acknowledged`);
+    res.json({ ok: true, ackCount });
+});
+
 // ── DELETE /api/messages/:id ───────────────────────────────────
 app.delete('/api/messages/:id', (req, res) => {
     if (!checkAuth(req, res)) return;
     const id = parseInt(req.params.id);
     messages = messages.filter(m => m.id !== id);
+    acknowledgements.delete(id);
     res.json({ ok: true });
 });
 
@@ -210,6 +234,7 @@ app.delete('/api/messages/:id', (req, res) => {
 app.delete('/api/messages', (req, res) => {
     if (!checkAuth(req, res)) return;
     messages = [];
+    acknowledgements.clear();
     res.json({ ok: true });
 });
 

@@ -276,6 +276,9 @@ const Announcements = (() => {
                     <button class="announce-popup-close" title="Dismiss">✕</button>
                 </div>
                 <div class="announce-popup-body markdown-body">${parsedBody}</div>
+                <div class="announce-popup-footer">
+                    <button class="announce-popup-ack" title="Acknowledge receipt">✓ Acknowledge</button>
+                </div>
                 ${msg.duration > 0 ? `<div class="announce-popup-timer"><div class="announce-popup-timer-bar"></div></div>` : ''}
             </div>
         `;
@@ -287,6 +290,17 @@ const Announcements = (() => {
             dismissOnServer(msg.id);
         };
         closeBtn.addEventListener('click', doClose);
+
+        const ackBtn = overlay.querySelector('.announce-popup-ack');
+        if (ackBtn) {
+            ackBtn.addEventListener('click', async () => {
+                ackBtn.disabled = true;
+                ackBtn.textContent = '✓ Acknowledged';
+                ackBtn.classList.add('acked');
+                await acknowledgeMessage(msg.id);
+                setTimeout(doClose, 600);
+            });
+        }
 
         if (msg.type !== 'emergency') {
             overlay.addEventListener('click', e => { if (e.target === overlay) doClose(); });
@@ -329,6 +343,37 @@ const Announcements = (() => {
     }
     function escHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── Visitor ID (stable across page refreshes, unique per browser) ─
+    function getVisitorId() {
+        let id = localStorage.getItem('shelly-visitor-id');
+        if (!id) {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                id = crypto.randomUUID();
+            } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                const buf = new Uint8Array(16);
+                crypto.getRandomValues(buf);
+                id = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+            } else {
+                id = Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+            }
+            localStorage.setItem('shelly-visitor-id', id);
+        }
+        return id;
+    }
+
+    // ── Tell server a message was acknowledged ─────────────────────
+    async function acknowledgeMessage(id) {
+        try {
+            await fetch(`/api/messages/${id}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visitorId: getVisitorId() }),
+            });
+        } catch (err) {
+            console.warn('[Announcements] Acknowledge failed:', err.message);
+        }
     }
 
     // ── Tell server a message was dismissed ────────────────────────
