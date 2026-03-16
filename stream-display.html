@@ -8,90 +8,670 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-    <link rel="stylesheet" href="css/overlay.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:          #0a0e1a;
+            --surface:     #111827;
+            --accent:      #3b82f6;
+            --accent2:     #06b6d4;
+            --text:        #f0f4ff;
+            --muted:       #94a3b8;
+            --red:         #ef4444;
+            --orange:      #f97316;
+            --yellow:      #eab308;
+            --green:       #22c55e;
+            --border:      rgba(59,130,246,.3);
+            --font-d:      'Orbitron', monospace;
+            --font-b:      'Inter', sans-serif;
+            --font-m:      'Roboto Mono', monospace;
+        }
+
+        html, body {
+            width: 1920px; height: 1080px;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-b);
+        }
+
+        /* ── ROOT + SEVERITY AMBIENT ──────────────────────────── */
+        #root {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
+            transition: box-shadow .8s ease;
+        }
+        /* Ambient severity glow — applied as class on #root */
+        #root::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 8000;
+            transition: background 0.8s ease;
+            background: transparent;
+        }
+        #root.sev-tornado  { box-shadow: inset 0 0 80px rgba(239,68,68,.22),  inset 0 0 0 3px rgba(239,68,68,.5); }
+        #root.sev-tornado::before { background: rgba(239,68,68, 0.15); }
+        #root.sev-storm    { box-shadow: inset 0 0 80px rgba(249,115,22,.18), inset 0 0 0 3px rgba(249,115,22,.4); }
+        #root.sev-storm::before { background: rgba(249,115,22, 0.12); }
+        #root.sev-flood    { box-shadow: inset 0 0 80px rgba(34,197,94,.15),  inset 0 0 0 3px rgba(34,197,94,.35); }
+        #root.sev-flood::before { background: rgba(34,197,94, 0.1); }
+        #root.sev-fire     { box-shadow: inset 0 0 80px rgba(234,179,8,.18),  inset 0 0 0 3px rgba(234,179,8,.4); }
+        #root.sev-fire::before { background: rgba(234,179,8, 0.12); }
+        #root.sev-watch    { box-shadow: inset 0 0 60px rgba(59,130,246,.12), inset 0 0 0 2px rgba(59,130,246,.3); }
+        #root.sev-watch::before { background: rgba(59,130,246, 0.08); }
+        #root.sev-advisory { box-shadow: inset 0 0 40px rgba(59,130,246,.08), inset 0 0 0 1px rgba(59,130,246,.2); }
+        /* Pulse animation for tornado only */
+        #root.sev-tornado  { animation: sev-pulse-tornado 2.5s ease-in-out infinite; }
+        @keyframes sev-pulse-tornado {
+            0%,100% { box-shadow: inset 0 0 80px rgba(239,68,68,.22), inset 0 0 0 3px rgba(239,68,68,.5); }
+            50%      { box-shadow: inset 0 0 120px rgba(239,68,68,.38), inset 0 0 0 4px rgba(239,68,68,.8); }
+        }
+
+        /* ── HEADER ──────────────────────────────────────────── */
+        #header {
+            flex-shrink: 0;
+            height: 74px;
+            display: flex; align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            background: linear-gradient(180deg, rgba(10,14,26,.98) 0%, rgba(10,14,26,.85) 100%);
+            border-bottom: 2px solid var(--border);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            position: relative;
+        }
+
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .brand-lightning { font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(6,182,212,.8)); }
+        .brand-name {
+            font-family: var(--font-d);
+            font-size: 1.2rem; font-weight: 700;
+            letter-spacing: .15em;
+            color: var(--accent2);
+            text-shadow: 0 0 16px rgba(6,182,212,.5);
+        }
+        .brand-sub {
+            font-family: var(--font-m);
+            font-size: .6rem; color: var(--muted);
+            letter-spacing: .1em; text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .header-center {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #mode-label {
+            font-family: var(--font-d);
+            font-size: .65rem; letter-spacing: .2em;
+            color: var(--yellow); text-transform: uppercase;
+            line-height: 1; margin-bottom: 2px;
+        }
+        #header-clock {
+            font-family: var(--font-m);
+            font-size: 2rem; font-weight: 700;
+            color: var(--text);
+            text-shadow: 0 0 12px rgba(59,130,246,.4);
+            line-height: 1; margin-bottom: 1px;
+        }
+        #header-date {
+            font-family: var(--font-m);
+            font-size: .65rem; color: var(--muted);
+            letter-spacing: .08em; text-transform: uppercase;
+            line-height: 1; margin-top: 1px;
+        }
+
+        .header-right {
+            display: flex; align-items: center; gap: 16px; text-align: right;
+        }
+        #header-location {
+            font-family: var(--font-m); font-size: .8rem;
+            color: var(--muted); letter-spacing: .04em;
+        }
+        #conn-status {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--yellow);
+            box-shadow: 0 0 0 0 rgba(234,179,8,.6);
+            animation: pulse-warn 2s ease-out infinite;
+        }
+        #conn-status.ok     { background: var(--green); animation: pulse-ok 2s ease-out infinite; }
+        #conn-status.error  { background: var(--red);   animation: pulse-err 1s ease-out infinite; }
+
+        /* ── BODY ───────────────────────────────────────────── */
+        #body {
+            flex: 1; display: flex; overflow: hidden; position: relative;
+        }
+
+        /* ── MAIN PANEL ─────────────────────────────────────── */
+        #main-panel {
+            flex: 1; position: relative; overflow: hidden;
+        }
+
+        /* ── SLIDES ─────────────────────────────────────────── */
+        .slide {
+            position: absolute; inset: 0;
+            opacity: 0; pointer-events: none;
+            transition: opacity .4s ease;
+        }
+        .slide.active {
+            opacity: 1; pointer-events: auto;
+        }
+
+        /* Radar slide */
+        #slide-radar { background: var(--bg); }
+        #radar-map   { width: 100%; height: 100%; }
+
+        /* Radar label */
+        #radar-label {
+            position: absolute; top: 12px; left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-d); font-size: .65rem;
+            letter-spacing: .25em; color: var(--accent2);
+            text-transform: uppercase; opacity: .8; z-index: 10;
+            background: rgba(10,14,26,.6);
+            padding: 4px 12px; border-radius: 4px;
+        }
+
+        /* Polygon legend */
+        #polygon-legend {
+            position: absolute; bottom: 16px; right: 16px;
+            z-index: 30; background: rgba(10,14,26,.85);
+            border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 14px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .legend-row {
+            display: flex; align-items: center; gap: 8px;
+            font-family: var(--font-m); font-size: .62rem;
+            color: var(--muted); letter-spacing: .06em;
+        }
+        .legend-swatch {
+            width: 14px; height: 10px; border-radius: 2px; flex-shrink: 0;
+        }
+
+        /* Forecast slide */
+        #slide-forecast {
+            background: linear-gradient(180deg, rgba(10,14,26,.98) 0%, rgba(17,24,39,.98) 100%);
+            display: flex; flex-direction: column; padding: 24px;
+        }
+        .slide-label {
+            font-family: var(--font-d); font-size: .8rem;
+            letter-spacing: .2em; color: var(--accent2);
+            text-transform: uppercase; margin-bottom: 20px;
+            text-align: center;
+        }
+        #forecast-content {
+            flex: 1; display: flex; gap: 16px;
+            align-items: center; justify-content: center; flex-wrap: wrap;
+        }
+        .forecast-card {
+            background: rgba(26,34,53,.8);
+            border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px 16px;
+            text-align: center; min-width: 140px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .forecast-day  { font-family: var(--font-d); font-size: .75rem; letter-spacing: .1em; color: var(--muted); }
+        .forecast-icon { font-size: 2.5rem; line-height: 1; }
+        .forecast-desc { font-size: .8rem; color: var(--text); }
+        .forecast-temps { display: flex; gap: 10px; justify-content: center; align-items: baseline; }
+        .forecast-high  { font-family: var(--font-m); font-size: 1.4rem; font-weight: 700; color: var(--yellow); }
+        .forecast-low   { font-family: var(--font-m); font-size: 1rem; color: var(--muted); }
+        .forecast-precip { font-size: .72rem; color: var(--accent2); }
+        .forecast-loading, .forecast-placeholder { color: var(--muted); font-size: .9rem; text-align: center; }
+
+        /* Alerts slide */
+        #slide-alerts {
+            background: linear-gradient(180deg, rgba(10,14,26,.98) 0%, rgba(17,24,39,.98) 100%);
+            padding: 24px; overflow-y: auto;
+        }
+        #alerts-content { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .alert-detail-card {
+            background: rgba(26,34,53,.8);
+            border-left: 4px solid var(--muted);
+            border-radius: 0 10px 10px 0;
+            padding: 16px 20px;
+        }
+        .alert-detail-card--extreme { border-left-color: var(--red); }
+        .alert-detail-card--severe  { border-left-color: var(--orange); }
+        .alert-detail-card--moderate{ border-left-color: var(--yellow); }
+        .alert-detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .alert-detail-event  { font-family: var(--font-d); font-size: .8rem; letter-spacing: .1em; }
+        .alert-detail-severity { font-family: var(--font-m); font-size: .7rem; color: var(--muted); }
+        .alert-detail-headline { font-size: .85rem; color: rgba(240,244,255,.85); margin-bottom: 6px; }
+        .alert-detail-area  { font-family: var(--font-m); font-size: .72rem; color: var(--muted); }
+        .alert-none { color: var(--muted); font-size: .9rem; text-align: center; padding: 40px 0; }
+
+        /* Cities slide */
+        #slide-cities {
+            background: linear-gradient(180deg, rgba(10,14,26,.98) 0%, rgba(17,24,39,.98) 100%);
+            padding: 24px; overflow-y: auto;
+        }
+        #cities-content { display: flex; flex-direction: column; gap: 6px; margin-top: 20px; }
+        .city-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(26,34,53,.6);
+            border: 1px solid rgba(59,130,246,.1);
+            border-radius: 8px;
+        }
+        .city-name  { font-family: var(--font-d); font-size: .8rem; letter-spacing: .06em; }
+        .city-state { font-size: .72rem; color: var(--muted); margin-left: 8px; }
+        .city-temps { display: flex; gap: 12px; align-items: baseline; }
+        .city-high  { font-family: var(--font-m); font-size: 1.2rem; font-weight: 700; color: var(--yellow); }
+        .city-low   { font-family: var(--font-m); font-size: .9rem; color: var(--muted); }
+        .city-icon  { font-size: 1.6rem; }
+        .city-cond  { font-size: .72rem; color: var(--muted); text-align: right; }
+
+        /* Waiting screen */
+        #slide-waiting {
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg);
+        }
+        .waiting-inner { text-align: center; }
+        .waiting-logo  { font-size: 4rem; margin-bottom: 16px; animation: pulse-ok 3s ease-in-out infinite; }
+        .waiting-title {
+            font-family: var(--font-d); font-size: 2.5rem; font-weight: 900;
+            letter-spacing: .2em; color: var(--accent2);
+            text-shadow: 0 0 30px rgba(6,182,212,.5);
+            margin-bottom: 8px;
+        }
+        .waiting-sub { font-size: .9rem; color: var(--muted); letter-spacing: .1em; margin-bottom: 20px; }
+        .waiting-status { font-family: var(--font-m); font-size: .8rem; color: var(--accent); }
+
+        /* ── SIDE PANEL ─────────────────────────────────────── */
+        #side-panel {
+            width: 300px; flex-shrink: 0;
+            background: linear-gradient(180deg, rgba(10,14,26,.92) 0%, rgba(17,24,39,.88) 100%);
+            border-left: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            display: flex; flex-direction: column;
+            z-index: 20;
+        }
+        .side-panel-title {
+            font-family: var(--font-d); font-size: .65rem;
+            letter-spacing: .2em; color: var(--accent2);
+            text-transform: uppercase; text-align: center;
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        #side-alerts { flex: 1; overflow-y: auto; padding: 8px 0; }
+        .side-alert-item {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(59,130,246,.08);
+            transition: background .2s;
+        }
+        .side-alert-item--extreme { border-left: 3px solid var(--red); }
+        .side-alert-item--severe  { border-left: 3px solid var(--orange); }
+        .side-alert-item--moderate{ border-left: 3px solid var(--yellow); }
+        .side-alert-event { font-family: var(--font-d); font-size: .68rem; letter-spacing: .08em; margin-bottom: 2px; }
+        .side-alert-area  { font-family: var(--font-m); font-size: .6rem; color: var(--muted); }
+        .side-alert-none  { padding: 20px 16px; color: var(--muted); font-size: .8rem; text-align: center; }
+
+        /* ── TICKER ─────────────────────────────────────────── */
+        #alert-ticker {
+            flex-shrink: 0;
+            height: 52px;
+            background: linear-gradient(90deg, rgba(10,14,26,.98) 0%, rgba(17,24,39,.95) 100%);
+            border-top: 2px solid var(--border);
+            display: flex; align-items: center; overflow: hidden;
+            z-index: 50;
+        }
+        #alert-ticker.hidden { display: none; }
+        .ticker-label {
+            flex-shrink: 0;
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 20px; height: 100%;
+            background: var(--accent);
+            font-family: var(--font-d); font-size: .7rem;
+            font-weight: 700; letter-spacing: .15em;
+            color: #fff; text-transform: uppercase;
+            white-space: nowrap;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+            padding-right: 26px;
+        }
+        .ticker-label.warning { background: var(--red); animation: alert-flash 1s ease-in-out infinite; }
+        .ticker-track  { flex: 1; overflow: hidden; height: 100%; display: flex; align-items: center; }
+        #ticker-content {
+            display: flex; align-items: center;
+            white-space: nowrap;
+            font-family: var(--font-m); font-size: .95rem;
+            color: var(--text); letter-spacing: .03em;
+            animation: ticker-scroll 60s linear infinite;
+        }
+
+        /* ── ALERT BANNER (non-takeover) ───────────────────── */
+        #alert-banner {
+            position: absolute; left: 0; right: 300px; top: 74px;
+            background: rgba(10,14,26,.97);
+            border-bottom: 3px solid var(--red);
+            border-right: 1px solid var(--border);
+            padding: 14px 20px 6px 24px;
+            display: flex; align-items: center; gap: 16px;
+            z-index: 150;
+            transform: translateY(-110%);
+            transition: transform .5s cubic-bezier(.16,1,.3,1);
+            pointer-events: none;
+            flex-wrap: nowrap;
+        }
+        #alert-banner.visible {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .banner-stripe {
+            width: 5px; height: 56px; border-radius: 3px;
+            background: var(--red); flex-shrink: 0;
+            box-shadow: 0 0 14px rgba(239,68,68,.7);
+            animation: alert-flash 1.2s ease-in-out infinite;
+        }
+        .banner-stripe.storm  { background: var(--accent); box-shadow: 0 0 14px rgba(59,130,246,.7); animation: none; }
+        .banner-stripe.flood  { background: var(--green);  box-shadow: 0 0 14px rgba(34,197,94,.7);  animation: none; }
+        .banner-stripe.fire   { background: var(--orange); box-shadow: 0 0 14px rgba(249,115,22,.7); animation: none; }
+        .banner-icon  { font-size: 2.4rem; line-height: 1; flex-shrink: 0; }
+        .banner-body  { flex: 1; min-width: 0; }
+        .banner-type  {
+            font-family: var(--font-d); font-size: .75rem;
+            font-weight: 700; letter-spacing: .15em;
+            color: var(--red); text-transform: uppercase; margin-bottom: 3px;
+        }
+        .banner-type.storm  { color: var(--accent); }
+        .banner-type.flood  { color: var(--green); }
+        .banner-type.fire   { color: var(--orange); }
+        .banner-headline {
+            font-size: .95rem; color: var(--text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .banner-area { font-family: var(--font-m); font-size: .72rem; color: var(--muted); margin-top: 2px; }
+        /* Progress bar replaces timer text */
+        .banner-progress-wrap {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            height: 4px; background: rgba(255,255,255,.08);
+            overflow: hidden;
+        }
+        .banner-progress-fill {
+            height: 100%;
+            background: var(--red);
+            width: 100%;
+            transition: width 0.05s linear;
+        }
+        .banner-dismiss {
+            background: rgba(255,255,255,.06); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--muted); cursor: pointer;
+            padding: 8px 14px; font-size: .8rem;
+            transition: all .2s; flex-shrink: 0;
+            z-index: 1;
+        }
+        .banner-dismiss:hover { border-color: var(--red); color: var(--red); background: rgba(239,68,68,.08); }
+
+
+        /* ── ALERT TAKEOVER (full screen, manual only) ────── */
+        #alert-takeover {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 200; opacity: 0; pointer-events: none;
+            transition: opacity .3s ease;
+        }
+        #alert-takeover.active {
+            opacity: 1; pointer-events: auto;
+            animation: alert-slide-in .6s cubic-bezier(.16,1,.3,1) both;
+        }
+        .takeover-border {
+            position: absolute; inset: 0;
+            border: 6px solid var(--red);
+            animation: alert-flash .8s ease-in-out infinite;
+            pointer-events: none;
+        }
+        #alert-takeover.active[data-type="storm"]     { background: radial-gradient(ellipse at center, rgba(30,58,95,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="storm"]     .takeover-border { border-color: var(--accent); }
+        #alert-takeover.active[data-type="tornado"]   { background: radial-gradient(ellipse at center, rgba(127,29,29,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="flood"]     { background: radial-gradient(ellipse at center, rgba(20,83,45,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="flood"]     .takeover-border { border-color: var(--green); }
+        #alert-takeover.active[data-type="fire"]      { background: radial-gradient(ellipse at center, rgba(124,45,18,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="fire"]      .takeover-border { border-color: var(--orange); }
+        #alert-takeover.active[data-type="emergency"] { background: radial-gradient(ellipse at center, rgba(88,28,135,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="emergency"] .takeover-border { border-color: #a855f7; }
+        #alert-takeover.active[data-type="info"]      { background: radial-gradient(ellipse at center, rgba(17,24,39,.97) 0%, rgba(10,14,26,.98) 100%); }
+        #alert-takeover.active[data-type="info"]      .takeover-border { border-color: var(--accent2); }
+        .takeover-inner { position: relative; z-index: 1; text-align: center; padding: 40px; }
+        #takeover-icon  { font-size: 6rem; line-height: 1; margin-bottom: 20px; filter: drop-shadow(0 0 20px rgba(239,68,68,.6)); animation: alert-flash 1.2s ease-in-out infinite; }
+        #takeover-type  { font-family: var(--font-d); font-size: 3.5rem; font-weight: 900; letter-spacing: .15em; color: #fff; text-shadow: 0 0 30px rgba(239,68,68,.6); margin-bottom: 16px; }
+        #takeover-headline { font-size: 1.5rem; font-weight: 500; color: rgba(255,255,255,.92); max-width: 1200px; line-height: 1.4; margin-bottom: 12px; }
+        #takeover-county   { font-family: var(--font-m); font-size: 1.1rem; color: rgba(255,255,255,.65); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 20px; }
+        #takeover-expires  { font-family: var(--font-m); font-size: .9rem; color: rgba(255,255,255,.5); }
+        #takeover-source   { font-family: var(--font-m); font-size: .75rem; color: rgba(255,255,255,.35); margin-top: 12px; letter-spacing: .08em; }
+
+        /* ── LOWER THIRD ───────────────────────────────────── */
+        #lower-third {
+            position: absolute;
+            bottom: 52px; left: 0; right: 300px;
+            height: 76px;
+            display: flex; align-items: center;
+            padding: 0 36px;
+            background: linear-gradient(90deg, rgba(10,14,26,.96) 0%, rgba(59,130,246,.15) 60%, transparent 100%);
+            border-top: 2px solid var(--accent);
+            transform: translateY(100%); opacity: 0;
+            transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .4s ease;
+            z-index: 40;
+        }
+        #lower-third.visible { transform: translateY(0); opacity: 1; }
+        .lt-bar { width: 4px; height: 48px; background: var(--accent); border-radius: 2px; margin-right: 18px; flex-shrink: 0; box-shadow: 0 0 12px rgba(59,130,246,.6); }
+        #lower-third-text { font-family: var(--font-d); font-size: 1.2rem; font-weight: 600; color: var(--text); letter-spacing: .05em; }
+        #lower-third.lt-warning  .lt-bar { background: var(--orange); box-shadow: 0 0 12px rgba(249,115,22,.6); }
+        #lower-third.lt-warning  { border-top-color: var(--orange); }
+        #lower-third.lt-alert    .lt-bar { background: var(--red);    box-shadow: 0 0 16px rgba(239,68,68,.8); }
+        #lower-third.lt-alert    { border-top-color: var(--red); }
+        #lower-third.lt-success  .lt-bar { background: var(--green);  box-shadow: 0 0 12px rgba(34,197,94,.6); }
+        #lower-third.lt-success  { border-top-color: var(--green); }
+
+        /* ── SCAN LINE EFFECT ────────────────────────────────── */
+        #scan-lines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 5;
+            background: repeating-linear-gradient(
+                0deg, transparent, transparent 3px,
+                rgba(0,0,0,.05) 3px, rgba(0,0,0,.05) 4px
+            );
+        }
+
+        /* ── ANIMATIONS ──────────────────────────────────────── */
+        @keyframes pulse-ok  { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}  70%{box-shadow:0 0 0 8px rgba(34,197,94,0)} }
+        @keyframes pulse-warn{ 0%,100%{box-shadow:0 0 0 0 rgba(234,179,8,.6)}  70%{box-shadow:0 0 0 8px rgba(234,179,8,0)} }
+        @keyframes pulse-err { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.6)}  70%{box-shadow:0 0 0 8px rgba(239,68,68,0)} }
+        @keyframes alert-flash { 0%,100%{opacity:1} 50%{opacity:.5} }
+        @keyframes alert-slide-in { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+        @keyframes ticker-scroll { 0%{transform:translateX(100vw)} 100%{transform:translateX(-100%)} }
+
+        /* Leaflet dark map overrides */
+        .leaflet-container { background: #0a0e1a; }
+
+        /* ── CITIES SLIDE ───────────────────────────────────── */
+        #slide-cities #cities-content {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 10px;
+            max-height: 100%;
+            overflow: hidden;
+        }
+        .city-row {
+            display: flex; align-items: center; gap: 14px;
+            background: rgba(255,255,255,.04);
+            border: 1px solid rgba(59,130,246,.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+        }
+        .city-icon { font-size: 2.2rem; line-height: 1; }
+        .city-name { font-family: var(--font-d); font-size: .85rem; font-weight: 700; letter-spacing: .05em; color: var(--text); }
+        .city-state { font-family: var(--font-m); font-size: .65rem; color: var(--muted); }
+        .city-cond  { font-family: var(--font-m); font-size: .68rem; color: var(--muted); margin-top: 2px; }
+        .city-temps { margin-left: auto; text-align: right; }
+        .city-high  { font-family: var(--font-d); font-size: 1.2rem; color: var(--orange); }
+        .city-low   { font-family: var(--font-m); font-size: .85rem; color: var(--muted); }
+        .city-loading { color: var(--muted); font-family: var(--font-m); font-size: .8rem; padding: 30px; text-align: center; }
+
+        /* ── FORECAST CURRENT CARD ──────────────────────────── */
+        .forecast-card--current {
+            border: 1px solid rgba(59,130,246,.4);
+            background: rgba(59,130,246,.08);
+            box-shadow: 0 0 20px rgba(59,130,246,.15);
+        }
+        .forecast-card--current .forecast-high {
+            color: var(--accent2);
+        }
+
+        /* ── RADAR CURSOR ───────────────────────────────────── */
+        .radar-cursor-icon {
+            pointer-events: none;
+        }
+        .radar-cursor-crosshair {
+            width: 20px; height: 20px;
+            border: 2px solid rgba(6, 182, 212, 0.8);
+            border-radius: 50%;
+            position: relative;
+            background: rgba(6, 182, 212, 0.2);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+            animation: pulse-ok 1.5s infinite;
+        }
+        .radar-cursor-crosshair::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px; height: 4px;
+            background: #fff;
+            border-radius: 50%;
+        }
+</style>
 </head>
-<body class="overlay-root">
-    <!-- Header bar -->
-    <header class="overlay-header">
+<body>
+<div id="root">
+
+    <!-- ══ HEADER ══════════════════════════════════════════════ -->
+    <header id="header">
         <div class="header-brand">
-            <span class="brand-logo">⚡</span>
-            <span class="brand-name">S.H.E.L.L.Y.</span>
-            <span class="brand-sub">LIVE BROADCAST</span>
+            <span class="brand-lightning">⚡</span>
+            <div>
+                <div class="brand-name">S.H.E.L.L.Y.</div>
+                <div class="brand-sub">LIVE BROADCAST</div>
+            </div>
         </div>
-        <div class="header-mode" id="mode-label">BROADCAST MODE</div>
+        <div class="header-center">
+            <div id="mode-label">BROADCAST MODE</div>
+            <div id="header-clock">--:--:--</div>
+            <div id="header-date"></div>
+        </div>
         <div class="header-right">
-            <span class="header-location" id="header-location">Waiting for broadcast…</span>
-            <span class="header-clock" id="header-clock">--:--:--</span>
-            <span class="connection-status" id="conn-status" title="Dashboard connection"></span>
+            <span id="header-location">Waiting for broadcast…</span>
+            <span id="conn-status" title="Connection status"></span>
         </div>
     </header>
 
-    <!-- Main body -->
-    <div class="overlay-body">
-        <main class="main-panel" id="main-panel">
-            <!-- Radar slide (default) -->
-            <div class="slide active" id="slide-radar">
-                <div class="slide-label" id="radar-label">LIVE RADAR</div>
-                <div id="radar-map" class="radar-map"></div>
+    <!-- ══ BODY ════════════════════════════════════════════════ -->
+    <div id="body">
+
+        <!-- Main panel -->
+        <main id="main-panel">
+
+            <!-- Alert banner (non-disruptive) -->
+            <div id="alert-banner" role="alert" aria-live="assertive">
+                <div class="banner-stripe" id="banner-stripe"></div>
+                <div class="banner-icon" id="banner-icon">⚠️</div>
+                <div class="banner-body">
+                    <div class="banner-type" id="banner-type">WARNING</div>
+                    <div class="banner-headline" id="banner-headline"></div>
+                    <div class="banner-area" id="banner-area"></div>
+                </div>
+                <div class="banner-progress-wrap">
+                    <div class="banner-progress-fill" id="banner-progress"></div>
+                </div>
+                <button class="banner-dismiss" id="banner-dismiss" onclick="dismissBanner()">✕ Dismiss</button>
             </div>
+
+            <!-- Radar slide -->
+            <div class="slide active" id="slide-radar">
+                <div id="radar-map"></div>
+                <div id="radar-label">LIVE RADAR</div>
+                <div id="polygon-legend">
+                    <div class="legend-row"><div class="legend-swatch" style="background:rgba(239,68,68,.6);border:1.5px solid #ef4444"></div>Tornado Warning</div>
+                    <div class="legend-row"><div class="legend-swatch" style="background:rgba(249,115,22,.5);border:1.5px solid #f97316"></div>Severe Thunderstorm</div>
+                    <div class="legend-row"><div class="legend-swatch" style="background:rgba(34,197,94,.4);border:1.5px solid #22c55e"></div>Flash Flood</div>
+                    <div class="legend-row"><div class="legend-swatch" style="background:rgba(234,179,8,.4);border:1.5px solid #eab308"></div>Fire / Red Flag</div>
+                    <div class="legend-row"><div class="legend-swatch" style="background:rgba(59,130,246,.3);border:1.5px solid #3b82f6"></div>Watch / Advisory</div>
+                </div>
+            </div>
+
             <!-- Forecast slide -->
             <div class="slide" id="slide-forecast">
-                <div class="slide-label" id="forecast-label">FORECAST</div>
-                <div id="forecast-content" class="conditions-content"></div>
+                <div class="slide-label" id="forecast-label">7-DAY FORECAST</div>
+                <div id="forecast-content"></div>
             </div>
+
             <!-- Alerts slide -->
             <div class="slide" id="slide-alerts">
                 <div class="slide-label">⚠ ACTIVE ALERTS</div>
-                <div id="alerts-content" class="alerts-detail-content"></div>
+                <div id="alerts-content"></div>
             </div>
+
             <!-- Cities slide -->
             <div class="slide" id="slide-cities">
                 <div class="slide-label">🌎 CITY FORECASTS</div>
-                <div id="cities-content" class="city-list city-list-full"></div>
+                <div id="cities-content"></div>
             </div>
-            <!-- Waiting for broadcast screen (shown when not connected) -->
-            <div class="slide active waiting-screen" id="slide-waiting">
+
+            <!-- Waiting screen -->
+            <div class="slide active" id="slide-waiting">
                 <div class="waiting-inner">
                     <div class="waiting-logo">⚡</div>
                     <div class="waiting-title">S.H.E.L.L.Y.</div>
-                    <div class="waiting-sub">Stream Display</div>
+                    <div class="waiting-sub">Stream Display System</div>
                     <div class="waiting-status" id="waiting-status">Connecting to dashboard…</div>
                 </div>
             </div>
+
+            <!-- Scanlines -->
+            <div id="scan-lines"></div>
+
+            <!-- Lower third -->
+            <div id="lower-third">
+                <div class="lt-bar"></div>
+                <div id="lower-third-text"></div>
+            </div>
+
+            <!-- Alert takeover -->
+            <div id="alert-takeover">
+                <div class="takeover-border"></div>
+                <div class="takeover-inner">
+                    <div id="takeover-icon">⚠️</div>
+                    <div id="takeover-type">WEATHER ALERT</div>
+                    <div id="takeover-headline"></div>
+                    <div id="takeover-county"></div>
+                    <div id="takeover-expires"></div>
+                    <div id="takeover-source">National Weather Service</div>
+                </div>
+            </div>
         </main>
-        <aside class="side-panel" id="side-panel">
+
+        <!-- Side panel -->
+        <aside id="side-panel">
             <div class="side-panel-title">⚠ ACTIVE ALERTS</div>
-            <div id="side-alerts" class="side-alert-list"></div>
+            <div id="side-alerts"></div>
         </aside>
-    </div>
 
-    <!-- Alert ticker -->
-    <div class="alert-ticker" id="alert-ticker">
-        <div class="ticker-label">⚠ ALERTS</div>
+    </div><!-- /body -->
+
+    <!-- Ticker -->
+    <div id="alert-ticker">
+        <div class="ticker-label" id="ticker-label">⚠ ALERTS</div>
         <div class="ticker-track">
-            <span class="ticker-content" id="ticker-content">Connecting to S.H.E.L.L.Y. stream server…</span>
+            <span id="ticker-content">Connecting to S.H.E.L.L.Y. stream server…</span>
         </div>
     </div>
 
-    <!-- Lower third overlay -->
-    <div class="lower-third hidden" id="lower-third">
-        <div class="lower-third__bar"></div>
-        <div class="lower-third-text" id="lower-third-text"></div>
-    </div>
+</div><!-- /root -->
 
-    <!-- Alert takeover -->
-    <div class="alert-takeover hidden" id="alert-takeover">
-        <div class="takeover-inner">
-            <div class="takeover-icon" id="takeover-icon">⚠️</div>
-            <div class="takeover-type" id="takeover-type">WEATHER ALERT</div>
-            <div class="takeover-headline" id="takeover-headline"></div>
-            <div class="takeover-county" id="takeover-county"></div>
-            <div class="takeover-expires" id="takeover-expires"></div>
-            <div class="takeover-source">National Weather Service</div>
-        </div>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="js/stream-display.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="js/stream-display.js"></script>
 </body>
 </html>

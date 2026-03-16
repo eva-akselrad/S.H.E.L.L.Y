@@ -487,19 +487,45 @@ app.get('/api/spc-outlook', async (req, res) => {
 // ── Stream State ───────────────────────────────────────────────
 // Single source of truth for what the stream display is showing.
 let streamState = {
-    radar:      { region: 'national', lat: null, lon: null, zoom: 5, animation: true },
+    radar:      { region: 'national', lat: null, lon: null, zoom: 5, animation: true, animSpeed: 600, opacity: 0.65 },
     mode:       'radar',          // 'radar' | 'forecast' | 'alerts' | 'cities'
     lowerThird: { visible: false, text: '', style: 'info' },
     alert:      { active: false, type: 'info', headline: '', county: '', expires: null },
     forecast:   { visible: false, location: '', lat: null, lon: null },
     ticker:     { visible: true, custom: '' },
+    autoFocus:  true,  // auto-pan map to new warning polygons
+    autoTTS:    true,  // TTS reads new NWS warnings aloud
+    autoBanner: true,  // show non-disruptive banner for new warnings
+    polygonVisibility: {
+        tornado: true, storm: true, flood: true, fire: true,
+        advisory: true, watch: true,
+    },
 };
 
 // ── Cached NWS alerts (polled server-side every 2 min) ─────────
 let cachedNwsAlerts = [];
 let nwsAlertError   = null;
+let lastSeenAlertIds = new Set(); // for diffing new vs. known alerts
 const NWS_POLL_ZONE = process.env.NWS_POLL_ZONE || ''; // e.g. "TXC113" or leave blank for national
 const NWS_POLL_MS   = 2 * 60 * 1000; // 2 minutes
+
+// Alert types that trigger auto-focus, auto-TTS, and auto-banner
+const AUTO_ALERT_EVENTS = [
+    'tornado warning', 'severe thunderstorm warning', 'flash flood warning',
+    'tornado emergency', 'particularly dangerous situation',
+    'flash flood emergency', 'fire weather watch', 'red flag warning',
+];
+
+function alertCategory(event) {
+    const e = (event || '').toLowerCase();
+    if (e.includes('tornado'))             return 'tornado';
+    if (e.includes('thunderstorm'))        return 'storm';
+    if (e.includes('flash flood'))         return 'flood';
+    if (e.includes('fire') || e.includes('red flag')) return 'fire';
+    if (e.includes('watch'))               return 'watch';
+    if (e.includes('advisory'))            return 'advisory';
+    return 'advisory';
+}
 
 async function pollNwsAlerts() {
     const url  = NWS_POLL_ZONE
@@ -512,19 +538,46 @@ async function pollNwsAlerts() {
         });
         if (!r.ok) throw new Error(`NWS HTTP ${r.status}`);
         const json = await r.json();
-        cachedNwsAlerts = (json.features || []).filter(f => f?.properties).map(f => ({
-            id:       f.id,
-            event:    f.properties?.event    ?? '',
-            headline: f.properties?.headline ?? '',
-            area:     f.properties?.areaDesc ?? '',
-            severity: f.properties?.severity ?? '',
-            urgency:  f.properties?.urgency  ?? '',
-            expires:  f.properties?.expires  ?? null,
-            sent:     f.properties?.sent     ?? null,
+
+        const features = (json.features || []).filter(f => f?.properties);
+
+        cachedNwsAlerts = features.map(f => ({
+            id:          f.id,
+            event:       f.properties?.event    ?? '',
+            headline:    f.properties?.headline ?? '',
+            description: (f.properties?.description ?? '').slice(0, 2000),
+            area:        f.properties?.areaDesc ?? '',
+            severity:    f.properties?.severity ?? '',
+            urgency:     f.properties?.urgency  ?? '',
+            certainty:   f.properties?.certainty ?? '',
+            expires:     f.properties?.expires  ?? null,
+            sent:        f.properties?.sent     ?? null,
+            category:    alertCategory(f.properties?.event),
+            geometry:    f.geometry ?? null,  // GeoJSON polygon/multipolygon
         }));
+
         nwsAlertError = null;
+
+        // ── Diff: find newly appeared alerts that merit auto-actions ──
+        const currentIds  = new Set(cachedNwsAlerts.map(a => a.id));
+        const newAlerts   = cachedNwsAlerts.filter(a =>
+            !lastSeenAlertIds.has(a.id) &&
+            AUTO_ALERT_EVENTS.some(e => a.event.toLowerCase().includes(e.replace(' warning','').replace(' emergency','')))
+        );
+        lastSeenAlertIds  = currentIds;
+
         // Push fresh alerts to all connected WebSocket clients
         broadcastToDisplays({ type: 'nws-alerts', alerts: cachedNwsAlerts });
+        broadcastSSE({ type: 'nws-alerts', alerts: cachedNwsAlerts });
+
+        // Push new-alert event so display can auto-focus/TTS/banner
+        if (newAlerts.length > 0) {
+            const newAlertMsg = { type: 'new-alerts', alerts: newAlerts };
+            broadcastToDisplays(newAlertMsg);
+            broadcastSSE(newAlertMsg);
+            console.log(`[Stream] ${newAlerts.length} NEW alert(s):`, newAlerts.map(a => a.event).join(', '));
+        }
+
     } catch (err) {
         nwsAlertError = err.message;
         console.warn('[Stream] NWS poll error:', err.message);
@@ -579,6 +632,26 @@ wss.on('connection', (ws, req) => {
                 ws.send(JSON.stringify({ type: 'state', state: streamState }));
                 ws.send(JSON.stringify({ type: 'nws-alerts', alerts: cachedNwsAlerts }));
             }
+            return;
+        }
+
+        // Heartbeat ping from client – reset alive flag
+        if (msg.type === 'ping') {
+            ws.isAlive = true;
+            return;
+        }
+
+        // Display relays map-moved so dashboards can sync position
+        if (msg.type === 'map-moved' && ws.role === 'display') {
+            broadcastToDashboards({ type: 'map-moved', lat: msg.lat, lon: msg.lon, zoom: msg.zoom });
+            return;
+        }
+
+        // Dashboard relays cursor-move so displays can show cursor
+        if (msg.type === 'cursor-move' && ws.role === 'dashboard') {
+            broadcastToDisplays({ type: 'cursor-move', lat: msg.lat, lon: msg.lon, visible: msg.visible });
+            // Also broadcast via SSE for SSE clients if needed
+            broadcastSSE({ type: 'cursor-move', lat: msg.lat, lon: msg.lon, visible: msg.visible });
             return;
         }
 
@@ -652,17 +725,61 @@ function applyStreamCommand(action, data) {
             };
             if (data.visible) streamState.mode = 'forecast';
             break;
+        case 'toggle-overlay':
+            // Relay direct instruction to all display clients (no state change needed)
+            broadcastToDisplays({ type: 'overlay-toggle', overlay: data.overlay, visible: !!data.visible });
+            return; // skip the normal broadcastToDashboards state below
         case 'trigger-tts':
-            // Ephemeral – not stored in state, just broadcast
-            break;
+            // Ephemeral – broadcast directly without state change
+            broadcastToDisplays({ type: 'tts', ...data });
+            broadcastSSE({ type: 'tts', ...data });
+            console.log(`[Stream] TTS triggered (WS):`, (data.text || '').slice(0, 60));
+            return; // skip second broadcast below
         case 'trigger-sound':
-            // Ephemeral – not stored in state, just broadcast
+            // Ephemeral – broadcast directly without state change
+            broadcastToDisplays({ type: 'sound', sound: data.sound, volume: data.volume ?? 0.8 });
+            broadcastSSE({ type: 'sound', sound: data.sound, volume: data.volume ?? 0.8 });
+            console.log(`[Stream] Sound triggered (WS):`, data.sound);
+            return;
+        // ── New commands ────────────────────────────────────────
+        case 'set-auto-focus':
+            streamState.autoFocus = !!data.enabled;
             break;
+        case 'set-auto-tts':
+            streamState.autoTTS = !!data.enabled;
+            break;
+        case 'set-auto-banner':
+            streamState.autoBanner = !!data.enabled;
+            break;
+        case 'set-polygon-visibility':
+            if (data.type && data.type in streamState.polygonVisibility) {
+                streamState.polygonVisibility[data.type] = !!data.visible;
+            }
+            break;
+        case 'set-anim-speed':
+            streamState.radar.animSpeed = Math.min(Math.max(parseInt(data.speed) || 600, 100), 3000);
+            break;
+        case 'set-radar-opacity':
+            streamState.radar.opacity = Math.min(Math.max(parseFloat(data.opacity) || 0.65, 0.1), 1.0);
+            break;
+        case 'focus-polygon': {
+            // Ephemeral – tell display to pan to a specific alert by id or bbox
+            const focusMsg = { type: 'focus-polygon', alertId: data.alertId, bbox: data.bbox };
+            broadcastToDisplays(focusMsg);
+            broadcastSSE(focusMsg);
+            console.log(`[Stream] Focus polygon: alertId=${data.alertId}`);
+            return;
+        }
+        case 'dismiss-banner':
+            // Ephemeral – tell display to hide the alert banner
+            broadcastToDisplays({ type: 'dismiss-banner' });
+            return;
         default:
             return; // unknown action – don't broadcast
     }
     // Broadcast updated state to all display/overlay clients
     broadcastToDisplays({ type: 'state', state: streamState });
+    broadcastSSE({ type: 'state', state: streamState });
     console.log(`[Stream] Command: ${action}`, data);
 }
 
@@ -758,6 +875,36 @@ app.post('/api/stream/sound', streamLimiter, (req, res) => {
 app.get('/api/stream/alerts', (_, res) => {
     res.setHeader('Cache-Control', 'public, max-age=120');
     res.json({ alerts: cachedNwsAlerts, error: nwsAlertError, polledAt: Date.now() });
+});
+
+// ── GET /api/stream/alerts/polygons ──────────────────────────
+// Returns GeoJSON FeatureCollection of all active alert polygons
+app.get('/api/stream/alerts/polygons', (_, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    const features = cachedNwsAlerts
+        .filter(a => a.geometry)
+        .map(a => ({
+            type: 'Feature',
+            id: a.id,
+            geometry: a.geometry,
+            properties: {
+                event: a.event,
+                headline: a.headline,
+                area: a.area,
+                severity: a.severity,
+                category: a.category,
+                expires: a.expires,
+            }
+        }));
+    res.json({ type: 'FeatureCollection', features });
+});
+
+// ── POST /api/stream/alerts/force-check ──────────────────────
+// Forces an immediate NWS poll (admin only)
+app.post('/api/stream/alerts/force-check', streamLimiter, async (req, res) => {
+    if (!checkAuth(req, res)) return;
+    await pollNwsAlerts();
+    res.json({ ok: true, count: cachedNwsAlerts.length });
 });
 
 // ── Connected client count ────────────────────────────────────

@@ -1,888 +1,541 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.H.E.L.L.Y. – Stream Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/overlay.css">
-    <style>
-        /* ── Login screen ──────────────────────────────────────── */
-        .login-screen {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-primary);
-        }
-        .login-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-strong);
-            border-radius: var(--radius-lg);
-            padding: 48px 40px;
-            width: 100%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            box-shadow: var(--glow);
-            text-align: center;
-        }
-        .login-logo { font-size: 2.5rem; line-height: 1; }
-        .login-title {
-            font-family: var(--font-display);
-            font-size: 1.4rem;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            color: var(--accent2);
-            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
-        }
-        .login-sub { font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase; }
-        .login-error { color: var(--alert-red); font-size: 0.85rem; min-height: 1.2em; }
-        .login-form { display: flex; flex-direction: column; gap: 12px; }
-        /* ── Alert type grid ──────────────────────────────────── */
-        .alert-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .alert-type-btn {
-            display: flex; flex-direction: column; align-items: center; gap: 5px;
-            padding: 12px 8px; border-radius: var(--radius-sm); border: 2px solid transparent;
-            background: var(--bg-secondary); cursor: pointer; transition: all var(--transition);
-            font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.08em;
-            color: var(--text-secondary); text-transform: uppercase;
-        }
-        .alert-type-btn__icon { font-size: 1.5rem; line-height: 1; }
-        .alert-type-btn:hover { transform: translateY(-2px); }
-        .alert-type-btn.active { color: var(--text-primary); transform: translateY(-2px); }
-        .alert-type-btn--tornado:hover,  .alert-type-btn--tornado.active  { border-color: var(--alert-red);    background: rgba(127,29,29,0.4); box-shadow: 0 0 14px rgba(239,68,68,0.3); }
-        .alert-type-btn--storm:hover,    .alert-type-btn--storm.active    { border-color: var(--accent);       background: rgba(30,58,95,0.5);  box-shadow: 0 0 14px rgba(59,130,246,0.3); }
-        .alert-type-btn--flood:hover,    .alert-type-btn--flood.active    { border-color: var(--alert-green);  background: rgba(20,83,45,0.5);  box-shadow: 0 0 14px rgba(34,197,94,0.25); }
-        .alert-type-btn--fire:hover,     .alert-type-btn--fire.active     { border-color: var(--alert-orange); background: rgba(124,45,18,0.5); box-shadow: 0 0 14px rgba(249,115,22,0.25); }
-        .alert-type-btn--emergency:hover,.alert-type-btn--emergency.active{ border-color: #a855f7;             background: rgba(88,28,135,0.5); box-shadow: 0 0 14px rgba(168,85,247,0.25); }
-        .alert-type-btn--info:hover,     .alert-type-btn--info.active     { border-color: var(--accent2);      background: rgba(6,182,212,0.12);box-shadow: 0 0 14px rgba(6,182,212,0.2); }
-        /* ── Radar region grid ────────────────────────────────── */
-        .radar-region-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .radar-region-btn {
-            padding: 8px 4px; background: var(--bg-secondary); border: 1px solid var(--border);
-            border-radius: var(--radius-sm); color: var(--text-secondary); font-family: var(--font-mono);
-            font-size: 0.68rem; letter-spacing: 0.04em; text-align: center; cursor: pointer;
-            transition: all var(--transition); text-transform: uppercase;
-        }
-        .radar-region-btn:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(6,182,212,0.08); }
-        .radar-region-btn.active { border-color: var(--accent2); background: rgba(6,182,212,0.15); color: var(--accent2); box-shadow: 0 0 10px rgba(6,182,212,0.2); }
-        /* ── Mode tabs ────────────────────────────────────────── */
-        .mode-tabs { display: flex; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
-        .mode-tab {
-            flex: 1; padding: 9px 12px; border-radius: calc(var(--radius-sm) - 2px);
-            background: transparent; border: none; color: var(--text-secondary);
-            font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.1em;
-            text-transform: uppercase; cursor: pointer; transition: all var(--transition); text-align: center;
-        }
-        .mode-tab:hover { color: var(--text-primary); background: rgba(59,130,246,0.08); }
-        .mode-tab.active { background: var(--accent); color: #fff; box-shadow: 0 0 12px rgba(59,130,246,0.4); }
-        /* ── Sound grid ───────────────────────────────────────── */
-        .sound-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .sound-btn {
-            display: flex; flex-direction: column; align-items: center; gap: 6px;
-            padding: 14px 8px; background: var(--bg-secondary); border: 1px solid var(--border);
-            border-radius: var(--radius-sm); color: var(--text-secondary); font-family: var(--font-mono);
-            font-size: 0.68rem; letter-spacing: 0.04em; text-align: center;
-            cursor: pointer; transition: all var(--transition); text-transform: uppercase;
-        }
-        .sound-btn:hover { border-color: var(--accent); color: var(--text-primary); background: rgba(59,130,246,0.1); transform: translateY(-1px); box-shadow: var(--glow); }
-        .sound-btn:active { transform: scale(0.97); }
-        .sound-btn__icon { font-size: 1.4rem; line-height: 1; }
-        /* ── Lower third preview ──────────────────────────────── */
-        .lower-third-preview {
-            border-radius: var(--radius-sm); overflow: hidden;
-            height: 56px; position: relative; background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
-        }
-        .lower-third-preview .lower-third {
-            position: absolute; bottom: 0; left: 0; right: 0;
-            width: 100%; pointer-events: none;
-        }
-        /* ── Ticker preview ───────────────────────────────────── */
-        .ticker-preview { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; padding: 8px 12px; font-size: 0.75rem; }
-        .ticker-preview__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); font-family: var(--font-mono); }
-        /* ── db-section section header ────────────────────────── */
-        .db-section__header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
-        .db-section__icon { font-size: 1.1rem; line-height: 1; }
-        .db-section__title { font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-primary); flex: 1; }
-        .db-section__badge { font-family: var(--font-mono); font-size: 0.62rem; background: rgba(59,130,246,0.15); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; color: var(--accent2); }
-        /* ── TTS sliders ──────────────────────────────────────── */
-        .tts-slider-group { display: flex; flex-direction: column; gap: 10px; }
-        .db-range-row { display: flex; align-items: center; gap: 10px; }
-        .db-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-secondary); letter-spacing: 0.04em; white-space: nowrap; }
-        .db-range { flex: 1; accent-color: var(--accent); height: 4px; cursor: pointer; }
-        .db-range-value { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent2); min-width: 32px; text-align: right; }
-        /* ── Toggle ───────────────────────────────────────────── */
-        .db-toggle-row { display: flex; align-items: center; justify-content: space-between; }
-        .db-toggle-label { font-size: 0.82rem; color: var(--text-secondary); }
-        .db-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .db-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-        .db-toggle__track {
-            position: absolute; inset: 0; background: var(--bg-primary); border-radius: 24px;
-            border: 1px solid var(--border); cursor: pointer; transition: background 0.25s;
-        }
-        .db-toggle__track::after {
-            content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
-            background: var(--text-secondary); border-radius: 50%; transition: all 0.25s;
-        }
-        .db-toggle input:checked + .db-toggle__track { background: var(--accent); border-color: var(--accent); }
-        .db-toggle input:checked + .db-toggle__track::after { transform: translateX(20px); background: #fff; }
-        /* ── NWS item ─────────────────────────────────────────── */
-        .nws-alert-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
-        .nws-alert-item__event { font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.1em; margin-bottom: 3px; }
-        .nws-alert-item__headline { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
-        .nws-alert-item__area { font-family: var(--font-mono); font-size: 0.67rem; color: var(--text-secondary); opacity: 0.7; }
-        .nws-alert-item--extreme .nws-alert-item__event { color: #f87171; }
-        .nws-alert-item--severe  .nws-alert-item__event { color: var(--alert-orange); }
-        .nws-alert-item--moderate .nws-alert-item__event { color: var(--alert-yellow); }
-        /* ── State readout ────────────────────────────────────── */
-        .state-readout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-        .state-readout__item { background: var(--bg-primary); border-radius: var(--radius-sm); padding: 8px 10px; }
-        .state-readout__key { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-secondary); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
-        .state-readout__val { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent2); font-weight: 600; }
-        .hidden { display: none !important; }
-    </style>
-</head>
-<body style="background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-body);">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.E.L.L.Y. – Stream Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--card:#1a2235;--card2:#1e2a40;
+  --accent:#3b82f6;--accent2:#06b6d4;
+  --red:#ef4444;--orange:#f97316;--yellow:#eab308;--green:#22c55e;--purple:#a855f7;
+  --text:#f0f4ff;--muted:#94a3b8;
+  --border:rgba(59,130,246,.2);--border-s:rgba(59,130,246,.5);
+  --radius:10px;--tr:.2s ease;
+  --font-d:'Orbitron',monospace;--font-b:'Inter',sans-serif;--font-m:'Roboto Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:14px;overflow:hidden}
 
-<!-- ══════════ LOGIN SCREEN ══════════ -->
-<div id="login-screen" class="login-screen">
-    <div class="login-card">
-        <div class="login-logo">⚡</div>
-        <div>
-            <div class="login-title">S.H.E.L.L.Y.</div>
-            <div class="login-sub" style="margin-top:4px;">Stream Dashboard</div>
-        </div>
-        <div class="login-error" id="login-error" role="alert" aria-live="assertive"></div>
-        <div class="login-form">
-            <label for="login-password" class="sr-only">Admin password</label>
-            <input type="password" id="login-password" class="db-input" placeholder="Admin password" autocomplete="current-password"
-                   aria-label="Admin password" style="text-align:center;font-size:1rem;padding:14px;">
-            <button class="db-btn db-btn--primary db-btn--lg" id="login-btn" onclick="doLogin()">
-                Unlock Dashboard
-            </button>
-        </div>
+/* ── Login ─── */
+#login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:999}
+.login-card{background:var(--surface);border:1px solid var(--border-s);border-radius:var(--radius);padding:40px 36px;width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.login-logo{font-size:2rem;margin-bottom:12px}
+.login-title{font-family:var(--font-d);font-size:1.1rem;color:var(--accent2);letter-spacing:.12em;margin-bottom:4px}
+.login-sub{font-size:.75rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:24px}
+.login-err{color:var(--red);font-size:.8rem;min-height:18px;margin-bottom:8px}
+.login-inp{width:100%;padding:11px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;outline:none;transition:border-color var(--tr);margin-bottom:12px}
+.login-inp:focus{border-color:var(--accent)}
+.login-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-family:var(--font-d);font-size:.85rem;font-weight:700;letter-spacing:.06em;cursor:pointer;transition:filter var(--tr)}
+.login-btn:hover{filter:brightness(1.15)}
+
+/* ── App shell ─── */
+#app{display:none;height:100vh;flex-direction:column}
+#app.show{display:flex}
+
+/* ── Top bar ─── */
+#topbar{flex-shrink:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border-s)}
+.tb-brand{display:flex;align-items:center;gap:10px}
+.tb-logo{font-family:var(--font-d);font-size:.75rem;font-weight:900;background:var(--accent);color:#fff;padding:4px 9px;border-radius:5px;letter-spacing:.06em}
+.tb-title{font-family:var(--font-d);font-size:.95rem;color:var(--accent2);letter-spacing:.1em}
+.tb-right{display:flex;align-items:center;gap:12px}
+#ws-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow);flex-shrink:0}
+#ws-dot.ok{background:var(--green);animation:pulse-ok 2s ease-out infinite}
+#ws-dot.err{background:var(--red)}
+#ws-lbl{font-family:var(--font-m);font-size:.72rem;color:var(--muted)}
+.tb-btn{padding:6px 14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:.78rem;cursor:pointer;transition:all var(--tr)}
+.tb-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ── Status bar ─── */
+#statusbar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:6px 20px;background:rgba(10,14,26,.8);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.sb-item{display:flex;align-items:center;gap:5px;font-family:var(--font-m);font-size:.68rem;color:var(--muted)}
+.sb-item strong{color:var(--text);font-weight:600}
+.sb-div{width:1px;height:14px;background:var(--border)}
+
+/* ── Main layout ─── */
+#main{flex:1;display:flex;overflow:hidden}
+
+/* ── Sidebar ─── */
+#sidebar{width:280px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#sidebar-scroll{flex:1;overflow-y:auto;padding:12px}
+#sidebar-scroll::-webkit-scrollbar{width:4px}
+#sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(59,130,246,.3);border-radius:4px}
+
+/* ── Content area ─── */
+#content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:16px;gap:16px;overflow-y:auto}
+#content::-webkit-scrollbar{width:4px}
+#content::-webkit-scrollbar-thumb{background:rgba(59,130,246,.3);border-radius:4px}
+
+/* ── Section card ─── */
+.sec{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;transition:border-color var(--tr)}
+.sec:hover{border-color:var(--border-s)}
+.sec-hdr{display:flex;align-items:center;gap:8px}
+.sec-icon{font-size:1rem;line-height:1}
+.sec-title{font-family:var(--font-d);font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text);flex:1}
+.sec-badge{font-family:var(--font-m);font-size:.6rem;background:rgba(59,130,246,.15);border:1px solid var(--border);border-radius:20px;padding:2px 10px;color:var(--accent2)}
+.sec-danger{border-color:rgba(239,68,68,.3)}
+.sec-danger:hover{border-color:rgba(239,68,68,.6);box-shadow:0 0 16px rgba(239,68,68,.1)}
+
+/* ── Buttons ─── */
+.btn{padding:8px 14px;border-radius:7px;border:none;cursor:pointer;font-family:var(--font-b);font-size:.8rem;font-weight:600;transition:all var(--tr);display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{filter:brightness(1.15)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--accent2);color:var(--text)}
+.btn-sm{padding:5px 10px;font-size:.75rem}
+.btn-full{width:100%}
+.btn-flat{background:rgba(59,130,246,.1);border:1px solid var(--border);color:var(--text)}
+.btn-flat:hover{background:rgba(59,130,246,.2);border-color:var(--accent)}
+.btn-flat.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 10px rgba(59,130,246,.4)}
+
+/* ── Mode tabs ─── */
+.tab-row{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:7px;border:1px solid var(--border)}
+.mode-tab{flex:1;padding:7px 6px;border-radius:5px;background:transparent;border:none;color:var(--muted);font-family:var(--font-d);font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--tr);text-align:center}
+.mode-tab:hover{color:var(--text);background:rgba(59,130,246,.08)}
+.mode-tab.active{background:var(--accent);color:#fff;box-shadow:0 0 10px rgba(59,130,246,.4)}
+
+/* ── Radar region grid ─── */
+.region-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.region-btn{padding:6px 4px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:var(--font-m);font-size:.65rem;text-align:center;cursor:pointer;transition:all var(--tr);text-transform:uppercase;letter-spacing:.04em}
+.region-btn:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(6,182,212,.08)}
+.region-btn.active{border-color:var(--accent2);background:rgba(6,182,212,.15);color:var(--accent2)}
+
+/* ── Sound grid ─── */
+.sound-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sound-btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 5px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--muted);font-family:var(--font-m);font-size:.62rem;cursor:pointer;transition:all var(--tr);text-transform:uppercase;letter-spacing:.04em}
+.sound-btn:hover{border-color:var(--accent);color:var(--text);background:rgba(59,130,246,.1);transform:translateY(-1px)}
+.sound-btn:active{transform:scale(.97)}
+.sound-btn .si{font-size:1.3rem;line-height:1}
+
+/* ── Alert type grid ─── */
+.atype-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.atype-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 5px;border-radius:7px;border:2px solid transparent;background:var(--card2);color:var(--muted);cursor:pointer;transition:all var(--tr);font-family:var(--font-d);font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;text-align:center}
+.atype-btn:hover{transform:translateY(-2px)}
+.atype-btn.active{color:var(--text);transform:translateY(-2px)}
+.atype-btn--tornado.active{border-color:var(--red);background:rgba(127,29,29,.4);box-shadow:0 0 12px rgba(239,68,68,.3)}
+.atype-btn--storm.active{border-color:var(--accent);background:rgba(30,58,95,.5)}
+.atype-btn--flood.active{border-color:var(--green);background:rgba(20,83,45,.5)}
+.atype-btn--fire.active{border-color:var(--orange);background:rgba(124,45,18,.5)}
+.atype-btn--emergency.active{border-color:var(--purple);background:rgba(88,28,135,.5)}
+.atype-btn--info.active{border-color:var(--accent2);background:rgba(6,182,212,.12)}
+.atype-icon{font-size:1.4rem;line-height:1}
+
+/* ── Toggle ─── */
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-lbl{font-size:.8rem;color:var(--muted)}
+.toggle{position:relative;display:inline-block;width:40px;height:22px}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:var(--bg);border-radius:22px;border:1px solid var(--border);cursor:pointer;transition:background .25s}
+.toggle-track::after{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;background:var(--muted);border-radius:50%;transition:all .25s}
+.toggle input:checked+.toggle-track{background:var(--accent);border-color:var(--accent)}
+.toggle input:checked+.toggle-track::after{transform:translateX(18px);background:#fff}
+
+/* ── Input ─── */
+.inp{width:100%;padding:8px 12px;background:var(--card2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font-b);font-size:.85rem;outline:none;transition:border-color var(--tr)}
+.inp:focus{border-color:var(--accent)}
+.inp-sm{padding:6px 10px;font-size:.8rem}
+textarea.inp{resize:vertical;min-height:64px}
+
+/* ── Range ─── */
+.range-row{display:flex;align-items:center;gap:8px}
+.range-lbl{font-family:var(--font-m);font-size:.68rem;color:var(--muted);white-space:nowrap;min-width:50px}
+.range-inp{flex:1;accent-color:var(--accent);height:4px;cursor:pointer}
+.range-val{font-family:var(--font-m);font-size:.68rem;color:var(--accent2);min-width:34px;text-align:right}
+
+/* ── Btn row ─── */
+.btn-row{display:flex;gap:8px}
+
+/* ── Lower-third preview ─── */
+.lt-preview{border-radius:6px;overflow:hidden;height:48px;position:relative;background:rgba(0,0,0,.3);border:1px solid var(--border)}
+
+/* ── NWS alert item ─── */
+.nws-item{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:9px 11px;transition:border-color var(--tr)}
+.nws-item:hover{border-color:var(--border-s)}
+.nws-item__top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
+.nws-item__event{font-family:var(--font-d);font-size:.66rem;letter-spacing:.08em;flex:1}
+.nws-item__event.extreme{color:var(--red)}
+.nws-item__event.severe{color:var(--orange)}
+.nws-item__event.moderate{color:var(--yellow)}
+.nws-item__area{font-family:var(--font-m);font-size:.62rem;color:var(--muted);margin-bottom:6px}
+.nws-item__btns{display:flex;gap:5px;flex-wrap:wrap}
+.focus-btn{padding:3px 9px;background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);border-radius:5px;color:var(--accent2);font-size:.65rem;cursor:pointer;transition:all var(--tr)}
+.focus-btn:hover{background:rgba(6,182,212,.25);border-color:var(--accent2)}
+.tts-btn{padding:3px 9px;background:rgba(59,130,246,.1);border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:.65rem;cursor:pointer;transition:all var(--tr)}
+.tts-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sound-tag-btn{padding:3px 9px;background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:5px;color:var(--yellow);font-size:.65rem;cursor:pointer;transition:all var(--tr)}
+.sound-tag-btn:hover{background:rgba(234,179,8,.2)}
+.nws-item__headline{font-size:.72rem;color:rgba(240,244,255,.7);margin-bottom:4px}
+
+/* ── Activity log ─── */
+.activity-log{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.activity-log::-webkit-scrollbar{width:3px}
+.activity-log::-webkit-scrollbar-thumb{background:rgba(59,130,246,.3);border-radius:3px}
+.log-entry{display:flex;gap:8px;font-family:var(--font-m);font-size:.68rem}
+.log-time{color:var(--muted);flex-shrink:0}
+.log-msg{flex:1}
+.log-msg.ok{color:var(--green)}
+.log-msg.err{color:var(--red)}
+.log-msg.warn{color:var(--yellow)}
+.log-msg.info{color:var(--accent2)}
+
+/* ── Polygon visibility toggles ─── */
+.poly-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.poly-toggle{display:flex;align-items:center;gap:7px;padding:6px 9px;background:var(--card2);border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all var(--tr)}
+.poly-toggle:hover{border-color:var(--border-s)}
+.poly-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.poly-label{font-family:var(--font-m);font-size:.66rem;color:var(--muted);flex:1;letter-spacing:.04em}
+.poly-toggle input{margin-left:auto}
+
+/* ── Quick region buttons ─── */
+.quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.quick-btn{padding:6px 4px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:.68rem;cursor:pointer;transition:all var(--tr);text-align:center}
+.quick-btn:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(6,182,212,.08)}
+
+/* ── Voice select ─── */
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+
+/* ── Wide sections ─── */
+.sec-wide{grid-column:span 2}
+
+/* ── Animations ─── */
+@keyframes pulse-ok{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⚡</div>
+    <div class="login-title">S.H.E.L.L.Y.</div>
+    <div class="login-sub">Stream Control Dashboard</div>
+    <div class="login-err" id="login-err"></div>
+    <div>
+      <input type="password" id="login-pw" class="login-inp" placeholder="Admin password" autocomplete="current-password">
+      <button class="login-btn" id="login-btn" onclick="doLogin()">Unlock Dashboard</button>
     </div>
+  </div>
 </div>
 
-<!-- ══════════ DASHBOARD ══════════ -->
-<div id="dashboard" class="stream-dashboard hidden">
+<!-- APP -->
+<div id="app">
 
-    <!-- Header -->
-    <header class="stream-dashboard__header">
-        <div class="stream-dashboard__title">
-            <span style="font-size:1.4rem">⚡</span>
-            <div>
-                <h1>S.H.E.L.L.Y.</h1>
-                <span>Stream Control Dashboard</span>
-            </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:14px;">
-            <span id="ws-indicator" class="connection-status connection-status--connecting" title="Dashboard WebSocket"></span>
-            <span style="font-size:0.75rem;color:var(--text-secondary);font-family:var(--font-mono);" id="ws-label">Connecting…</span>
-            <button class="db-btn db-btn--sm" onclick="doLogout()" style="margin-left:8px;">Log out</button>
-        </div>
-    </header>
-
-    <!-- Status Bar -->
-    <div class="db-status-bar">
-        <div class="db-status-bar__item">
-            <span>Mode:</span>
-            <strong id="sb-mode">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>Display clients:</span>
-            <strong id="sb-displays">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>Dashboard clients:</span>
-            <strong id="sb-dashboards">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>SSE clients:</span>
-            <strong id="sb-sse">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>Lower third:</span>
-            <strong id="sb-lt">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>Alert takeover:</span>
-            <strong id="sb-alert">—</strong>
-        </div>
-        <div class="db-status-bar__divider"></div>
-        <div class="db-status-bar__item">
-            <span>Ticker:</span>
-            <strong id="sb-ticker">—</strong>
-        </div>
+  <!-- Top bar -->
+  <div id="topbar">
+    <div class="tb-brand">
+      <div class="tb-logo">S.H.E.L.L.Y.</div>
+      <div class="tb-title">Stream Dashboard</div>
     </div>
+    <div class="tb-right">
+      <span id="ws-dot"></span>
+      <span id="ws-lbl">Connecting…</span>
+      <button class="tb-btn btn-sm" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
 
-    <!-- Body grid -->
-    <div class="stream-dashboard__body">
+  <!-- Status bar -->
+  <div id="statusbar">
+    <div class="sb-item"><span>Mode:</span><strong id="sb-mode">—</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Display:</span><strong id="sb-displays">—</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Dashboard:</span><strong id="sb-dashboards">—</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Lower Third:</span><strong id="sb-lt">—</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Takeover:</span><strong id="sb-alert">—</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Auto-Focus:</span><strong id="sb-autofocus">ON</strong></div>
+    <div class="sb-div"></div>
+    <div class="sb-item"><span>Auto-TTS:</span><strong id="sb-autotts">ON</strong></div>
+  </div>
 
-        <!-- ── Mode Control ─────────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">📺</span>
-                <span class="db-section__title">Display Mode</span>
-                <span class="db-section__badge" id="mode-badge">radar</span>
-            </div>
-            <div class="mode-tabs" id="mode-tabs">
-                <button class="mode-tab active" data-mode="radar"    onclick="setMode('radar')">📡 Radar</button>
-                <button class="mode-tab"        data-mode="forecast" onclick="setMode('forecast')">🌤 Forecast</button>
-                <button class="mode-tab"        data-mode="alerts"   onclick="setMode('alerts')">⚠ Alerts</button>
-                <button class="mode-tab"        data-mode="cities"   onclick="setMode('cities')">🌎 Cities</button>
-            </div>
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-scroll">
+
+        <!-- Display Mode -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">📺</span><span class="sec-title">Display Mode</span><span class="sec-badge" id="mode-badge">radar</span></div>
+          <div class="tab-row" id="mode-tabs">
+            <button class="mode-tab active" data-mode="radar"    onclick="setMode('radar')">📡 Radar</button>
+            <button class="mode-tab"        data-mode="forecast" onclick="setMode('forecast')">🌤 Forecast</button>
+            <button class="mode-tab"        data-mode="alerts"   onclick="setMode('alerts')">⚠ Alerts</button>
+            <button class="mode-tab"        data-mode="cities"   onclick="setMode('cities')">🌎 Cities</button>
+          </div>
         </div>
 
-        <!-- ── Radar Control ────────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">📡</span>
-                <span class="db-section__title">Radar Region</span>
-                <span class="db-section__badge" id="radar-badge">national</span>
-            </div>
-            <div class="radar-region-grid" id="radar-region-grid">
-                <button class="radar-region-btn active" data-region="national"          onclick="setRadarRegion('national')">National</button>
-                <button class="radar-region-btn"        data-region="northeast"         onclick="setRadarRegion('northeast')">Northeast</button>
-                <button class="radar-region-btn"        data-region="southeast"         onclick="setRadarRegion('southeast')">Southeast</button>
-                <button class="radar-region-btn"        data-region="midwest"           onclick="setRadarRegion('midwest')">Midwest</button>
-                <button class="radar-region-btn"        data-region="south"             onclick="setRadarRegion('south')">South</button>
-                <button class="radar-region-btn"        data-region="great-plains"      onclick="setRadarRegion('great-plains')">Gr. Plains</button>
-                <button class="radar-region-btn"        data-region="west-coast"        onclick="setRadarRegion('west-coast')">West Coast</button>
-                <button class="radar-region-btn"        data-region="pacific-northwest" onclick="setRadarRegion('pacific-northwest')">Pac. NW</button>
-            </div>
-            <div class="db-section__header" style="margin-top:4px;">
-                <span class="db-section__title" style="font-size:0.65rem;opacity:0.7;">Manual Coordinates</span>
-            </div>
-            <div class="db-input-group" style="display:flex;gap:8px;align-items:center;">
-                <input id="custom-lat" type="number" class="db-input db-input--sm" placeholder="Lat" step="0.1" style="flex:1;">
-                <input id="custom-lon" type="number" class="db-input db-input--sm" placeholder="Lon" step="0.1" style="flex:1;">
-                <input id="custom-zoom" type="number" class="db-input db-input--sm" placeholder="Zoom" min="3" max="10" value="5" style="width:72px;">
-                <button class="db-btn db-btn--sm db-btn--primary" onclick="setRadarCustom()">Go</button>
-            </div>
+        <!-- Radar Region -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">📡</span><span class="sec-title">Radar Region</span><span class="sec-badge" id="radar-badge">national</span></div>
+          <div class="region-grid" id="region-grid">
+            <button class="region-btn active" data-region="national"          onclick="setRadarRegion('national')">National</button>
+            <button class="region-btn"        data-region="northeast"         onclick="setRadarRegion('northeast')">Northeast</button>
+            <button class="region-btn"        data-region="southeast"         onclick="setRadarRegion('southeast')">Southeast</button>
+            <button class="region-btn"        data-region="midwest"           onclick="setRadarRegion('midwest')">Midwest</button>
+            <button class="region-btn"        data-region="south"             onclick="setRadarRegion('south')">South</button>
+            <button class="region-btn"        data-region="great-plains"      onclick="setRadarRegion('great-plains')">Gr. Plains</button>
+            <button class="region-btn"        data-region="west-coast"        onclick="setRadarRegion('west-coast')">West Coast</button>
+            <button class="region-btn"        data-region="pacific-northwest" onclick="setRadarRegion('pacific-northwest')">Pac. NW</button>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <input id="custom-lat"  type="number" class="inp inp-sm" placeholder="Lat"  step="0.1" style="flex:1">
+            <input id="custom-lon"  type="number" class="inp inp-sm" placeholder="Lon"  step="0.1" style="flex:1">
+            <input id="custom-zoom" type="number" class="inp inp-sm" placeholder="Zoom" min="3" max="10" value="5" style="width:56px">
+            <button class="btn btn-primary btn-sm" onclick="setRadarCustom()">Go</button>
+          </div>
+          <!-- Radar settings -->
+          <div class="range-row">
+            <span class="range-lbl">Anim Speed</span>
+            <input type="range" id="anim-speed" class="range-inp" min="100" max="1500" step="50" value="600"
+              oninput="document.getElementById('anim-speed-val').textContent=this.value+'ms';cmd('set-anim-speed',{speed:+this.value})">
+            <span class="range-val" id="anim-speed-val">600ms</span>
+          </div>
+          <div class="range-row">
+            <span class="range-lbl">Opacity</span>
+            <input type="range" id="radar-opacity" class="range-inp" min="0.1" max="1" step="0.05" value="0.65"
+              oninput="document.getElementById('opacity-val').textContent=(+this.value).toFixed(2);cmd('set-radar-opacity',{opacity:+this.value})">
+            <span class="range-val" id="opacity-val">0.65</span>
+          </div>
         </div>
 
-        <!-- ── Alert Takeover ───────────────────────────────── -->
-        <div class="db-section db-section--alert db-section--wide">
-            <div class="db-section__header">
-                <span class="db-section__icon">🚨</span>
-                <span class="db-section__title">Alert Takeover</span>
-                <span class="db-section__badge" id="takeover-badge" style="color:var(--alert-red);">INACTIVE</span>
-            </div>
-            <div class="alert-type-grid">
-                <button class="alert-type-btn alert-type-btn--tornado active" data-atype="tornado" onclick="selectAlertType('tornado')">
-                    <span class="alert-type-btn__icon">🌪️</span>Tornado
-                </button>
-                <button class="alert-type-btn alert-type-btn--storm" data-atype="storm" onclick="selectAlertType('storm')">
-                    <span class="alert-type-btn__icon">⛈️</span>Thunderstorm
-                </button>
-                <button class="alert-type-btn alert-type-btn--flood" data-atype="flood" onclick="selectAlertType('flood')">
-                    <span class="alert-type-btn__icon">🌊</span>Flash Flood
-                </button>
-                <button class="alert-type-btn alert-type-btn--fire" data-atype="fire" onclick="selectAlertType('fire')">
-                    <span class="alert-type-btn__icon">🔥</span>Fire Weather
-                </button>
-                <button class="alert-type-btn alert-type-btn--emergency" data-atype="emergency" onclick="selectAlertType('emergency')">
-                    <span class="alert-type-btn__icon">🚨</span>Emergency
-                </button>
-                <button class="alert-type-btn alert-type-btn--info" data-atype="info" onclick="selectAlertType('info')">
-                    <span class="alert-type-btn__icon">ℹ️</span>Statement
-                </button>
-            </div>
-            <input id="alert-headline" type="text" class="db-input" placeholder="Headline text…" maxlength="200">
-            <input id="alert-county"   type="text" class="db-input" placeholder="County / area…" maxlength="100">
-            <div class="db-btn-row">
-                <button class="db-btn db-btn--danger db-btn--lg" style="flex:2;" onclick="triggerAlertTakeover()">
-                    ⚡ Trigger Alert
-                </button>
-                <button class="db-btn db-btn--sm" style="flex:1;" onclick="clearAlertTakeover()">
-                    ✕ Clear
-                </button>
-            </div>
+        <!-- Quick Focus -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">📍</span><span class="sec-title">Quick Focus</span></div>
+          <div class="quick-grid">
+            <button class="quick-btn" onclick="quickFocus(35.5,-97.5,6)">Oklahoma City</button>
+            <button class="quick-btn" onclick="quickFocus(29.8,-95.4,6)">Houston</button>
+            <button class="quick-btn" onclick="quickFocus(32.8,-97.3,6)">Dallas / FW</button>
+            <button class="quick-btn" onclick="quickFocus(41.9,-87.6,6)">Chicago</button>
+            <button class="quick-btn" onclick="quickFocus(30.3,-81.7,6)">Jacksonville</button>
+            <button class="quick-btn" onclick="quickFocus(37.8,-122.5,6)">San Francisco</button>
+            <button class="quick-btn" onclick="quickFocus(47.6,-122.3,6)">Seattle</button>
+            <button class="quick-btn" onclick="quickFocus(25.8,-80.2,6)">Miami</button>
+          </div>
         </div>
 
-        <!-- ── Lower Third ──────────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">📝</span>
-                <span class="db-section__title">Lower Third</span>
-                <span class="db-section__badge" id="lt-badge">OFF</span>
-            </div>
-            <div class="db-toggle-row">
-                <span class="db-toggle-label">Show lower third</span>
-                <label class="db-toggle">
-                    <input type="checkbox" id="lt-toggle" onchange="setLowerThird()">
-                    <span class="db-toggle__track"></span>
-                </label>
-            </div>
-            <input id="lt-text" type="text" class="db-input" placeholder="Lower third text…" maxlength="200" oninput="setLowerThird()">
-            <div style="display:flex;gap:6px;">
-                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="info"    onclick="setLTStyle('info')"   >ℹ Info</button>
-                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="warning" onclick="setLTStyle('warning')">⚠ Warning</button>
-                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="alert"   onclick="setLTStyle('alert')"  >🚨 Alert</button>
-                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="success" onclick="setLTStyle('success')">✓ Success</button>
-            </div>
-            <!-- Live preview -->
-            <div class="lower-third-preview" id="lt-preview">
-                <div class="lower-third lower-third--info hidden" id="lt-preview-bar">
-                    <div class="lower-third__bar"></div>
-                    <div class="lower-third-text" id="lt-preview-text"></div>
-                </div>
-            </div>
+        <!-- Manual Radar Control -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">🕹️</span><span class="sec-title">Radar Control</span><span class="sec-badge" id="radar-pos-badge">Pan &amp; Zoom</span></div>
+          <!-- Joystick -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:4px;max-width:160px;margin:0 auto">
+            <div></div>
+            <button class="btn btn-flat btn-sm" id="pan-n" onmousedown="startPan('n')" onmouseup="stopPan()" onmouseleave="stopPan()" title="Pan North">▲</button>
+            <div></div>
+            <button class="btn btn-flat btn-sm" id="pan-w" onmousedown="startPan('w')" onmouseup="stopPan()" onmouseleave="stopPan()" title="Pan West">◀</button>
+            <button class="btn btn-ghost btn-sm" onclick="resetMapView()" title="Reset view">⌂</button>
+            <button class="btn btn-flat btn-sm" id="pan-e" onmousedown="startPan('e')" onmouseup="stopPan()" onmouseleave="stopPan()" title="Pan East">▶</button>
+            <div></div>
+            <button class="btn btn-flat btn-sm" id="pan-s" onmousedown="startPan('s')" onmouseup="stopPan()" onmouseleave="stopPan()" title="Pan South">▼</button>
+            <div></div>
+          </div>
+          <div class="range-row" style="margin-top:6px">
+            <span class="range-lbl">Zoom</span>
+            <input type="range" id="map-zoom" class="range-inp" min="3" max="12" step="1" value="4"
+              oninput="document.getElementById('map-zoom-val').textContent=this.value;sendMapView()">
+            <span class="range-val" id="map-zoom-val">4</span>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="zoomIn()">➕ Zoom In</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1" onclick="zoomOut()">➖ Zoom Out</button>
+          </div>
+          <div style="font-family:var(--font-m);font-size:.62rem;color:var(--muted);text-align:center" id="map-coords">—</div>
         </div>
 
-        <!-- ── TTS Panel ────────────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">🔊</span>
-                <span class="db-section__title">Text-to-Speech</span>
-            </div>
-            <textarea id="tts-text" class="db-input" rows="3"
-                placeholder="Type message to speak on stream display…"
-                maxlength="500"
-                style="resize:vertical;"></textarea>
-            <div class="tts-slider-group">
-                <div class="db-range-row">
-                    <span class="db-label">Rate</span>
-                    <input type="range" id="tts-rate" class="db-range" min="0.5" max="2" step="0.1" value="1"
-                           oninput="document.getElementById('tts-rate-val').textContent = (+this.value).toFixed(1)">
-                    <span class="db-range-value" id="tts-rate-val">1.0</span>
-                </div>
-                <div class="db-range-row">
-                    <span class="db-label">Pitch</span>
-                    <input type="range" id="tts-pitch" class="db-range" min="0" max="2" step="0.1" value="1"
-                           oninput="document.getElementById('tts-pitch-val').textContent = (+this.value).toFixed(1)">
-                    <span class="db-range-value" id="tts-pitch-val">1.0</span>
-                </div>
-                <div class="db-range-row">
-                    <span class="db-label">Volume</span>
-                    <input type="range" id="tts-volume" class="db-range" min="0" max="1" step="0.05" value="1"
-                           oninput="document.getElementById('tts-vol-val').textContent = (+this.value).toFixed(2)">
-                    <span class="db-range-value" id="tts-vol-val">1.00</span>
-                </div>
-            </div>
-            <button class="db-btn db-btn--primary db-btn--full" onclick="sendTTS()">
-                🔊 Speak on Stream
-            </button>
+        <!-- Warning Polygon Visibility -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">🗺️</span><span class="sec-title">Polygon Layers</span></div>
+          <div class="poly-grid">
+            <label class="poly-toggle"><div class="poly-dot" style="background:#ef4444"></div><span class="poly-label">Tornado</span><input type="checkbox" checked onchange="setPolyVisibility('tornado',this.checked)"></label>
+            <label class="poly-toggle"><div class="poly-dot" style="background:#f97316"></div><span class="poly-label">T-Storm</span><input type="checkbox" checked onchange="setPolyVisibility('storm',this.checked)"></label>
+            <label class="poly-toggle"><div class="poly-dot" style="background:#22c55e"></div><span class="poly-label">Flood</span><input type="checkbox" checked onchange="setPolyVisibility('flood',this.checked)"></label>
+            <label class="poly-toggle"><div class="poly-dot" style="background:#eab308"></div><span class="poly-label">Fire</span><input type="checkbox" checked onchange="setPolyVisibility('fire',this.checked)"></label>
+            <label class="poly-toggle"><div class="poly-dot" style="background:#3b82f6"></div><span class="poly-label">Watch</span><input type="checkbox" checked onchange="setPolyVisibility('watch',this.checked)"></label>
+            <label class="poly-toggle"><div class="poly-dot" style="background:#3b82f6"></div><span class="poly-label">Advisory</span><input type="checkbox" checked onchange="setPolyVisibility('advisory',this.checked)"></label>
+          </div>
         </div>
 
-        <!-- ── Sound Alerts ─────────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">🎵</span>
-                <span class="db-section__title">Sound Alerts</span>
-            </div>
-            <div class="sound-grid">
-                <button class="sound-btn" onclick="sendSound('tornado-warning')">
-                    <span class="sound-btn__icon">🌪️</span>Tornado Siren
-                </button>
-                <button class="sound-btn" onclick="sendSound('severe-thunderstorm')">
-                    <span class="sound-btn__icon">⛈️</span>Thunderstorm
-                </button>
-                <button class="sound-btn" onclick="sendSound('flash-flood')">
-                    <span class="sound-btn__icon">🌊</span>Flash Flood
-                </button>
-                <button class="sound-btn" onclick="sendSound('special-weather')">
-                    <span class="sound-btn__icon">📡</span>Special Wx
-                </button>
-                <button class="sound-btn" onclick="sendSound('chime')">
-                    <span class="sound-btn__icon">🔔</span>Chime
-                </button>
-                <button class="sound-btn" onclick="sendSound('test-tone')">
-                    <span class="sound-btn__icon">🎚️</span>Test Tone
-                </button>
-            </div>
+        <!-- Auto Behavior -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">🤖</span><span class="sec-title">Auto-Actions</span></div>
+          <div class="toggle-row"><span class="toggle-lbl">Auto-Focus on new warnings</span><label class="toggle"><input type="checkbox" id="auto-focus" checked onchange="cmd('set-auto-focus',{enabled:this.checked})"><span class="toggle-track"></span></label></div>
+          <div class="toggle-row"><span class="toggle-lbl">Auto-TTS read new alerts</span><label class="toggle"><input type="checkbox" id="auto-tts" checked onchange="cmd('set-auto-tts',{enabled:this.checked})"><span class="toggle-track"></span></label></div>
+          <div class="toggle-row"><span class="toggle-lbl">Auto-Banner for new alerts</span><label class="toggle"><input type="checkbox" id="auto-banner" checked onchange="cmd('set-auto-banner',{enabled:this.checked})"><span class="toggle-track"></span></label></div>
+          <button class="btn btn-ghost btn-sm btn-full" onclick="forceCheck()">⟳ Force NWS Check Now</button>
         </div>
 
-        <!-- ── Ticker Control ───────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">📜</span>
-                <span class="db-section__title">Alert Ticker</span>
-                <span class="db-section__badge" id="ticker-badge">VISIBLE</span>
-            </div>
-            <div class="db-toggle-row">
-                <span class="db-toggle-label">Show ticker bar</span>
-                <label class="db-toggle">
-                    <input type="checkbox" id="ticker-toggle" checked onchange="setTicker()">
-                    <span class="db-toggle__track"></span>
-                </label>
-            </div>
-            <input id="ticker-custom" type="text" class="db-input" placeholder="Custom ticker text (leave blank for NWS alerts)…" maxlength="500">
-            <button class="db-btn db-btn--primary db-btn--full" onclick="setTicker()">Apply Ticker</button>
-            <div class="ticker-preview">
-                <div class="ticker-preview__text" id="ticker-preview-text">Ticker preview…</div>
-            </div>
+        <!-- Sound Alerts -->
+        <div class="sec" style="margin-bottom:10px">
+          <div class="sec-hdr"><span class="sec-icon">🎵</span><span class="sec-title">Sound Alerts</span></div>
+          <div class="sound-grid">
+            <button class="sound-btn" onclick="sendSound('tornado-warning')"><span class="si">🌪️</span>Tornado Siren</button>
+            <button class="sound-btn" onclick="sendSound('severe-thunderstorm')"><span class="si">⛈️</span>T-Storm</button>
+            <button class="sound-btn" onclick="sendSound('flash-flood')"><span class="si">🌊</span>Flash Flood</button>
+            <button class="sound-btn" onclick="sendSound('special-weather')"><span class="si">📡</span>Special Wx</button>
+            <button class="sound-btn" onclick="sendSound('chime')"><span class="si">🔔</span>Chime</button>
+            <button class="sound-btn" onclick="sendSound('test-tone')"><span class="si">🎚️</span>Test Tone</button>
+          </div>
+          <div class="range-row">
+            <span class="range-lbl">Volume</span>
+            <input type="range" id="sound-vol" class="range-inp" min="0" max="1" step="0.05" value="0.8"
+              oninput="document.getElementById('sound-vol-val').textContent=(+this.value).toFixed(2)">
+            <span class="range-val" id="sound-vol-val">0.80</span>
+          </div>
         </div>
 
-        <!-- ── Forecast Location ────────────────────────────── -->
-        <div class="db-section">
-            <div class="db-section__header">
-                <span class="db-section__icon">🌤</span>
-                <span class="db-section__title">Forecast Location</span>
-            </div>
-            <input id="forecast-location" type="text" class="db-input" placeholder="City, ST (e.g. Oklahoma City, OK)" maxlength="100">
-            <div class="db-input-group" style="display:flex;gap:8px;">
-                <input id="forecast-lat" type="number" class="db-input db-input--sm" placeholder="Lat" step="0.0001" style="flex:1;">
-                <input id="forecast-lon" type="number" class="db-input db-input--sm" placeholder="Lon" step="0.0001" style="flex:1;">
-            </div>
-            <button class="db-btn db-btn--primary db-btn--full" onclick="setForecastLocation()">Set &amp; Show Forecast</button>
+      </div><!-- /sidebar-scroll -->
+    </div><!-- /sidebar -->
+
+    <!-- Content Area -->
+    <div id="content">
+
+      <!-- Top row: alert takeover + lower third -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+        <!-- Alert Takeover -->
+        <div class="sec sec-danger">
+          <div class="sec-hdr"><span class="sec-icon">🚨</span><span class="sec-title">Alert Takeover</span><span class="sec-badge" id="takeover-badge" style="color:var(--red)">INACTIVE</span></div>
+          <div class="atype-grid">
+            <button class="atype-btn atype-btn--tornado active" data-atype="tornado" onclick="selectAlertType('tornado')"><span class="atype-icon">🌪️</span>Tornado</button>
+            <button class="atype-btn atype-btn--storm"          data-atype="storm"   onclick="selectAlertType('storm')"><span class="atype-icon">⛈️</span>T-Storm</button>
+            <button class="atype-btn atype-btn--flood"          data-atype="flood"   onclick="selectAlertType('flood')"><span class="atype-icon">🌊</span>Flash Flood</button>
+            <button class="atype-btn atype-btn--fire"           data-atype="fire"    onclick="selectAlertType('fire')"><span class="atype-icon">🔥</span>Fire Wx</button>
+            <button class="atype-btn atype-btn--emergency"      data-atype="emergency" onclick="selectAlertType('emergency')"><span class="atype-icon">🚨</span>Emergency</button>
+            <button class="atype-btn atype-btn--info"           data-atype="info"    onclick="selectAlertType('info')"><span class="atype-icon">ℹ️</span>Statement</button>
+          </div>
+          <input id="alert-headline" type="text" class="inp" placeholder="Headline text…" maxlength="200">
+          <input id="alert-county"   type="text" class="inp" placeholder="County / area…" maxlength="100">
+          <div class="btn-row">
+            <button class="btn btn-danger" style="flex:2" onclick="triggerAlertTakeover()">⚡ Trigger Takeover</button>
+            <button class="btn btn-ghost"  style="flex:1" onclick="cmd('clear-alert',{})">✕ Clear</button>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-full" onclick="cmd('dismiss-banner',{})">✕ Dismiss Alert Banner</button>
         </div>
 
-        <!-- ── Live NWS Alerts ──────────────────────────────── -->
-        <div class="db-section db-section--wide"
-             id="nws-alerts-section"
-             hx-get="/api/stream/alerts"
-             hx-trigger="load, every 60s"
-             hx-swap="none">
-            <div class="db-section__header">
-                <span class="db-section__icon">⚠</span>
-                <span class="db-section__title">Live NWS Alerts</span>
-                <span class="db-section__badge" id="nws-count-badge">Loading…</span>
-                <button class="db-btn db-btn--sm" style="margin-left:auto;" onclick="htmx.trigger('#nws-alerts-section','load')">↻ Refresh</button>
+        <!-- Lower Third + TTS -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="sec">
+            <div class="sec-hdr"><span class="sec-icon">📝</span><span class="sec-title">Lower Third</span><span class="sec-badge" id="lt-badge">OFF</span></div>
+            <div class="toggle-row"><span class="toggle-lbl">Show lower third</span><label class="toggle"><input type="checkbox" id="lt-toggle" onchange="setLowerThird()"><span class="toggle-track"></span></label></div>
+            <input id="lt-text" type="text" class="inp" placeholder="Lower third text…" maxlength="200" oninput="setLowerThird()">
+            <div class="btn-row">
+              <button class="btn btn-flat btn-sm" style="flex:1" data-ltstyle="info"    onclick="setLTStyle('info')">ℹ Info</button>
+              <button class="btn btn-flat btn-sm" style="flex:1" data-ltstyle="warning" onclick="setLTStyle('warning')">⚠ Warn</button>
+              <button class="btn btn-flat btn-sm" style="flex:1" data-ltstyle="alert"   onclick="setLTStyle('alert')">🚨 Alert</button>
+              <button class="btn btn-flat btn-sm" style="flex:1" data-ltstyle="success" onclick="setLTStyle('success')">✓ OK</button>
             </div>
-            <div class="nws-alert-list" id="nws-alert-list" aria-live="polite">
-                <div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:12px 0;">Loading NWS alerts...</div>
+          </div>
+          <div class="sec">
+            <div class="sec-hdr"><span class="sec-icon">🔊</span><span class="sec-title">Text-to-Speech</span></div>
+            <textarea id="tts-text" class="inp" rows="2" placeholder="Speak on stream display…" maxlength="500"></textarea>
+            <div class="range-row"><span class="range-lbl">Rate</span><input type="range" id="tts-rate" class="range-inp" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('tts-rate-v').textContent=(+this.value).toFixed(1)"><span class="range-val" id="tts-rate-v">1.0</span></div>
+            <div class="range-row"><span class="range-lbl">Pitch</span><input type="range" id="tts-pitch" class="range-inp" min="0" max="2" step="0.1" value="1" oninput="document.getElementById('tts-pitch-v').textContent=(+this.value).toFixed(1)"><span class="range-val" id="tts-pitch-v">1.0</span></div>
+            <div class="range-row"><span class="range-lbl">Volume</span><input type="range" id="tts-volume" class="range-inp" min="0" max="1" step="0.05" value="1" oninput="document.getElementById('tts-vol-v').textContent=(+this.value).toFixed(2)"><span class="range-val" id="tts-vol-v">1.00</span></div>
+            <select id="tts-voice" class="inp inp-sm"></select>
+            <div class="btn-row">
+              <button class="btn btn-primary btn-full" onclick="sendTTS()">🔊 Speak on Stream</button>
+              <button class="btn btn-ghost btn-sm" onclick="previewTTS()" title="Preview locally">Preview</button>
             </div>
+          </div>
         </div>
 
-        <!-- ── Activity Log ─────────────────────────────────── -->
-        <div class="db-section db-section--wide">
-            <div class="db-section__header">
-                <span class="db-section__icon">📋</span>
-                <span class="db-section__title">Activity Log</span>
-                <button class="db-btn db-btn--sm" style="margin-left:auto;" onclick="clearLog()">Clear</button>
-            </div>
-            <div class="activity-log" id="activity-log">
-                <div class="activity-log__entry">
-                    <span class="activity-log__msg activity-log__msg--info">Dashboard ready. Log in to begin.</span>
-                </div>
-            </div>
+      </div><!-- /top row -->
+
+      <!-- Ticker + Forecast -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="sec">
+          <div class="sec-hdr"><span class="sec-icon">📜</span><span class="sec-title">Alert Ticker</span><span class="sec-badge" id="ticker-badge">VISIBLE</span></div>
+          <div class="toggle-row"><span class="toggle-lbl">Show ticker bar</span><label class="toggle"><input type="checkbox" id="ticker-toggle" checked onchange="setTicker()"><span class="toggle-track"></span></label></div>
+          <input id="ticker-custom" type="text" class="inp" placeholder="Custom text (blank = NWS alerts)…" maxlength="500">
+          <button class="btn btn-primary btn-sm btn-full" onclick="setTicker()">Apply Ticker</button>
         </div>
+        <div class="sec">
+          <div class="sec-hdr"><span class="sec-icon">🌤</span><span class="sec-title">Forecast Location</span></div>
+          <input id="forecast-location" type="text" class="inp" placeholder="City, ST (e.g. Oklahoma City, OK)" maxlength="100">
+          <div style="display:flex;gap:6px">
+            <input id="forecast-lat" type="number" class="inp inp-sm" placeholder="Lat" step="0.0001" style="flex:1">
+            <input id="forecast-lon" type="number" class="inp inp-sm" placeholder="Lon" step="0.0001" style="flex:1">
+          </div>
+          <button class="btn btn-primary btn-sm btn-full" onclick="setForecastLocation()">Set &amp; Show Forecast</button>
+        </div>
+      </div>
 
-    </div><!-- /body grid -->
-</div><!-- /dashboard -->
+      <!-- Live NWS Alerts -->
+      <div class="sec">
+        <div class="sec-hdr">
+          <span class="sec-icon">⚠</span>
+          <span class="sec-title">Live NWS Alerts</span>
+          <span class="sec-badge" id="nws-count">Loading…</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="refreshAlerts()">↻ Refresh</button>
+          <button class="btn btn-ghost btn-sm" onclick="forceCheck()">⟳ Force Check</button>
+        </div>
+        <div id="nws-list" aria-live="polite">
+          <div style="color:var(--muted);font-size:.8rem;font-family:var(--font-m)">Loading NWS alerts…</div>
+        </div>
+      </div>
 
-<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
-        integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
-        crossorigin="anonymous"></script>
-<script>
-'use strict';
+      <!-- Activity Log -->
+      <div class="sec">
+        <div class="sec-hdr"><span class="sec-icon">📋</span><span class="sec-title">Activity Log</span><button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearLog()">Clear</button></div>
+        <div class="activity-log" id="activity-log">
+          <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg info">Dashboard ready.</span></div>
+        </div>
+      </div>
 
-// ── Auth ──────────────────────────────────────────────────────
-let adminPassword = sessionStorage.getItem('shelly-admin-pw') || '';
-let dashWS        = null;
-let activityLog   = [];
-let currentState  = null;
-let selectedAlertType = 'tornado';
-let selectedLTStyle   = 'info';
+      <!-- Interactive Radar Mini-Map -->
+      <div class="sec" style="padding:0;overflow:hidden">
+        <div class="sec-hdr" style="padding:12px 14px 10px">
+          <span class="sec-icon">🗺️</span>
+          <span class="sec-title">Radar Preview</span>
+          <span class="sec-badge" id="minimap-badge">Interactive</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="syncMiniMapFromDisplay()">⟳ Sync</button>
+          <a href="/stream-display.html" target="_blank" class="btn btn-ghost btn-sm">↗ Full</a>
+        </div>
+        <div id="dash-minimap" style="height:280px;width:100%;border-top:1px solid var(--border);background:#0a0e1a;"></div>
+        <div style="padding:6px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-family:var(--font-m);font-size:.62rem;color:var(--muted);flex:1" id="minimap-coords">Move the map to pan display</span>
+          <button class="btn btn-ghost btn-sm" onclick="resetMiniMap()">⌂ Reset</button>
+        </div>
+      </div>
 
-// ── HTMX password injection ───────────────────────────────────
-document.body.addEventListener('htmx:configRequest', (e) => {
-    if (adminPassword) e.detail.headers['X-Admin-Password'] = adminPassword;
-});
+      <!-- Overlay Layers -->
+      <div class="sec">
+        <div class="sec-hdr"><span class="sec-icon">🌩️</span><span class="sec-title">Overlay Layers</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div class="toggle-row">
+            <span class="toggle-lbl">SPC Day 1 Outlook</span>
+            <label class="toggle" title="Show Storm Prediction Center convective outlook">
+              <input type="checkbox" id="spc-toggle" onchange="toggleSPCLayer(this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-lbl">Snow / WPC Outlook</span>
+            <label class="toggle" title="Show WPC winter weather / snow outlook">
+              <input type="checkbox" id="snow-toggle" onchange="toggleSnowLayer(this.checked)">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+        </div>
+        <div style="font-family:var(--font-m);font-size:.6rem;color:var(--muted);padding-top:2px">
+          SPC = convective risk areas &bull; Snow = WPC winter precipitation
+        </div>
+      </div>
 
-// ── HTMX NWS alerts post-processing ──────────────────────────
-document.body.addEventListener('htmx:afterRequest', (e) => {
-    if (!e.detail.pathInfo?.requestPath?.includes('/api/stream/alerts')) return;
-    try {
-        const data = JSON.parse(e.detail.xhr.responseText);
-        renderNwsAlerts(data.alerts || []);
-    } catch (_) {}
-});
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
 
-// ── Auto-login on page load ───────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-    if (adminPassword) {
-        verifyAndShow(adminPassword);
-    }
-    // Enter key on password field
-    document.getElementById('login-password').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') doLogin();
-    });
-});
-
-async function doLogin() {
-    const btn = document.getElementById('login-btn');
-    const errEl = document.getElementById('login-error');
-    const pw  = document.getElementById('login-password').value.trim();
-    if (!pw) { errEl.textContent = 'Please enter the admin password.'; return; }
-    btn.disabled = true;
-    btn.textContent = 'Verifying…';
-    errEl.textContent = '';
-    try {
-        const res = await fetch('/api/verify', {
-            headers: { 'x-admin-password': pw },
-        });
-        if (res.ok) {
-            adminPassword = pw;
-            sessionStorage.setItem('shelly-admin-pw', pw);
-            showDashboard();
-        } else {
-            errEl.textContent = 'Incorrect password.';
-        }
-    } catch (e) {
-        errEl.textContent = 'Connection error – is the server running?';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Unlock Dashboard';
-    }
-}
-
-async function verifyAndShow(pw) {
-    try {
-        const res = await fetch('/api/verify', {
-            headers: { 'x-admin-password': pw },
-        });
-        if (res.ok) {
-            showDashboard();
-        } else {
-            sessionStorage.removeItem('shelly-admin-pw');
-            adminPassword = '';
-        }
-    } catch (_) {}
-}
-
-function doLogout() {
-    sessionStorage.removeItem('shelly-admin-pw');
-    adminPassword = '';
-    if (dashWS) { dashWS.close(); dashWS = null; }
-    document.getElementById('dashboard').classList.add('hidden');
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('login-password').value = '';
-    document.getElementById('login-error').textContent = '';
-}
-
-function showDashboard() {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    connectDashboardWS();
-    refreshConnections();
-    setInterval(refreshConnections, 10000);
-    addLog('Dashboard unlocked', 'success');
-    // Prime state from REST
-    fetch('/api/stream/state')
-        .then(r => r.json())
-        .then(d => { if (d.state) applyDashboardState(d.state); })
-        .catch(() => {});
-}
-
-// ── WebSocket ─────────────────────────────────────────────────
-function connectDashboardWS() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${proto}//${location.host}/api/stream/ws`);
-    dashWS = socket;
-
-    socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ type: 'register', role: 'dashboard' }));
-        setWsStatus('connected');
-    });
-
-    socket.addEventListener('message', (e) => {
-        try {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'state') applyDashboardState(msg.state);
-        } catch (_) {}
-    });
-
-    socket.addEventListener('close', () => {
-        setWsStatus('disconnected');
-        setTimeout(connectDashboardWS, 3000);
-    });
-
-    socket.addEventListener('error', () => socket.close());
-}
-
-function setWsStatus(status) {
-    const dot   = document.getElementById('ws-indicator');
-    const label = document.getElementById('ws-label');
-    if (dot) dot.className = `connection-status connection-status--${status}`;
-    if (label) label.textContent = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting…' : 'Disconnected';
-}
-
-// ── Apply state to dashboard UI ───────────────────────────────
-function applyDashboardState(state) {
-    currentState = state;
-
-    // Status bar
-    const sb = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    sb('sb-mode', state.mode || '—');
-    sb('sb-lt',    state.lowerThird?.visible ? 'ON' : 'OFF');
-    sb('sb-alert', state.alert?.active       ? '⚡ ACTIVE' : 'off');
-    sb('sb-ticker', state.ticker?.visible !== false ? 'visible' : 'hidden');
-
-    // Mode badge + tabs
-    const modeBadge = document.getElementById('mode-badge');
-    if (modeBadge) modeBadge.textContent = state.mode || '—';
-    document.querySelectorAll('.mode-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === state.mode);
-    });
-
-    // Radar badge
-    const rBadge = document.getElementById('radar-badge');
-    if (rBadge) rBadge.textContent = state.radar?.region || '—';
-    document.querySelectorAll('.radar-region-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.region === state.radar?.region);
-    });
-
-    // Alert takeover badge
-    const tbadge = document.getElementById('takeover-badge');
-    if (tbadge) {
-        tbadge.textContent = state.alert?.active ? '⚡ ACTIVE' : 'INACTIVE';
-        tbadge.style.color = state.alert?.active ? 'var(--alert-red)' : '';
-    }
-
-    // Lower third state
-    const ltToggle = document.getElementById('lt-toggle');
-    if (ltToggle) ltToggle.checked = !!state.lowerThird?.visible;
-    const ltBadge = document.getElementById('lt-badge');
-    if (ltBadge) ltBadge.textContent = state.lowerThird?.visible ? 'ON' : 'OFF';
-    updateLTPreview();
-
-    // Ticker state
-    const tickerToggle = document.getElementById('ticker-toggle');
-    if (tickerToggle) tickerToggle.checked = state.ticker?.visible !== false;
-    const tickerBadge = document.getElementById('ticker-badge');
-    if (tickerBadge) tickerBadge.textContent = state.ticker?.visible !== false ? 'VISIBLE' : 'HIDDEN';
-
-    // Forecast fields
-    if (state.forecast?.location) {
-        const loc = document.getElementById('forecast-location');
-        if (loc && !loc.value) loc.value = state.forecast.location;
-    }
-}
-
-// ── Connections poll ──────────────────────────────────────────
-async function refreshConnections() {
-    try {
-        const r = await fetch('/api/stream/connections');
-        if (!r.ok) return;
-        const d = await r.json();
-        const sb = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        sb('sb-displays',   d.display ?? '—');
-        sb('sb-dashboards', d.dashboard ?? '—');
-        sb('sb-sse',        d.sse ?? '—');
-    } catch (_) {}
-}
-
-// ── API helpers ───────────────────────────────────────────────
-async function cmd(action, data = {}) {
-    try {
-        const res = await fetch('/api/stream/command', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Admin-Password': adminPassword,
-            },
-            body: JSON.stringify({ action, data }),
-        });
-        const json = await res.json();
-        if (json.ok) {
-            addLog(`✓ ${action}`, 'success');
-            if (json.state) applyDashboardState(json.state);
-        } else {
-            addLog(`✗ ${action}: ${json.error || res.status}`, 'error');
-        }
-        return json;
-    } catch (e) {
-        addLog(`✗ ${action}: ${e.message}`, 'error');
-        return null;
-    }
-}
-
-// ── Mode control ──────────────────────────────────────────────
-function setMode(mode) {
-    cmd('set-mode', { mode });
-}
-
-// ── Radar control ─────────────────────────────────────────────
-function setRadarRegion(region) {
-    cmd('set-radar', { region });
-}
-
-function setRadarCustom() {
-    const lat  = parseFloat(document.getElementById('custom-lat').value);
-    const lon  = parseFloat(document.getElementById('custom-lon').value);
-    const zoom = parseInt(document.getElementById('custom-zoom').value) || 5;
-    if (isNaN(lat) || isNaN(lon)) { addLog('Invalid lat/lon', 'warn'); return; }
-    cmd('set-radar', { lat, lon, zoom, region: 'custom' });
-}
-
-// ── Alert takeover ────────────────────────────────────────────
-function selectAlertType(type) {
-    selectedAlertType = type;
-    document.querySelectorAll('.alert-type-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.atype === type);
-    });
-}
-
-function triggerAlertTakeover() {
-    const headline = document.getElementById('alert-headline').value.trim();
-    const county   = document.getElementById('alert-county').value.trim();
-    if (!headline) { addLog('Headline is required for alert takeover', 'warn'); return; }
-    cmd('trigger-alert', { type: selectedAlertType, headline, county });
-}
-
-function clearAlertTakeover() {
-    cmd('clear-alert', {});
-}
-
-// ── Lower third ───────────────────────────────────────────────
-function setLTStyle(style) {
-    selectedLTStyle = style;
-    document.querySelectorAll('[data-ltstyle]').forEach(btn => {
-        btn.classList.toggle('db-btn--primary', btn.dataset.ltstyle === style);
-    });
-    updateLTPreview();
-    setLowerThird();
-}
-
-function setLowerThird() {
-    const visible = document.getElementById('lt-toggle').checked;
-    const text    = document.getElementById('lt-text').value;
-    cmd('set-lower-third', { visible, text, style: selectedLTStyle });
-    updateLTPreview();
-}
-
-function updateLTPreview() {
-    const bar  = document.getElementById('lt-preview-bar');
-    const text = document.getElementById('lt-preview-text');
-    const ltText = document.getElementById('lt-text')?.value || '';
-    const visible = document.getElementById('lt-toggle')?.checked;
-    if (!bar || !text) return;
-    if (!visible || !ltText) {
-        bar.classList.add('hidden');
-        return;
-    }
-    bar.className = `lower-third lower-third--${selectedLTStyle}`;
-    text.textContent = ltText;
-    bar.classList.remove('hidden');
-}
-
-// Real-time preview update
-document.addEventListener('DOMContentLoaded', () => {
-    const ltText = document.getElementById('lt-text');
-    if (ltText) ltText.addEventListener('input', updateLTPreview);
-});
-
-// ── Ticker control ────────────────────────────────────────────
-function setTicker() {
-    const visible = document.getElementById('ticker-toggle').checked;
-    const custom  = document.getElementById('ticker-custom').value.trim();
-    cmd('toggle-ticker', { visible, custom });
-    const preview = document.getElementById('ticker-preview-text');
-    if (preview) preview.textContent = custom || '(NWS alerts will appear here)';
-    const badge = document.getElementById('ticker-badge');
-    if (badge) badge.textContent = visible ? 'VISIBLE' : 'HIDDEN';
-}
-
-// ── Forecast location ─────────────────────────────────────────
-function setForecastLocation() {
-    const location = document.getElementById('forecast-location').value.trim();
-    const lat = parseFloat(document.getElementById('forecast-lat').value) || null;
-    const lon = parseFloat(document.getElementById('forecast-lon').value) || null;
-    if (!location) { addLog('Location name required', 'warn'); return; }
-    cmd('set-forecast', { visible: true, location, lat, lon });
-}
-
-// ── TTS ───────────────────────────────────────────────────────
-async function sendTTS() {
-    const text  = document.getElementById('tts-text').value.trim();
-    if (!text) { addLog('TTS text is empty', 'warn'); return; }
-    const rate   = parseFloat(document.getElementById('tts-rate').value);
-    const pitch  = parseFloat(document.getElementById('tts-pitch').value);
-    const volume = parseFloat(document.getElementById('tts-volume').value);
-    try {
-        const res = await fetch('/api/stream/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
-            body: JSON.stringify({ text, rate, pitch, volume }),
-        });
-        const json = await res.json();
-        if (json.ok) {
-            addLog(`✓ TTS: "${text.slice(0, 40)}…"`, 'success');
-            document.getElementById('tts-text').value = '';
-        } else {
-            addLog(`✗ TTS: ${json.error}`, 'error');
-        }
-    } catch (e) {
-        addLog(`✗ TTS: ${e.message}`, 'error');
-    }
-}
-
-// ── Sound ─────────────────────────────────────────────────────
-async function sendSound(sound) {
-    try {
-        const res = await fetch('/api/stream/sound', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
-            body: JSON.stringify({ sound, volume: 0.8 }),
-        });
-        const json = await res.json();
-        if (json.ok) addLog(`✓ Sound: ${sound}`, 'success');
-        else         addLog(`✗ Sound: ${json.error}`, 'error');
-    } catch (e) {
-        addLog(`✗ Sound: ${e.message}`, 'error');
-    }
-}
-
-// ── NWS alert rendering ───────────────────────────────────────
-function renderNwsAlerts(alerts) {
-    const list  = document.getElementById('nws-alert-list');
-    const badge = document.getElementById('nws-count-badge');
-    if (badge) badge.textContent = alerts.length ? `${alerts.length} active` : 'none';
-    if (!list) return;
-    if (!alerts.length) {
-        list.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:8px 0;">No active NWS alerts.</div>';
-        return;
-    }
-    list.innerHTML = alerts.map(a => {
-        const sev = (a.severity || '').toLowerCase();
-        const cls = sev === 'extreme' ? 'extreme' : sev === 'severe' ? 'severe' : sev === 'moderate' ? 'moderate' : '';
-        return `<div class="nws-alert-item nws-alert-item--${cls}">
-            <div class="nws-alert-item__event">${a.event || 'Alert'}</div>
-            <div class="nws-alert-item__headline">${a.headline || ''}</div>
-            <div class="nws-alert-item__area">📍 ${a.areaDesc || ''}</div>
-        </div>`;
-    }).join('');
-}
-
-// ── Activity log ──────────────────────────────────────────────
-function addLog(msg, type = 'info') {
-    activityLog.unshift({ time: new Date().toLocaleTimeString(), msg, type });
-    if (activityLog.length > 20) activityLog.pop();
-    renderLog();
-}
-
-function renderLog() {
-    const el = document.getElementById('activity-log');
-    if (!el) return;
-    if (!activityLog.length) {
-        el.innerHTML = '<div class="activity-log__entry"><span class="activity-log__msg activity-log__msg--info">Log cleared.</span></div>';
-        return;
-    }
-    el.innerHTML = activityLog.map(e =>
-        `<div class="activity-log__entry">
-            <span class="activity-log__time">${e.time}</span>
-            <span class="activity-log__msg activity-log__msg--${e.type}">${e.msg}</span>
-        </div>`
-    ).join('');
-}
-
-function clearLog() {
-    activityLog = [];
-    renderLog();
-}
-</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="js/stream-dashboard.js"></script>
 </body>
 </html>
