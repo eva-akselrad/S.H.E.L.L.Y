@@ -198,10 +198,10 @@
   }
 
   function checkTornadoTakeover(alerts) {
-    // Match NWS canonical event names for tornado watches/warnings/emergencies.
-    // Substring matching is intentional: NWS event strings include qualifiers
-    // (e.g. "Tornado Warning", "Tornado Emergency") that all contain "tornado warning"
-    // or "tornado emergency", so this safely covers all tornado-level events.
+    // Match NWS canonical event names for tornado-level events.
+    // "Tornado Warning" and "Tornado Emergency" are distinct NWS event types;
+    // we check for each independently using substring matching to handle any
+    // additional qualifiers NWS may append to the event name.
     const tornado = alerts.find(a => {
       const e = (a.event ?? '').toLowerCase();
       return e.includes('tornado warning') || e.includes('tornado emergency');
@@ -612,8 +612,7 @@
   // Try to reuse location set in the main S.H.E.L.L.Y. app
   function loadSavedLocation() {
     try {
-      const raw = localStorage.getItem('shelly-location')
-                ?? localStorage.getItem('weathernow-location');
+      const raw = localStorage.getItem('weathernow_location');
       if (!raw) return;
       const p = JSON.parse(raw);
       if (typeof p.lat === 'number' && typeof p.lon === 'number') {

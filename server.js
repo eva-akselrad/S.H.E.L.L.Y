@@ -512,15 +512,15 @@ async function pollNwsAlerts() {
         });
         if (!r.ok) throw new Error(`NWS HTTP ${r.status}`);
         const json = await r.json();
-        cachedNwsAlerts = (json.features || []).map(f => ({
+        cachedNwsAlerts = (json.features || []).filter(f => f?.properties).map(f => ({
             id:       f.id,
-            event:    f.properties.event,
-            headline: f.properties.headline,
-            area:     f.properties.areaDesc,
-            severity: f.properties.severity,
-            urgency:  f.properties.urgency,
-            expires:  f.properties.expires,
-            sent:     f.properties.sent,
+            event:    f.properties?.event    ?? '',
+            headline: f.properties?.headline ?? '',
+            area:     f.properties?.areaDesc ?? '',
+            severity: f.properties?.severity ?? '',
+            urgency:  f.properties?.urgency  ?? '',
+            expires:  f.properties?.expires  ?? null,
+            sent:     f.properties?.sent     ?? null,
         }));
         nwsAlertError = null;
         // Push fresh alerts to all connected WebSocket clients

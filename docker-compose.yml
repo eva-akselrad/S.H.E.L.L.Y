@@ -7,11 +7,15 @@ services:
       - "9000:3000"
     volumes:
       - ./music:/app/music:ro
+      - ./sounds:/app/sounds:ro
     environment:
       - TZ=America/New_York
       # Change this before deploying!
       - ADMIN_PASSWORD=weathernow
       - PORT=3000
+      # Optional: NWS zone code to filter server-side alert polling
+      # e.g. TXC113 = Parker County TX. Leave blank for national severe alerts.
+      - NWS_POLL_ZONE=
   # ── Cloudflare Tunnel (uncomment to expose publicly) ──────────
   # cloudflared:
   #   image: cloudflare/cloudflared:latest

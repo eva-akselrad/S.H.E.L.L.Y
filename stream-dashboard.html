@@ -157,10 +157,11 @@
             <div class="login-title">S.H.E.L.L.Y.</div>
             <div class="login-sub" style="margin-top:4px;">Stream Dashboard</div>
         </div>
-        <div class="login-error" id="login-error" aria-live="polite"></div>
+        <div class="login-error" id="login-error" role="alert" aria-live="assertive"></div>
         <div class="login-form">
+            <label for="login-password" class="sr-only">Admin password</label>
             <input type="password" id="login-password" class="db-input" placeholder="Admin password" autocomplete="current-password"
-                   style="text-align:center;font-size:1rem;padding:14px;">
+                   aria-label="Admin password" style="text-align:center;font-size:1rem;padding:14px;">
             <button class="db-btn db-btn--primary db-btn--lg" id="login-btn" onclick="doLogin()">
                 Unlock Dashboard
             </button>
@@ -521,9 +522,7 @@ async function doLogin() {
     errEl.textContent = '';
     try {
         const res = await fetch('/api/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pw }),
+            headers: { 'x-admin-password': pw },
         });
         if (res.ok) {
             adminPassword = pw;
@@ -543,9 +542,7 @@ async function doLogin() {
 async function verifyAndShow(pw) {
     try {
         const res = await fetch('/api/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pw }),
+            headers: { 'x-admin-password': pw },
         });
         if (res.ok) {
             showDashboard();

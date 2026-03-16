@@ -221,7 +221,7 @@ function renderForecastCards(data, container) {
                 <span class="forecast-high">${Math.round(daily.temperature_2m_max[i])}°</span>
                 <span class="forecast-low">${Math.round(daily.temperature_2m_min[i])}°</span>
             </div>
-            <div class="forecast-precip">💧 ${(daily.precipitation_sum[i] ?? 0).toFixed(1)}"</div>
+            <div class="forecast-precip">💧 ${(daily.precipitation_sum[i] ?? 0).toFixed(1)} in</div>
         </div>`;
     }).join('');
 }
