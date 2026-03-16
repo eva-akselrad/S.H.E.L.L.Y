@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.E.L.L.Y. – Stream Display</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="css/overlay.css">
+</head>
+<body class="overlay-root">
+    <!-- Header bar -->
+    <header class="overlay-header">
+        <div class="header-brand">
+            <span class="brand-logo">⚡</span>
+            <span class="brand-name">S.H.E.L.L.Y.</span>
+            <span class="brand-sub">LIVE BROADCAST</span>
+        </div>
+        <div class="header-mode" id="mode-label">BROADCAST MODE</div>
+        <div class="header-right">
+            <span class="header-location" id="header-location">Waiting for broadcast…</span>
+            <span class="header-clock" id="header-clock">--:--:--</span>
+            <span class="connection-status" id="conn-status" title="Dashboard connection"></span>
+        </div>
+    </header>
+
+    <!-- Main body -->
+    <div class="overlay-body">
+        <main class="main-panel" id="main-panel">
+            <!-- Radar slide (default) -->
+            <div class="slide active" id="slide-radar">
+                <div class="slide-label" id="radar-label">LIVE RADAR</div>
+                <div id="radar-map" class="radar-map"></div>
+            </div>
+            <!-- Forecast slide -->
+            <div class="slide" id="slide-forecast">
+                <div class="slide-label" id="forecast-label">FORECAST</div>
+                <div id="forecast-content" class="conditions-content"></div>
+            </div>
+            <!-- Alerts slide -->
+            <div class="slide" id="slide-alerts">
+                <div class="slide-label">⚠ ACTIVE ALERTS</div>
+                <div id="alerts-content" class="alerts-detail-content"></div>
+            </div>
+            <!-- Cities slide -->
+            <div class="slide" id="slide-cities">
+                <div class="slide-label">🌎 CITY FORECASTS</div>
+                <div id="cities-content" class="city-list city-list-full"></div>
+            </div>
+            <!-- Waiting for broadcast screen (shown when not connected) -->
+            <div class="slide active waiting-screen" id="slide-waiting">
+                <div class="waiting-inner">
+                    <div class="waiting-logo">⚡</div>
+                    <div class="waiting-title">S.H.E.L.L.Y.</div>
+                    <div class="waiting-sub">Stream Display</div>
+                    <div class="waiting-status" id="waiting-status">Connecting to dashboard…</div>
+                </div>
+            </div>
+        </main>
+        <aside class="side-panel" id="side-panel">
+            <div class="side-panel-title">⚠ ACTIVE ALERTS</div>
+            <div id="side-alerts" class="side-alert-list"></div>
+        </aside>
+    </div>
+
+    <!-- Alert ticker -->
+    <div class="alert-ticker" id="alert-ticker">
+        <div class="ticker-label">⚠ ALERTS</div>
+        <div class="ticker-track">
+            <span class="ticker-content" id="ticker-content">Connecting to S.H.E.L.L.Y. stream server…</span>
+        </div>
+    </div>
+
+    <!-- Lower third overlay -->
+    <div class="lower-third hidden" id="lower-third">
+        <div class="lower-third__bar"></div>
+        <div class="lower-third-text" id="lower-third-text"></div>
+    </div>
+
+    <!-- Alert takeover -->
+    <div class="alert-takeover hidden" id="alert-takeover">
+        <div class="takeover-inner">
+            <div class="takeover-icon" id="takeover-icon">⚠️</div>
+            <div class="takeover-type" id="takeover-type">WEATHER ALERT</div>
+            <div class="takeover-headline" id="takeover-headline"></div>
+            <div class="takeover-county" id="takeover-county"></div>
+            <div class="takeover-expires" id="takeover-expires"></div>
+            <div class="takeover-source">National Weather Service</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="js/stream-display.js"></script>
+</body>
+</html>

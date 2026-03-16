@@ -2268,6 +2268,16 @@ html, body {
     letter-spacing: 0.08em;
 }
 
+/* ── Lower third – flat class alias ──────────────────────────── */
+.lower-third-text {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.05em;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
 /* ── Ticker – flat aliases for .alert-ticker children ─────────── */
 .ticker-label {
     flex-shrink: 0;

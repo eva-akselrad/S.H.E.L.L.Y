@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.E.L.L.Y. – Stream Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/overlay.css">
+    <style>
+        /* ── Login screen ──────────────────────────────────────── */
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+        }
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius-lg);
+            padding: 48px 40px;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            box-shadow: var(--glow);
+            text-align: center;
+        }
+        .login-logo { font-size: 2.5rem; line-height: 1; }
+        .login-title {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--accent2);
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .login-sub { font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase; }
+        .login-error { color: var(--alert-red); font-size: 0.85rem; min-height: 1.2em; }
+        .login-form { display: flex; flex-direction: column; gap: 12px; }
+        /* ── Alert type grid ──────────────────────────────────── */
+        .alert-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .alert-type-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+            padding: 12px 8px; border-radius: var(--radius-sm); border: 2px solid transparent;
+            background: var(--bg-secondary); cursor: pointer; transition: all var(--transition);
+            font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.08em;
+            color: var(--text-secondary); text-transform: uppercase;
+        }
+        .alert-type-btn__icon { font-size: 1.5rem; line-height: 1; }
+        .alert-type-btn:hover { transform: translateY(-2px); }
+        .alert-type-btn.active { color: var(--text-primary); transform: translateY(-2px); }
+        .alert-type-btn--tornado:hover,  .alert-type-btn--tornado.active  { border-color: var(--alert-red);    background: rgba(127,29,29,0.4); box-shadow: 0 0 14px rgba(239,68,68,0.3); }
+        .alert-type-btn--storm:hover,    .alert-type-btn--storm.active    { border-color: var(--accent);       background: rgba(30,58,95,0.5);  box-shadow: 0 0 14px rgba(59,130,246,0.3); }
+        .alert-type-btn--flood:hover,    .alert-type-btn--flood.active    { border-color: var(--alert-green);  background: rgba(20,83,45,0.5);  box-shadow: 0 0 14px rgba(34,197,94,0.25); }
+        .alert-type-btn--fire:hover,     .alert-type-btn--fire.active     { border-color: var(--alert-orange); background: rgba(124,45,18,0.5); box-shadow: 0 0 14px rgba(249,115,22,0.25); }
+        .alert-type-btn--emergency:hover,.alert-type-btn--emergency.active{ border-color: #a855f7;             background: rgba(88,28,135,0.5); box-shadow: 0 0 14px rgba(168,85,247,0.25); }
+        .alert-type-btn--info:hover,     .alert-type-btn--info.active     { border-color: var(--accent2);      background: rgba(6,182,212,0.12);box-shadow: 0 0 14px rgba(6,182,212,0.2); }
+        /* ── Radar region grid ────────────────────────────────── */
+        .radar-region-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .radar-region-btn {
+            padding: 8px 4px; background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text-secondary); font-family: var(--font-mono);
+            font-size: 0.68rem; letter-spacing: 0.04em; text-align: center; cursor: pointer;
+            transition: all var(--transition); text-transform: uppercase;
+        }
+        .radar-region-btn:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(6,182,212,0.08); }
+        .radar-region-btn.active { border-color: var(--accent2); background: rgba(6,182,212,0.15); color: var(--accent2); box-shadow: 0 0 10px rgba(6,182,212,0.2); }
+        /* ── Mode tabs ────────────────────────────────────────── */
+        .mode-tabs { display: flex; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+        .mode-tab {
+            flex: 1; padding: 9px 12px; border-radius: calc(var(--radius-sm) - 2px);
+            background: transparent; border: none; color: var(--text-secondary);
+            font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.1em;
+            text-transform: uppercase; cursor: pointer; transition: all var(--transition); text-align: center;
+        }
+        .mode-tab:hover { color: var(--text-primary); background: rgba(59,130,246,0.08); }
+        .mode-tab.active { background: var(--accent); color: #fff; box-shadow: 0 0 12px rgba(59,130,246,0.4); }
+        /* ── Sound grid ───────────────────────────────────────── */
+        .sound-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .sound-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            padding: 14px 8px; background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text-secondary); font-family: var(--font-mono);
+            font-size: 0.68rem; letter-spacing: 0.04em; text-align: center;
+            cursor: pointer; transition: all var(--transition); text-transform: uppercase;
+        }
+        .sound-btn:hover { border-color: var(--accent); color: var(--text-primary); background: rgba(59,130,246,0.1); transform: translateY(-1px); box-shadow: var(--glow); }
+        .sound-btn:active { transform: scale(0.97); }
+        .sound-btn__icon { font-size: 1.4rem; line-height: 1; }
+        /* ── Lower third preview ──────────────────────────────── */
+        .lower-third-preview {
+            border-radius: var(--radius-sm); overflow: hidden;
+            height: 56px; position: relative; background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+        }
+        .lower-third-preview .lower-third {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            width: 100%; pointer-events: none;
+        }
+        /* ── Ticker preview ───────────────────────────────────── */
+        .ticker-preview { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; padding: 8px 12px; font-size: 0.75rem; }
+        .ticker-preview__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); font-family: var(--font-mono); }
+        /* ── db-section section header ────────────────────────── */
+        .db-section__header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+        .db-section__icon { font-size: 1.1rem; line-height: 1; }
+        .db-section__title { font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-primary); flex: 1; }
+        .db-section__badge { font-family: var(--font-mono); font-size: 0.62rem; background: rgba(59,130,246,0.15); border: 1px solid var(--border); border-radius: 20px; padding: 2px 10px; color: var(--accent2); }
+        /* ── TTS sliders ──────────────────────────────────────── */
+        .tts-slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .db-range-row { display: flex; align-items: center; gap: 10px; }
+        .db-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-secondary); letter-spacing: 0.04em; white-space: nowrap; }
+        .db-range { flex: 1; accent-color: var(--accent); height: 4px; cursor: pointer; }
+        .db-range-value { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent2); min-width: 32px; text-align: right; }
+        /* ── Toggle ───────────────────────────────────────────── */
+        .db-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+        .db-toggle-label { font-size: 0.82rem; color: var(--text-secondary); }
+        .db-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .db-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .db-toggle__track {
+            position: absolute; inset: 0; background: var(--bg-primary); border-radius: 24px;
+            border: 1px solid var(--border); cursor: pointer; transition: background 0.25s;
+        }
+        .db-toggle__track::after {
+            content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+            background: var(--text-secondary); border-radius: 50%; transition: all 0.25s;
+        }
+        .db-toggle input:checked + .db-toggle__track { background: var(--accent); border-color: var(--accent); }
+        .db-toggle input:checked + .db-toggle__track::after { transform: translateX(20px); background: #fff; }
+        /* ── NWS item ─────────────────────────────────────────── */
+        .nws-alert-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+        .nws-alert-item__event { font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.1em; margin-bottom: 3px; }
+        .nws-alert-item__headline { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
+        .nws-alert-item__area { font-family: var(--font-mono); font-size: 0.67rem; color: var(--text-secondary); opacity: 0.7; }
+        .nws-alert-item--extreme .nws-alert-item__event { color: #f87171; }
+        .nws-alert-item--severe  .nws-alert-item__event { color: var(--alert-orange); }
+        .nws-alert-item--moderate .nws-alert-item__event { color: var(--alert-yellow); }
+        /* ── State readout ────────────────────────────────────── */
+        .state-readout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        .state-readout__item { background: var(--bg-primary); border-radius: var(--radius-sm); padding: 8px 10px; }
+        .state-readout__key { font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-secondary); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+        .state-readout__val { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent2); font-weight: 600; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body style="background:var(--bg-primary);color:var(--text-primary);font-family:var(--font-body);">
+
+<!-- ══════════ LOGIN SCREEN ══════════ -->
+<div id="login-screen" class="login-screen">
+    <div class="login-card">
+        <div class="login-logo">⚡</div>
+        <div>
+            <div class="login-title">S.H.E.L.L.Y.</div>
+            <div class="login-sub" style="margin-top:4px;">Stream Dashboard</div>
+        </div>
+        <div class="login-error" id="login-error" aria-live="polite"></div>
+        <div class="login-form">
+            <input type="password" id="login-password" class="db-input" placeholder="Admin password" autocomplete="current-password"
+                   style="text-align:center;font-size:1rem;padding:14px;">
+            <button class="db-btn db-btn--primary db-btn--lg" id="login-btn" onclick="doLogin()">
+                Unlock Dashboard
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div id="dashboard" class="stream-dashboard hidden">
+
+    <!-- Header -->
+    <header class="stream-dashboard__header">
+        <div class="stream-dashboard__title">
+            <span style="font-size:1.4rem">⚡</span>
+            <div>
+                <h1>S.H.E.L.L.Y.</h1>
+                <span>Stream Control Dashboard</span>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+            <span id="ws-indicator" class="connection-status connection-status--connecting" title="Dashboard WebSocket"></span>
+            <span style="font-size:0.75rem;color:var(--text-secondary);font-family:var(--font-mono);" id="ws-label">Connecting…</span>
+            <button class="db-btn db-btn--sm" onclick="doLogout()" style="margin-left:8px;">Log out</button>
+        </div>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="db-status-bar">
+        <div class="db-status-bar__item">
+            <span>Mode:</span>
+            <strong id="sb-mode">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>Display clients:</span>
+            <strong id="sb-displays">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>Dashboard clients:</span>
+            <strong id="sb-dashboards">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>SSE clients:</span>
+            <strong id="sb-sse">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>Lower third:</span>
+            <strong id="sb-lt">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>Alert takeover:</span>
+            <strong id="sb-alert">—</strong>
+        </div>
+        <div class="db-status-bar__divider"></div>
+        <div class="db-status-bar__item">
+            <span>Ticker:</span>
+            <strong id="sb-ticker">—</strong>
+        </div>
+    </div>
+
+    <!-- Body grid -->
+    <div class="stream-dashboard__body">
+
+        <!-- ── Mode Control ─────────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">📺</span>
+                <span class="db-section__title">Display Mode</span>
+                <span class="db-section__badge" id="mode-badge">radar</span>
+            </div>
+            <div class="mode-tabs" id="mode-tabs">
+                <button class="mode-tab active" data-mode="radar"    onclick="setMode('radar')">📡 Radar</button>
+                <button class="mode-tab"        data-mode="forecast" onclick="setMode('forecast')">🌤 Forecast</button>
+                <button class="mode-tab"        data-mode="alerts"   onclick="setMode('alerts')">⚠ Alerts</button>
+                <button class="mode-tab"        data-mode="cities"   onclick="setMode('cities')">🌎 Cities</button>
+            </div>
+        </div>
+
+        <!-- ── Radar Control ────────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">📡</span>
+                <span class="db-section__title">Radar Region</span>
+                <span class="db-section__badge" id="radar-badge">national</span>
+            </div>
+            <div class="radar-region-grid" id="radar-region-grid">
+                <button class="radar-region-btn active" data-region="national"          onclick="setRadarRegion('national')">National</button>
+                <button class="radar-region-btn"        data-region="northeast"         onclick="setRadarRegion('northeast')">Northeast</button>
+                <button class="radar-region-btn"        data-region="southeast"         onclick="setRadarRegion('southeast')">Southeast</button>
+                <button class="radar-region-btn"        data-region="midwest"           onclick="setRadarRegion('midwest')">Midwest</button>
+                <button class="radar-region-btn"        data-region="south"             onclick="setRadarRegion('south')">South</button>
+                <button class="radar-region-btn"        data-region="great-plains"      onclick="setRadarRegion('great-plains')">Gr. Plains</button>
+                <button class="radar-region-btn"        data-region="west-coast"        onclick="setRadarRegion('west-coast')">West Coast</button>
+                <button class="radar-region-btn"        data-region="pacific-northwest" onclick="setRadarRegion('pacific-northwest')">Pac. NW</button>
+            </div>
+            <div class="db-section__header" style="margin-top:4px;">
+                <span class="db-section__title" style="font-size:0.65rem;opacity:0.7;">Manual Coordinates</span>
+            </div>
+            <div class="db-input-group" style="display:flex;gap:8px;align-items:center;">
+                <input id="custom-lat" type="number" class="db-input db-input--sm" placeholder="Lat" step="0.1" style="flex:1;">
+                <input id="custom-lon" type="number" class="db-input db-input--sm" placeholder="Lon" step="0.1" style="flex:1;">
+                <input id="custom-zoom" type="number" class="db-input db-input--sm" placeholder="Zoom" min="3" max="10" value="5" style="width:72px;">
+                <button class="db-btn db-btn--sm db-btn--primary" onclick="setRadarCustom()">Go</button>
+            </div>
+        </div>
+
+        <!-- ── Alert Takeover ───────────────────────────────── -->
+        <div class="db-section db-section--alert db-section--wide">
+            <div class="db-section__header">
+                <span class="db-section__icon">🚨</span>
+                <span class="db-section__title">Alert Takeover</span>
+                <span class="db-section__badge" id="takeover-badge" style="color:var(--alert-red);">INACTIVE</span>
+            </div>
+            <div class="alert-type-grid">
+                <button class="alert-type-btn alert-type-btn--tornado active" data-atype="tornado" onclick="selectAlertType('tornado')">
+                    <span class="alert-type-btn__icon">🌪️</span>Tornado
+                </button>
+                <button class="alert-type-btn alert-type-btn--storm" data-atype="storm" onclick="selectAlertType('storm')">
+                    <span class="alert-type-btn__icon">⛈️</span>Thunderstorm
+                </button>
+                <button class="alert-type-btn alert-type-btn--flood" data-atype="flood" onclick="selectAlertType('flood')">
+                    <span class="alert-type-btn__icon">🌊</span>Flash Flood
+                </button>
+                <button class="alert-type-btn alert-type-btn--fire" data-atype="fire" onclick="selectAlertType('fire')">
+                    <span class="alert-type-btn__icon">🔥</span>Fire Weather
+                </button>
+                <button class="alert-type-btn alert-type-btn--emergency" data-atype="emergency" onclick="selectAlertType('emergency')">
+                    <span class="alert-type-btn__icon">🚨</span>Emergency
+                </button>
+                <button class="alert-type-btn alert-type-btn--info" data-atype="info" onclick="selectAlertType('info')">
+                    <span class="alert-type-btn__icon">ℹ️</span>Statement
+                </button>
+            </div>
+            <input id="alert-headline" type="text" class="db-input" placeholder="Headline text…" maxlength="200">
+            <input id="alert-county"   type="text" class="db-input" placeholder="County / area…" maxlength="100">
+            <div class="db-btn-row">
+                <button class="db-btn db-btn--danger db-btn--lg" style="flex:2;" onclick="triggerAlertTakeover()">
+                    ⚡ Trigger Alert
+                </button>
+                <button class="db-btn db-btn--sm" style="flex:1;" onclick="clearAlertTakeover()">
+                    ✕ Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Lower Third ──────────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">📝</span>
+                <span class="db-section__title">Lower Third</span>
+                <span class="db-section__badge" id="lt-badge">OFF</span>
+            </div>
+            <div class="db-toggle-row">
+                <span class="db-toggle-label">Show lower third</span>
+                <label class="db-toggle">
+                    <input type="checkbox" id="lt-toggle" onchange="setLowerThird()">
+                    <span class="db-toggle__track"></span>
+                </label>
+            </div>
+            <input id="lt-text" type="text" class="db-input" placeholder="Lower third text…" maxlength="200" oninput="setLowerThird()">
+            <div style="display:flex;gap:6px;">
+                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="info"    onclick="setLTStyle('info')"   >ℹ Info</button>
+                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="warning" onclick="setLTStyle('warning')">⚠ Warning</button>
+                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="alert"   onclick="setLTStyle('alert')"  >🚨 Alert</button>
+                <button class="db-btn db-btn--sm" style="flex:1;" data-ltstyle="success" onclick="setLTStyle('success')">✓ Success</button>
+            </div>
+            <!-- Live preview -->
+            <div class="lower-third-preview" id="lt-preview">
+                <div class="lower-third lower-third--info hidden" id="lt-preview-bar">
+                    <div class="lower-third__bar"></div>
+                    <div class="lower-third-text" id="lt-preview-text"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── TTS Panel ────────────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">🔊</span>
+                <span class="db-section__title">Text-to-Speech</span>
+            </div>
+            <textarea id="tts-text" class="db-input" rows="3"
+                placeholder="Type message to speak on stream display…"
+                maxlength="500"
+                style="resize:vertical;"></textarea>
+            <div class="tts-slider-group">
+                <div class="db-range-row">
+                    <span class="db-label">Rate</span>
+                    <input type="range" id="tts-rate" class="db-range" min="0.5" max="2" step="0.1" value="1"
+                           oninput="document.getElementById('tts-rate-val').textContent = (+this.value).toFixed(1)">
+                    <span class="db-range-value" id="tts-rate-val">1.0</span>
+                </div>
+                <div class="db-range-row">
+                    <span class="db-label">Pitch</span>
+                    <input type="range" id="tts-pitch" class="db-range" min="0" max="2" step="0.1" value="1"
+                           oninput="document.getElementById('tts-pitch-val').textContent = (+this.value).toFixed(1)">
+                    <span class="db-range-value" id="tts-pitch-val">1.0</span>
+                </div>
+                <div class="db-range-row">
+                    <span class="db-label">Volume</span>
+                    <input type="range" id="tts-volume" class="db-range" min="0" max="1" step="0.05" value="1"
+                           oninput="document.getElementById('tts-vol-val').textContent = (+this.value).toFixed(2)">
+                    <span class="db-range-value" id="tts-vol-val">1.00</span>
+                </div>
+            </div>
+            <button class="db-btn db-btn--primary db-btn--full" onclick="sendTTS()">
+                🔊 Speak on Stream
+            </button>
+        </div>
+
+        <!-- ── Sound Alerts ─────────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">🎵</span>
+                <span class="db-section__title">Sound Alerts</span>
+            </div>
+            <div class="sound-grid">
+                <button class="sound-btn" onclick="sendSound('tornado-warning')">
+                    <span class="sound-btn__icon">🌪️</span>Tornado Siren
+                </button>
+                <button class="sound-btn" onclick="sendSound('severe-thunderstorm')">
+                    <span class="sound-btn__icon">⛈️</span>Thunderstorm
+                </button>
+                <button class="sound-btn" onclick="sendSound('flash-flood')">
+                    <span class="sound-btn__icon">🌊</span>Flash Flood
+                </button>
+                <button class="sound-btn" onclick="sendSound('special-weather')">
+                    <span class="sound-btn__icon">📡</span>Special Wx
+                </button>
+                <button class="sound-btn" onclick="sendSound('chime')">
+                    <span class="sound-btn__icon">🔔</span>Chime
+                </button>
+                <button class="sound-btn" onclick="sendSound('test-tone')">
+                    <span class="sound-btn__icon">🎚️</span>Test Tone
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Ticker Control ───────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">📜</span>
+                <span class="db-section__title">Alert Ticker</span>
+                <span class="db-section__badge" id="ticker-badge">VISIBLE</span>
+            </div>
+            <div class="db-toggle-row">
+                <span class="db-toggle-label">Show ticker bar</span>
+                <label class="db-toggle">
+                    <input type="checkbox" id="ticker-toggle" checked onchange="setTicker()">
+                    <span class="db-toggle__track"></span>
+                </label>
+            </div>
+            <input id="ticker-custom" type="text" class="db-input" placeholder="Custom ticker text (leave blank for NWS alerts)…" maxlength="500">
+            <button class="db-btn db-btn--primary db-btn--full" onclick="setTicker()">Apply Ticker</button>
+            <div class="ticker-preview">
+                <div class="ticker-preview__text" id="ticker-preview-text">Ticker preview…</div>
+            </div>
+        </div>
+
+        <!-- ── Forecast Location ────────────────────────────── -->
+        <div class="db-section">
+            <div class="db-section__header">
+                <span class="db-section__icon">🌤</span>
+                <span class="db-section__title">Forecast Location</span>
+            </div>
+            <input id="forecast-location" type="text" class="db-input" placeholder="City, ST (e.g. Oklahoma City, OK)" maxlength="100">
+            <div class="db-input-group" style="display:flex;gap:8px;">
+                <input id="forecast-lat" type="number" class="db-input db-input--sm" placeholder="Lat" step="0.0001" style="flex:1;">
+                <input id="forecast-lon" type="number" class="db-input db-input--sm" placeholder="Lon" step="0.0001" style="flex:1;">
+            </div>
+            <button class="db-btn db-btn--primary db-btn--full" onclick="setForecastLocation()">Set &amp; Show Forecast</button>
+        </div>
+
+        <!-- ── Live NWS Alerts ──────────────────────────────── -->
+        <div class="db-section db-section--wide"
+             id="nws-alerts-section"
+             hx-get="/api/stream/alerts"
+             hx-trigger="load, every 60s"
+             hx-swap="none">
+            <div class="db-section__header">
+                <span class="db-section__icon">⚠</span>
+                <span class="db-section__title">Live NWS Alerts</span>
+                <span class="db-section__badge" id="nws-count-badge">Loading…</span>
+                <button class="db-btn db-btn--sm" style="margin-left:auto;" onclick="htmx.trigger('#nws-alerts-section','load')">↻ Refresh</button>
+            </div>
+            <div class="nws-alert-list" id="nws-alert-list">
+                <div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:12px 0;">Loading NWS alerts…</div>
+            </div>
+        </div>
+
+        <!-- ── Activity Log ─────────────────────────────────── -->
+        <div class="db-section db-section--wide">
+            <div class="db-section__header">
+                <span class="db-section__icon">📋</span>
+                <span class="db-section__title">Activity Log</span>
+                <button class="db-btn db-btn--sm" style="margin-left:auto;" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="activity-log" id="activity-log">
+                <div class="activity-log__entry">
+                    <span class="activity-log__msg activity-log__msg--info">Dashboard ready. Log in to begin.</span>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /body grid -->
+</div><!-- /dashboard -->
+
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous"></script>
+<script>
+'use strict';
+
+// ── Auth ──────────────────────────────────────────────────────
+let adminPassword = sessionStorage.getItem('shelly-admin-pw') || '';
+let dashWS        = null;
+let activityLog   = [];
+let currentState  = null;
+let selectedAlertType = 'tornado';
+let selectedLTStyle   = 'info';
+
+// ── HTMX password injection ───────────────────────────────────
+document.body.addEventListener('htmx:configRequest', (e) => {
+    if (adminPassword) e.detail.headers['X-Admin-Password'] = adminPassword;
+});
+
+// ── HTMX NWS alerts post-processing ──────────────────────────
+document.body.addEventListener('htmx:afterRequest', (e) => {
+    if (!e.detail.pathInfo?.requestPath?.includes('/api/stream/alerts')) return;
+    try {
+        const data = JSON.parse(e.detail.xhr.responseText);
+        renderNwsAlerts(data.alerts || []);
+    } catch (_) {}
+});
+
+// ── Auto-login on page load ───────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+    if (adminPassword) {
+        verifyAndShow(adminPassword);
+    }
+    // Enter key on password field
+    document.getElementById('login-password').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doLogin();
+    });
+});
+
+async function doLogin() {
+    const btn = document.getElementById('login-btn');
+    const errEl = document.getElementById('login-error');
+    const pw  = document.getElementById('login-password').value.trim();
+    if (!pw) { errEl.textContent = 'Please enter the admin password.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+    errEl.textContent = '';
+    try {
+        const res = await fetch('/api/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw }),
+        });
+        if (res.ok) {
+            adminPassword = pw;
+            sessionStorage.setItem('shelly-admin-pw', pw);
+            showDashboard();
+        } else {
+            errEl.textContent = 'Incorrect password.';
+        }
+    } catch (e) {
+        errEl.textContent = 'Connection error – is the server running?';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Unlock Dashboard';
+    }
+}
+
+async function verifyAndShow(pw) {
+    try {
+        const res = await fetch('/api/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw }),
+        });
+        if (res.ok) {
+            showDashboard();
+        } else {
+            sessionStorage.removeItem('shelly-admin-pw');
+            adminPassword = '';
+        }
+    } catch (_) {}
+}
+
+function doLogout() {
+    sessionStorage.removeItem('shelly-admin-pw');
+    adminPassword = '';
+    if (dashWS) { dashWS.close(); dashWS = null; }
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-error').textContent = '';
+}
+
+function showDashboard() {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    connectDashboardWS();
+    refreshConnections();
+    setInterval(refreshConnections, 10000);
+    addLog('Dashboard unlocked', 'success');
+    // Prime state from REST
+    fetch('/api/stream/state')
+        .then(r => r.json())
+        .then(d => { if (d.state) applyDashboardState(d.state); })
+        .catch(() => {});
+}
+
+// ── WebSocket ─────────────────────────────────────────────────
+function connectDashboardWS() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${proto}//${location.host}/api/stream/ws`);
+    dashWS = socket;
+
+    socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ type: 'hello', role: 'dashboard', password: adminPassword }));
+        setWsStatus('connected');
+    });
+
+    socket.addEventListener('message', (e) => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'state') applyDashboardState(msg.state);
+        } catch (_) {}
+    });
+
+    socket.addEventListener('close', () => {
+        setWsStatus('disconnected');
+        setTimeout(connectDashboardWS, 3000);
+    });
+
+    socket.addEventListener('error', () => socket.close());
+}
+
+function setWsStatus(status) {
+    const dot   = document.getElementById('ws-indicator');
+    const label = document.getElementById('ws-label');
+    if (dot) dot.className = `connection-status connection-status--${status}`;
+    if (label) label.textContent = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting…' : 'Disconnected';
+}
+
+// ── Apply state to dashboard UI ───────────────────────────────
+function applyDashboardState(state) {
+    currentState = state;
+
+    // Status bar
+    const sb = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    sb('sb-mode', state.mode || '—');
+    sb('sb-lt',    state.lowerThird?.visible ? 'ON' : 'OFF');
+    sb('sb-alert', state.alert?.active       ? '⚡ ACTIVE' : 'off');
+    sb('sb-ticker', state.ticker?.visible !== false ? 'visible' : 'hidden');
+
+    // Mode badge + tabs
+    const modeBadge = document.getElementById('mode-badge');
+    if (modeBadge) modeBadge.textContent = state.mode || '—';
+    document.querySelectorAll('.mode-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === state.mode);
+    });
+
+    // Radar badge
+    const rBadge = document.getElementById('radar-badge');
+    if (rBadge) rBadge.textContent = state.radar?.region || '—';
+    document.querySelectorAll('.radar-region-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.region === state.radar?.region);
+    });
+
+    // Alert takeover badge
+    const tbadge = document.getElementById('takeover-badge');
+    if (tbadge) {
+        tbadge.textContent = state.alert?.active ? '⚡ ACTIVE' : 'INACTIVE';
+        tbadge.style.color = state.alert?.active ? 'var(--alert-red)' : '';
+    }
+
+    // Lower third state
+    const ltToggle = document.getElementById('lt-toggle');
+    if (ltToggle) ltToggle.checked = !!state.lowerThird?.visible;
+    const ltBadge = document.getElementById('lt-badge');
+    if (ltBadge) ltBadge.textContent = state.lowerThird?.visible ? 'ON' : 'OFF';
+    updateLTPreview();
+
+    // Ticker state
+    const tickerToggle = document.getElementById('ticker-toggle');
+    if (tickerToggle) tickerToggle.checked = state.ticker?.visible !== false;
+    const tickerBadge = document.getElementById('ticker-badge');
+    if (tickerBadge) tickerBadge.textContent = state.ticker?.visible !== false ? 'VISIBLE' : 'HIDDEN';
+
+    // Forecast fields
+    if (state.forecast?.location) {
+        const loc = document.getElementById('forecast-location');
+        if (loc && !loc.value) loc.value = state.forecast.location;
+    }
+}
+
+// ── Connections poll ──────────────────────────────────────────
+async function refreshConnections() {
+    try {
+        const r = await fetch('/api/stream/connections');
+        if (!r.ok) return;
+        const d = await r.json();
+        const sb = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        sb('sb-displays',   d.display ?? '—');
+        sb('sb-dashboards', d.dashboard ?? '—');
+        sb('sb-sse',        d.sse ?? '—');
+    } catch (_) {}
+}
+
+// ── API helpers ───────────────────────────────────────────────
+async function cmd(action, data = {}) {
+    try {
+        const res = await fetch('/api/stream/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Password': adminPassword,
+            },
+            body: JSON.stringify({ action, data }),
+        });
+        const json = await res.json();
+        if (json.ok) {
+            addLog(`✓ ${action}`, 'success');
+            if (json.state) applyDashboardState(json.state);
+        } else {
+            addLog(`✗ ${action}: ${json.error || res.status}`, 'error');
+        }
+        return json;
+    } catch (e) {
+        addLog(`✗ ${action}: ${e.message}`, 'error');
+        return null;
+    }
+}
+
+// ── Mode control ──────────────────────────────────────────────
+function setMode(mode) {
+    cmd('set-mode', { mode });
+}
+
+// ── Radar control ─────────────────────────────────────────────
+function setRadarRegion(region) {
+    cmd('set-radar', { region });
+}
+
+function setRadarCustom() {
+    const lat  = parseFloat(document.getElementById('custom-lat').value);
+    const lon  = parseFloat(document.getElementById('custom-lon').value);
+    const zoom = parseInt(document.getElementById('custom-zoom').value) || 5;
+    if (isNaN(lat) || isNaN(lon)) { addLog('Invalid lat/lon', 'warn'); return; }
+    cmd('set-radar', { lat, lon, zoom, region: 'custom' });
+}
+
+// ── Alert takeover ────────────────────────────────────────────
+function selectAlertType(type) {
+    selectedAlertType = type;
+    document.querySelectorAll('.alert-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.atype === type);
+    });
+}
+
+function triggerAlertTakeover() {
+    const headline = document.getElementById('alert-headline').value.trim();
+    const county   = document.getElementById('alert-county').value.trim();
+    if (!headline) { addLog('Headline is required for alert takeover', 'warn'); return; }
+    cmd('trigger-alert', { type: selectedAlertType, headline, county });
+}
+
+function clearAlertTakeover() {
+    cmd('clear-alert', {});
+}
+
+// ── Lower third ───────────────────────────────────────────────
+function setLTStyle(style) {
+    selectedLTStyle = style;
+    document.querySelectorAll('[data-ltstyle]').forEach(btn => {
+        btn.classList.toggle('db-btn--primary', btn.dataset.ltstyle === style);
+    });
+    updateLTPreview();
+    setLowerThird();
+}
+
+function setLowerThird() {
+    const visible = document.getElementById('lt-toggle').checked;
+    const text    = document.getElementById('lt-text').value;
+    cmd('set-lower-third', { visible, text, style: selectedLTStyle });
+    updateLTPreview();
+}
+
+function updateLTPreview() {
+    const bar  = document.getElementById('lt-preview-bar');
+    const text = document.getElementById('lt-preview-text');
+    const ltText = document.getElementById('lt-text')?.value || '';
+    const visible = document.getElementById('lt-toggle')?.checked;
+    if (!bar || !text) return;
+    if (!visible || !ltText) {
+        bar.classList.add('hidden');
+        return;
+    }
+    bar.className = `lower-third lower-third--${selectedLTStyle}`;
+    text.textContent = ltText;
+    bar.classList.remove('hidden');
+}
+
+// Real-time preview update
+document.addEventListener('DOMContentLoaded', () => {
+    const ltText = document.getElementById('lt-text');
+    if (ltText) ltText.addEventListener('input', updateLTPreview);
+});
+
+// ── Ticker control ────────────────────────────────────────────
+function setTicker() {
+    const visible = document.getElementById('ticker-toggle').checked;
+    const custom  = document.getElementById('ticker-custom').value.trim();
+    cmd('toggle-ticker', { visible, custom });
+    const preview = document.getElementById('ticker-preview-text');
+    if (preview) preview.textContent = custom || '(NWS alerts will appear here)';
+    const badge = document.getElementById('ticker-badge');
+    if (badge) badge.textContent = visible ? 'VISIBLE' : 'HIDDEN';
+}
+
+// ── Forecast location ─────────────────────────────────────────
+function setForecastLocation() {
+    const location = document.getElementById('forecast-location').value.trim();
+    const lat = parseFloat(document.getElementById('forecast-lat').value) || null;
+    const lon = parseFloat(document.getElementById('forecast-lon').value) || null;
+    if (!location) { addLog('Location name required', 'warn'); return; }
+    cmd('set-forecast', { visible: true, location, lat, lon });
+}
+
+// ── TTS ───────────────────────────────────────────────────────
+async function sendTTS() {
+    const text  = document.getElementById('tts-text').value.trim();
+    if (!text) { addLog('TTS text is empty', 'warn'); return; }
+    const rate   = parseFloat(document.getElementById('tts-rate').value);
+    const pitch  = parseFloat(document.getElementById('tts-pitch').value);
+    const volume = parseFloat(document.getElementById('tts-volume').value);
+    try {
+        const res = await fetch('/api/stream/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+            body: JSON.stringify({ text, rate, pitch, volume }),
+        });
+        const json = await res.json();
+        if (json.ok) {
+            addLog(`✓ TTS: "${text.slice(0, 40)}…"`, 'success');
+            document.getElementById('tts-text').value = '';
+        } else {
+            addLog(`✗ TTS: ${json.error}`, 'error');
+        }
+    } catch (e) {
+        addLog(`✗ TTS: ${e.message}`, 'error');
+    }
+}
+
+// ── Sound ─────────────────────────────────────────────────────
+async function sendSound(sound) {
+    try {
+        const res = await fetch('/api/stream/sound', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+            body: JSON.stringify({ sound, volume: 0.8 }),
+        });
+        const json = await res.json();
+        if (json.ok) addLog(`✓ Sound: ${sound}`, 'success');
+        else         addLog(`✗ Sound: ${json.error}`, 'error');
+    } catch (e) {
+        addLog(`✗ Sound: ${e.message}`, 'error');
+    }
+}
+
+// ── NWS alert rendering ───────────────────────────────────────
+function renderNwsAlerts(alerts) {
+    const list  = document.getElementById('nws-alert-list');
+    const badge = document.getElementById('nws-count-badge');
+    if (badge) badge.textContent = alerts.length ? `${alerts.length} active` : 'none';
+    if (!list) return;
+    if (!alerts.length) {
+        list.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:8px 0;">No active NWS alerts.</div>';
+        return;
+    }
+    list.innerHTML = alerts.map(a => {
+        const sev = (a.severity || '').toLowerCase();
+        const cls = sev === 'extreme' ? 'extreme' : sev === 'severe' ? 'severe' : sev === 'moderate' ? 'moderate' : '';
+        return `<div class="nws-alert-item nws-alert-item--${cls}">
+            <div class="nws-alert-item__event">${a.event || 'Alert'}</div>
+            <div class="nws-alert-item__headline">${a.headline || ''}</div>
+            <div class="nws-alert-item__area">📍 ${a.areaDesc || ''}</div>
+        </div>`;
+    }).join('');
+}
+
+// ── Activity log ──────────────────────────────────────────────
+function addLog(msg, type = 'info') {
+    activityLog.unshift({ time: new Date().toLocaleTimeString(), msg, type });
+    if (activityLog.length > 20) activityLog.pop();
+    renderLog();
+}
+
+function renderLog() {
+    const el = document.getElementById('activity-log');
+    if (!el) return;
+    if (!activityLog.length) {
+        el.innerHTML = '<div class="activity-log__entry"><span class="activity-log__msg activity-log__msg--info">Log cleared.</span></div>';
+        return;
+    }
+    el.innerHTML = activityLog.map(e =>
+        `<div class="activity-log__entry">
+            <span class="activity-log__time">${e.time}</span>
+            <span class="activity-log__msg activity-log__msg--${e.type}">${e.msg}</span>
+        </div>`
+    ).join('');
+}
+
+function clearLog() {
+    activityLog = [];
+    renderLog();
+}
+</script>
+</body>
+</html>
