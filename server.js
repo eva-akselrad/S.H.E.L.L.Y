@@ -9,9 +9,13 @@ const fs = require('fs');
 const crypto = require('crypto');
 const webPush = require('web-push');
 const rateLimit = require('express-rate-limit');
+const http = require('http');
+const { WebSocketServer } = require('ws');
 
 const app = express();
 app.use(express.json());
+
+const server = http.createServer(app);
 
 // ── Build hash (automatic cache busting) ───────────────────────
 // Hash all local JS, CSS, and HTML files so that any code change
@@ -474,9 +478,300 @@ app.get('/api/spc-outlook', async (req, res) => {
     }
 });
 
+// ════════════════════════════════════════════════════════════════
+//  STREAMING OVERLAY / DASHBOARD SYSTEM
+//  WebSocket-based real-time communication between the streamer
+//  control dashboard and the live OBS Browser Source displays.
+// ════════════════════════════════════════════════════════════════
+
+// ── Stream State ───────────────────────────────────────────────
+// Single source of truth for what the stream display is showing.
+let streamState = {
+    radar:      { region: 'national', lat: null, lon: null, zoom: 5, animation: true },
+    mode:       'radar',          // 'radar' | 'forecast' | 'alerts' | 'cities'
+    lowerThird: { visible: false, text: '', style: 'info' },
+    alert:      { active: false, type: 'info', headline: '', county: '', expires: null },
+    forecast:   { visible: false, location: '', lat: null, lon: null },
+    ticker:     { visible: true, custom: '' },
+};
+
+// ── Cached NWS alerts (polled server-side every 2 min) ─────────
+let cachedNwsAlerts = [];
+let nwsAlertError   = null;
+const NWS_POLL_ZONE = process.env.NWS_POLL_ZONE || ''; // e.g. "TXC113" or leave blank for national
+const NWS_POLL_MS   = 2 * 60 * 1000; // 2 minutes
+
+async function pollNwsAlerts() {
+    const url  = NWS_POLL_ZONE
+        ? `https://api.weather.gov/alerts/active?zone=${encodeURIComponent(NWS_POLL_ZONE)}`
+        : 'https://api.weather.gov/alerts/active?status=actual&message_type=alert&urgency=Immediate,Expected&certainty=Observed,Likely&severity=Extreme,Severe';
+    try {
+        const r = await fetch(url, {
+            headers: { 'User-Agent': 'S.H.E.L.L.Y./1.0 (streaming; github.com/eva-akselrad/S.H.E.L.L.Y)' },
+            signal: AbortSignal.timeout(12000),
+        });
+        if (!r.ok) throw new Error(`NWS HTTP ${r.status}`);
+        const json = await r.json();
+        cachedNwsAlerts = (json.features || []).map(f => ({
+            id:       f.id,
+            event:    f.properties.event,
+            headline: f.properties.headline,
+            area:     f.properties.areaDesc,
+            severity: f.properties.severity,
+            urgency:  f.properties.urgency,
+            expires:  f.properties.expires,
+            sent:     f.properties.sent,
+        }));
+        nwsAlertError = null;
+        // Push fresh alerts to all connected WebSocket clients
+        broadcastToDisplays({ type: 'nws-alerts', alerts: cachedNwsAlerts });
+    } catch (err) {
+        nwsAlertError = err.message;
+        console.warn('[Stream] NWS poll error:', err.message);
+    }
+}
+
+// Poll immediately on startup, then every 2 minutes.
+pollNwsAlerts();
+setInterval(pollNwsAlerts, NWS_POLL_MS);
+
+// ── WebSocket Server ───────────────────────────────────────────
+const wss = new WebSocketServer({ server, path: '/api/stream/ws' });
+
+// Track connected clients by role: 'display', 'dashboard', 'overlay'
+const wsClients = new Set();
+
+function broadcastToDisplays(msg) {
+    const payload = JSON.stringify(msg);
+    for (const client of wsClients) {
+        if (client.readyState === 1 /* OPEN */ &&
+            (client.role === 'display' || client.role === 'overlay')) {
+            client.send(payload);
+        }
+    }
+}
+
+function broadcastToDashboards(msg) {
+    const payload = JSON.stringify(msg);
+    for (const client of wsClients) {
+        if (client.readyState === 1 /* OPEN */ && client.role === 'dashboard') {
+            client.send(payload);
+        }
+    }
+}
+
+wss.on('connection', (ws, req) => {
+    ws.role = 'unknown';
+    ws.isAlive = true;
+    wsClients.add(ws);
+
+    ws.on('pong', () => { ws.isAlive = true; });
+
+    ws.on('message', rawData => {
+        let msg;
+        try { msg = JSON.parse(rawData.toString()); } catch { return; }
+
+        if (msg.type === 'register') {
+            const allowed = ['display', 'dashboard', 'overlay'];
+            ws.role = allowed.includes(msg.role) ? msg.role : 'unknown';
+            // Send current state to newly connected display/overlay clients
+            if (ws.role === 'display' || ws.role === 'overlay') {
+                ws.send(JSON.stringify({ type: 'state', state: streamState }));
+                ws.send(JSON.stringify({ type: 'nws-alerts', alerts: cachedNwsAlerts }));
+            }
+            return;
+        }
+
+        // Only authenticated dashboards can send commands
+        if (msg.type === 'command') {
+            if (msg.password !== ADMIN_PASSWORD) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Unauthorized' }));
+                return;
+            }
+            applyStreamCommand(msg.action, msg.data || {});
+            // Echo updated state back to all dashboards
+            broadcastToDashboards({ type: 'state', state: streamState });
+            return;
+        }
+    });
+
+    ws.on('close', () => wsClients.delete(ws));
+    ws.on('error', () => wsClients.delete(ws));
+});
+
+// Heartbeat – drop stale connections every 30 s
+setInterval(() => {
+    for (const ws of wsClients) {
+        if (!ws.isAlive) { ws.terminate(); wsClients.delete(ws); continue; }
+        ws.isAlive = false;
+        ws.ping();
+    }
+}, 30000);
+
+// ── Stream Command Handler ─────────────────────────────────────
+function applyStreamCommand(action, data) {
+    switch (action) {
+        case 'set-radar':
+            streamState.radar = { ...streamState.radar, ...data };
+            streamState.mode  = 'radar';
+            break;
+        case 'set-mode':
+            if (['radar','forecast','alerts','cities'].includes(data.mode)) {
+                streamState.mode = data.mode;
+            }
+            break;
+        case 'set-lower-third':
+            streamState.lowerThird = {
+                visible: !!data.visible,
+                text:    (data.text || '').slice(0, 200),
+                style:   ['info','warning','alert','success'].includes(data.style) ? data.style : 'info',
+            };
+            break;
+        case 'trigger-alert':
+            streamState.alert = {
+                active:   true,
+                type:     ['tornado','storm','flood','fire','emergency','info'].includes(data.type) ? data.type : 'info',
+                headline: (data.headline || '').slice(0, 200),
+                county:   (data.county || '').slice(0, 100),
+                expires:  data.expires || null,
+            };
+            break;
+        case 'clear-alert':
+            streamState.alert = { active: false, type: 'info', headline: '', county: '', expires: null };
+            break;
+        case 'toggle-ticker':
+            streamState.ticker.visible = data.visible !== undefined ? !!data.visible : !streamState.ticker.visible;
+            if (data.custom !== undefined) streamState.ticker.custom = (data.custom || '').slice(0, 500);
+            break;
+        case 'set-forecast':
+            streamState.forecast = {
+                visible:  !!data.visible,
+                location: (data.location || '').slice(0, 100),
+                lat:      typeof data.lat === 'number' ? data.lat : null,
+                lon:      typeof data.lon === 'number' ? data.lon : null,
+            };
+            if (data.visible) streamState.mode = 'forecast';
+            break;
+        case 'trigger-tts':
+            // Ephemeral – not stored in state, just broadcast
+            break;
+        case 'trigger-sound':
+            // Ephemeral – not stored in state, just broadcast
+            break;
+        default:
+            return; // unknown action – don't broadcast
+    }
+    // Broadcast updated state to all display/overlay clients
+    broadcastToDisplays({ type: 'state', state: streamState });
+    console.log(`[Stream] Command: ${action}`, data);
+}
+
+// ── SSE fallback (/api/stream/events) ─────────────────────────
+const sseClients = new Set();
+
+app.get('/api/stream/events', (req, res) => {
+    res.setHeader('Content-Type',  'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection',    'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // nginx: disable proxy buffering
+
+    // Send initial state immediately
+    res.write(`data: ${JSON.stringify({ type: 'state', state: streamState })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'nws-alerts', alerts: cachedNwsAlerts })}\n\n`);
+
+    const sendEvent = data => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    res.sseEmit = sendEvent;
+    sseClients.add(res);
+
+    req.on('close', () => sseClients.delete(res));
+});
+
+function broadcastSSE(msg) {
+    for (const res of sseClients) {
+        try { res.sseEmit(msg); } catch { sseClients.delete(res); }
+    }
+}
+
+// ── Stream Rate Limiter ────────────────────────────────────────
+const streamLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// ── GET /api/stream/state ─────────────────────────────────────
+app.get('/api/stream/state', (_, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ state: streamState, alerts: cachedNwsAlerts });
+});
+
+// ── POST /api/stream/command ──────────────────────────────────
+app.post('/api/stream/command', streamLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const { action, data = {} } = req.body;
+    if (!action) return res.status(400).json({ error: 'action required' });
+    applyStreamCommand(action, data);
+    broadcastToDashboards({ type: 'state', state: streamState });
+    broadcastSSE({ type: 'state', state: streamState });
+    res.json({ ok: true, state: streamState });
+});
+
+// ── POST /api/stream/tts ──────────────────────────────────────
+app.post('/api/stream/tts', streamLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const { text = '', voice = '', rate = 1, pitch = 1, volume = 1 } = req.body;
+    if (!text.trim()) return res.status(400).json({ error: 'text required' });
+    const msg = {
+        type: 'tts',
+        text: text.slice(0, 500),
+        voice: (voice || '').slice(0, 100),
+        rate:   Math.min(Math.max(parseFloat(rate)   || 1, 0.1), 3),
+        pitch:  Math.min(Math.max(parseFloat(pitch)  || 1, 0),   2),
+        volume: Math.min(Math.max(parseFloat(volume) || 1, 0),   1),
+    };
+    broadcastToDisplays(msg);
+    broadcastSSE(msg);
+    console.log('[Stream] TTS triggered:', text.slice(0, 60));
+    res.json({ ok: true });
+});
+
+// ── POST /api/stream/sound ────────────────────────────────────
+app.post('/api/stream/sound', streamLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const ALLOWED_SOUNDS = ['tornado-warning','severe-thunderstorm','flash-flood',
+                            'special-weather','test-tone','chime'];
+    const { sound = 'chime', volume = 0.8 } = req.body;
+    if (!ALLOWED_SOUNDS.includes(sound)) return res.status(400).json({ error: 'unknown sound', allowed: ALLOWED_SOUNDS });
+    const msg = {
+        type: 'sound',
+        sound,
+        volume: Math.min(Math.max(parseFloat(volume) || 0.8, 0), 1),
+    };
+    broadcastToDisplays(msg);
+    broadcastSSE(msg);
+    console.log('[Stream] Sound alert:', sound);
+    res.json({ ok: true });
+});
+
+// ── GET /api/stream/alerts ────────────────────────────────────
+app.get('/api/stream/alerts', (_, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=120');
+    res.json({ alerts: cachedNwsAlerts, error: nwsAlertError, polledAt: Date.now() });
+});
+
+// ── Connected client count ────────────────────────────────────
+app.get('/api/stream/connections', (_, res) => {
+    const counts = { total: wsClients.size, display: 0, dashboard: 0, overlay: 0, sse: sseClients.size };
+    for (const c of wsClients) {
+        if (counts[c.role] !== undefined) counts[c.role]++;
+    }
+    res.json(counts);
+});
+
 // ── Start ─────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`WeatherNow running on http://0.0.0.0:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin.html`);
     console.log(`Admin password: ${ADMIN_PASSWORD}`);
