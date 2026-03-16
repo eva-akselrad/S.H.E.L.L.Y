@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.E.L.L.Y. – Streaming Overlay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link rel="stylesheet" href="css/overlay.css">
+</head>
+<body class="overlay-root">
+    <!-- Header bar -->
+    <header class="overlay-header">
+        <div class="header-brand">
+            <span class="brand-logo">⚡</span>
+            <span class="brand-name">S.H.E.L.L.Y.</span>
+            <span class="brand-sub">LIVE WEATHER</span>
+        </div>
+        <div class="header-mode" id="mode-label">AUTO MODE</div>
+        <div class="header-right">
+            <span class="header-location" id="header-location">Loading…</span>
+            <span class="header-clock" id="header-clock">--:--:--</span>
+            <span class="connection-status" id="conn-status" title="Server connection"></span>
+        </div>
+    </header>
+
+    <!-- Main content area -->
+    <div class="overlay-body">
+        <!-- Main panel: radar/info carousel -->
+        <main class="main-panel">
+            <!-- Radar slide -->
+            <div class="slide active" id="slide-radar">
+                <div class="slide-label">LIVE RADAR</div>
+                <div id="radar-map" class="radar-map"></div>
+                <div class="radar-controls">
+                    <button id="radar-prev" class="radar-btn">◀</button>
+                    <span id="radar-region-name">National</span>
+                    <button id="radar-next" class="radar-btn">▶</button>
+                </div>
+            </div>
+            <!-- Conditions slide -->
+            <div class="slide" id="slide-conditions">
+                <div class="slide-label">CURRENT CONDITIONS</div>
+                <div id="conditions-content" class="conditions-content"></div>
+            </div>
+            <!-- Extended forecast slide -->
+            <div class="slide" id="slide-extended">
+                <div class="slide-label">7-DAY FORECAST</div>
+                <div id="extended-content" class="extended-content"></div>
+            </div>
+            <!-- Alerts detail slide -->
+            <div class="slide" id="slide-alerts">
+                <div class="slide-label">⚠ ACTIVE ALERTS</div>
+                <div id="alerts-content" class="alerts-detail-content"></div>
+            </div>
+        </main>
+
+        <!-- Side panel: city forecasts -->
+        <aside class="side-panel">
+            <div class="side-panel-title">🌎 CITY FORECASTS</div>
+            <div id="city-list" class="city-list"></div>
+            <div class="side-panel-alerts">
+                <div class="side-panel-title">⚠ ACTIVE ALERTS</div>
+                <div id="side-alerts" class="side-alert-list"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Bottom ticker -->
+    <div class="alert-ticker" id="alert-ticker">
+        <div class="ticker-label">⚠ ALERTS</div>
+        <div class="ticker-track" id="ticker-track">
+            <span class="ticker-content" id="ticker-content">Checking for active alerts…</span>
+        </div>
+    </div>
+
+    <!-- Alert takeover overlay (hidden by default) -->
+    <div class="alert-takeover hidden" id="alert-takeover">
+        <div class="takeover-inner">
+            <div class="takeover-icon" id="takeover-icon">🌪️</div>
+            <div class="takeover-type" id="takeover-type">TORNADO WARNING</div>
+            <div class="takeover-headline" id="takeover-headline"></div>
+            <div class="takeover-county" id="takeover-county"></div>
+            <div class="takeover-expires" id="takeover-expires"></div>
+            <div class="takeover-source">National Weather Service</div>
+        </div>
+    </div>
+
+    <!-- Carousel indicators -->
+    <div class="carousel-indicators" id="carousel-indicators"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="js/overlay.js"></script>
+</body>
+</html>

@@ -1687,3 +1687,721 @@ html, body {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   OVERLAY PAGE – flat class names for overlay.html
+   (Y'allbot auto-mode OBS Browser Source layout)
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Utility ──────────────────────────────────────────────────── */
+.hidden {
+    display: none !important;
+}
+
+/* ── Header – flat aliases ────────────────────────────────────── */
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-logo {
+    font-size: 1.8rem;
+    filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.8));
+}
+
+.brand-name {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--accent2);
+    text-shadow: 0 0 16px rgba(6, 182, 212, 0.6);
+}
+
+.brand-sub {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    align-self: flex-end;
+    padding-bottom: 3px;
+}
+
+.header-mode {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--text-accent);
+    text-transform: uppercase;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.header-location {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+}
+
+.header-clock {
+    font-family: var(--font-mono);
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.06em;
+    text-shadow: var(--glow);
+}
+
+/* ── Overlay body (between header and ticker) ────────────────── */
+.overlay-body {
+    position: absolute;
+    top: 72px;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    display: flex;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+/* ── Main panel (left, slides carousel) ─────────────────────── */
+.main-panel {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    border-right: 2px solid var(--border);
+    background: var(--bg-primary);
+}
+
+/* ── Slides ───────────────────────────────────────────────────── */
+.slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+.slide.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.slide-label {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--accent2);
+    text-transform: uppercase;
+    padding: 10px 20px;
+    background: linear-gradient(90deg,
+        rgba(6, 182, 212, 0.1) 0%,
+        transparent 100%);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+/* ── Radar map ────────────────────────────────────────────────── */
+.radar-map {
+    flex: 1;
+    background: #050810;
+    min-height: 0;
+}
+
+.radar-controls {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 10px 24px;
+    background: rgba(10, 14, 26, 0.9);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+}
+
+.radar-btn {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid var(--border-strong);
+    color: var(--accent);
+    padding: 4px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background var(--transition);
+    pointer-events: auto;
+}
+
+.radar-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+}
+
+/* ── Conditions slide ─────────────────────────────────────────── */
+.conditions-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 32px;
+}
+
+.cond-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.cond-icon {
+    font-size: 6rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.4));
+}
+
+.cond-temp {
+    font-family: var(--font-display);
+    font-size: 5rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    text-shadow: var(--glow);
+}
+
+.cond-desc {
+    font-family: var(--font-body);
+    font-size: 1.4rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.cond-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.cond-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    gap: 6px;
+}
+
+.cond-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.cond-value {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.cond-location {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent2);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* ── Extended forecast slide ──────────────────────────────────── */
+.extended-content {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    padding: 20px;
+    gap: 12px;
+    min-height: 0;
+}
+
+.fcst-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color var(--transition);
+}
+
+.fcst-day:first-child {
+    border-color: var(--accent);
+    background: var(--bg-card2);
+}
+
+.fcst-dow {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+}
+
+.fcst-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
+.fcst-desc {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: 1.3;
+}
+
+.fcst-temps {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.fcst-hi {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-accent);
+}
+
+.fcst-lo {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* ── Alerts detail slide ──────────────────────────────────────── */
+.alerts-detail-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    overflow: hidden;
+}
+
+.alert-card {
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    border-left: 4px solid var(--alert-yellow);
+    background: rgba(234, 179, 8, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.alert-card--tornado {
+    border-left-color: var(--alert-red);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.alert-card--storm {
+    border-left-color: var(--accent);
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.alert-card--flood {
+    border-left-color: var(--alert-green);
+    background: rgba(34, 197, 94, 0.08);
+}
+
+.alert-card--fire {
+    border-left-color: var(--alert-orange);
+    background: rgba(249, 115, 22, 0.08);
+}
+
+.alert-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.alert-card-icon {
+    font-size: 1.3rem;
+}
+
+.alert-card-event {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.alert-card-area {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+}
+
+.alert-card-headline {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+    opacity: 0.85;
+}
+
+.no-data-msg {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--alert-green);
+    letter-spacing: 0.1em;
+}
+
+/* ── Side panel ───────────────────────────────────────────────── */
+.side-panel {
+    width: 440px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.side-panel-title {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--accent2);
+    text-transform: uppercase;
+    padding: 10px 18px;
+    background: linear-gradient(90deg,
+        rgba(6, 182, 212, 0.08) 0%,
+        transparent 100%);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+/* ── City list ────────────────────────────────────────────────── */
+.city-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.city-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    transition: background var(--transition);
+}
+
+.city-item:hover {
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.city-item--error {
+    opacity: 0.4;
+}
+
+.city-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.city-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    width: 32px;
+    text-align: center;
+}
+
+.city-name-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.city-name {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.05em;
+}
+
+.city-state {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.city-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.city-temp {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.city-hilow {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+}
+
+/* ── Side alerts ──────────────────────────────────────────────── */
+.side-panel-alerts {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-top: 2px solid var(--border);
+    overflow: hidden;
+}
+
+.side-alert-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.side-alert-item {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--alert-yellow);
+    background: rgba(234, 179, 8, 0.05);
+}
+
+.side-alert-item.side-alert--tornado {
+    border-left-color: var(--alert-red);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.side-alert-item.side-alert--storm {
+    border-left-color: var(--accent);
+    background: rgba(59, 130, 246, 0.06);
+}
+
+.side-alert-item.side-alert--flood {
+    border-left-color: var(--alert-green);
+    background: rgba(34, 197, 94, 0.06);
+}
+
+.side-alert-item.side-alert--fire {
+    border-left-color: var(--alert-orange);
+    background: rgba(249, 115, 22, 0.06);
+}
+
+.side-alert-event {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.side-alert-area {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    letter-spacing: 0.05em;
+}
+
+.no-alerts {
+    padding: 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--alert-green);
+    letter-spacing: 0.08em;
+}
+
+/* ── Ticker – flat aliases for .alert-ticker children ─────────── */
+.ticker-label {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px;
+    height: 100%;
+    background: var(--accent);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: #fff;
+    text-transform: uppercase;
+    white-space: nowrap;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+    padding-right: 28px;
+}
+
+.ticker-track {
+    flex: 1;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.ticker-content {
+    display: inline-block;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    letter-spacing: 0.03em;
+    animation: ticker-scroll 60s linear infinite;
+    padding-left: 100%;
+}
+
+/* ── Alert takeover – flat class children ─────────────────────── */
+.takeover-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 80px;
+    position: relative;
+    z-index: 1;
+}
+
+.takeover-icon {
+    font-size: 6rem;
+    line-height: 1;
+    margin-bottom: 24px;
+    filter: drop-shadow(var(--glow-alert));
+    animation: alert-pulse 1.2s ease-in-out infinite;
+}
+
+.takeover-type {
+    font-family: var(--font-display);
+    font-size: 4rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: var(--glow-alert);
+    margin-bottom: 16px;
+}
+
+.takeover-headline {
+    font-family: var(--font-body);
+    font-size: 1.6rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    max-width: 1200px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    padding: 0 80px;
+}
+
+.takeover-county {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.65);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+}
+
+.takeover-expires {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.05em;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 16px;
+    margin-top: 8px;
+}
+
+.takeover-source {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 16px;
+}
+
+/* Border pulse ring inside takeover */
+.alert-takeover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 6px solid var(--alert-red);
+    animation: alert-pulse 0.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.alert-takeover--storm::before    { border-color: var(--accent); }
+.alert-takeover--flood::before    { border-color: var(--alert-green); }
+.alert-takeover--fire::before     { border-color: var(--alert-orange); }
+.alert-takeover--emergency::before { border-color: #a855f7; }
+.alert-takeover--info::before     { border-color: var(--accent2); }
+
+/* Show takeover when .hidden is removed (uses opacity animation) */
+.alert-takeover:not(.hidden) {
+    opacity: 1;
+    pointer-events: auto;
+    animation: alert-slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Override base opacity:0 for the takeover when shown */
+.alert-takeover:not(.hidden) {
+    opacity: 1;
+}
