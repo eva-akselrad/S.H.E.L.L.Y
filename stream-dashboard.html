@@ -450,8 +450,8 @@
                 <span class="db-section__badge" id="nws-count-badge">Loading…</span>
                 <button class="db-btn db-btn--sm" style="margin-left:auto;" onclick="htmx.trigger('#nws-alerts-section','load')">↻ Refresh</button>
             </div>
-            <div class="nws-alert-list" id="nws-alert-list">
-                <div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:12px 0;">Loading NWS alerts…</div>
+            <div class="nws-alert-list" id="nws-alert-list" aria-live="polite">
+                <div style="color:var(--text-secondary);font-size:0.8rem;font-family:var(--font-mono);padding:12px 0;">Loading NWS alerts...</div>
             </div>
         </div>
 
@@ -472,7 +472,9 @@
     </div><!-- /body grid -->
 </div><!-- /dashboard -->
 
-<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+        integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
+        crossorigin="anonymous"></script>
 <script>
 'use strict';
 
@@ -585,7 +587,7 @@ function connectDashboardWS() {
     dashWS = socket;
 
     socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ type: 'hello', role: 'dashboard', password: adminPassword }));
+        socket.send(JSON.stringify({ type: 'register', role: 'dashboard' }));
         setWsStatus('connected');
     });
 

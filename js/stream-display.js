@@ -451,10 +451,10 @@ function connectWS() {
     ws = socket;
 
     socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ type: 'hello', role: 'display' }));
+        socket.send(JSON.stringify({ type: 'register', role: 'display' }));
         setConnStatus('connected');
-        const ws = $('waiting-status');
-        if (ws) ws.textContent = 'Connected – awaiting broadcast…';
+        const statusEl = $('waiting-status');
+        if (statusEl) statusEl.textContent = 'Connected – awaiting broadcast…';
         if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
     });
 
