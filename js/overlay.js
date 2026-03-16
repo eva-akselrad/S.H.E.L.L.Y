@@ -17,6 +17,8 @@
   const FRAME_COUNT        = 6;
   const ANIM_MS            = 700;
   const RADAR_OPACITY      = 0.7;
+  // Ticker scroll speed in pixels per second (keeps text readable at any length)
+  const TICKER_PX_PER_SEC  = 160;
 
   const CITIES = [
     { name: 'New York',    state: 'NY', lat: 40.7128,  lon: -74.0060  },
@@ -196,6 +198,10 @@
   }
 
   function checkTornadoTakeover(alerts) {
+    // Match NWS canonical event names for tornado watches/warnings/emergencies.
+    // Substring matching is intentional: NWS event strings include qualifiers
+    // (e.g. "Tornado Warning", "Tornado Emergency") that all contain "tornado warning"
+    // or "tornado emergency", so this safely covers all tornado-level events.
     const tornado = alerts.find(a => {
       const e = (a.event ?? '').toLowerCase();
       return e.includes('tornado warning') || e.includes('tornado emergency');
@@ -282,7 +288,7 @@
 
     // Scale animation duration so ticker scrolls at a consistent ~160 px/s
     const px = el.scrollWidth / 2;
-    el.style.animationDuration = `${Math.max(10, Math.round(px / 160))}s`;
+    el.style.animationDuration = `${Math.max(10, Math.round(px / TICKER_PX_PER_SEC))}s`;
   }
 
   // ── Side alerts ───────────────────────────────────────────────
@@ -505,6 +511,8 @@
 
       const newLayers = past.map(f =>
         L.tileLayer(`https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/6/1_1.png`, {
+          // Path segments: /256 = tile size, /6 = color scheme (RAINBOW/SELEX-SI),
+          // /1_1 = smooth=1, snow=1 (renders snow accumulation tiles)
           tileSize:       256,
           opacity:        0,
           zIndex:         200,
