@@ -4,7 +4,7 @@ const { spawn } = require('node:child_process');
 const net = require('node:net');
 
 async function findFreePort() {
-    return await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         const server = net.createServer();
         server.on('error', reject);
         server.listen(0, () => {
@@ -36,9 +36,13 @@ test('server health endpoint returns ok with numeric uptime', async (t) => {
         stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    let logs = '';
-    server.stdout.on('data', d => { logs += d.toString(); });
-    server.stderr.on('data', d => { logs += d.toString(); });
+    const outputChunks = [];
+    const capture = (d) => {
+        outputChunks.push(d.toString());
+        if (outputChunks.length > 20) outputChunks.shift();
+    };
+    server.stdout.on('data', capture);
+    server.stderr.on('data', capture);
 
     t.after(() => {
         if (!server.killed) server.kill('SIGTERM');
@@ -55,7 +59,7 @@ test('server health endpoint returns ok with numeric uptime', async (t) => {
     assert.equal(typeof body.pushSubscribers, 'number');
 
     if (server.exitCode !== null && server.exitCode !== 0) {
-        throw new Error(`Server exited unexpectedly with code ${server.exitCode}. Logs:\n${logs}`);
+        throw new Error(`Server exited unexpectedly with code ${server.exitCode}. Logs:\n${outputChunks.join('')}`);
     }
 });
 
