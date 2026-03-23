@@ -354,12 +354,12 @@ app.get('/api/health', (_, res) => res.json({
 }));
 
 // ── Release Notes ─────────────────────────────────────────────
-app.get('/api/release-notes', adminLimiter, (req, res) => {
+app.get('/api/release-notes', (req, res) => {
     if (!checkAuth(req, res)) return;
     res.json(releaseNotes);
 });
 
-app.post('/api/release-notes', adminLimiter, (req, res) => {
+app.post('/api/release-notes', (req, res) => {
     if (!checkAuth(req, res)) return;
     const { version = '', notes = '' } = req.body;
     if (!notes.trim()) return res.status(400).json({ error: 'notes required' });
@@ -369,13 +369,13 @@ app.post('/api/release-notes', adminLimiter, (req, res) => {
     res.json(note);
 });
 
-app.delete('/api/release-notes/:id', adminLimiter, (req, res) => {
+app.delete('/api/release-notes/:id', (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = releaseNotes.filter(n => n.id !== parseInt(req.params.id));
     res.json({ ok: true });
 });
 
-app.delete('/api/release-notes', adminLimiter, (req, res) => {
+app.delete('/api/release-notes', (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = [];
     res.json({ ok: true });
