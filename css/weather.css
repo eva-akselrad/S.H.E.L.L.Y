@@ -1335,6 +1335,11 @@ body {
     margin: 0 auto 20px;
 }
 
+.updating-spinner {
+    border-top-color: #22c55e;
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.35);
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);

@@ -1194,7 +1194,7 @@
 
             <div class="row">
                 <div class="field-group">
-                    <label>Version <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                    <label>Release Version</label>
                     <input type="text" id="rn-version" placeholder="e.g. v2.1.0" maxlength="30" />
                 </div>
                 <div class="field-group">
@@ -1222,6 +1222,19 @@
                         weather display so viewers can see what's new.</div>
                 </div>
             </div>
+
+            <div class="field-group"
+                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                <input type="checkbox" id="rn-autoupdate"
+                    style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
+                <div style="flex:1">
+                    <label for="rn-autoupdate"
+                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Enable forced auto-updates</label>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
+                </div>
+            </div>
+
+            <button class="clear-all-btn" id="rn-save-settings-btn" style="margin-bottom:10px">💾 Save Update Settings</button>
 
             <button class="send-btn" id="rn-post-btn"
                 style="background:linear-gradient(135deg,var(--accent2),#0ea5e9)">📝 POST RELEASE NOTES</button>
@@ -1427,6 +1440,7 @@
                 // Release Notes
                 document.getElementById('rn-post-btn').addEventListener('click', postReleaseNote);
                 document.getElementById('rn-clear-all-btn').addEventListener('click', clearAllReleaseNotes);
+                document.getElementById('rn-save-settings-btn').addEventListener('click', saveUpdateSettings);
                 // Pre-fill today's date display
                 document.getElementById('rn-date').value = new Date().toLocaleDateString();
 
@@ -1446,6 +1460,7 @@
                 loadMessages();
                 loadPushCount();
                 loadReleaseNotes();
+                loadUpdateSettings();
                 loadCustomForecast();
                 loadArmageddonState();
                 // Fast poll: messages + armageddon combined (10 s instead of 3 × 5 s)
@@ -1780,6 +1795,7 @@
                 const notes = document.getElementById('rn-notes').value.trim();
                 if (!notes) { rnFeedback('⚠ Please enter release notes.', '#f59e0b'); return; }
                 const version = document.getElementById('rn-version').value.trim();
+                if (!version) { rnFeedback('⚠ Version is required.', '#f59e0b'); return; }
                 const announce = document.getElementById('rn-announce').checked;
                 const btn = document.getElementById('rn-post-btn');
                 btn.disabled = true;
@@ -1793,7 +1809,6 @@
                     playChime();
                     rnFeedback('✓ Release note posted!', '#22c55e');
                     document.getElementById('rn-notes').value = '';
-                    document.getElementById('rn-version').value = '';
                     document.getElementById('rn-date').value = new Date().toLocaleDateString();
                     loadReleaseNotes();
 
@@ -1807,6 +1822,39 @@
                     }
                 } catch {
                     rnFeedback('⚠ Failed to post release note.', '#ef4444');
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function loadUpdateSettings() {
+                try {
+                    const r = await fetch(`${API}/app-update`);
+                    if (!r.ok) return;
+                    const data = await r.json();
+                    const versionEl = document.getElementById('rn-version');
+                    const autoEl = document.getElementById('rn-autoupdate');
+                    if (versionEl && data?.version) versionEl.value = String(data.version);
+                    if (autoEl && typeof data?.autoUpdateEnabled === 'boolean') autoEl.checked = data.autoUpdateEnabled;
+                } catch { /* ignore */ }
+            }
+
+            async function saveUpdateSettings() {
+                const version = document.getElementById('rn-version').value.trim();
+                if (!version) { rnFeedback('⚠ Version is required to save update settings.', '#f59e0b'); return; }
+                const autoUpdateEnabled = document.getElementById('rn-autoupdate').checked;
+                const btn = document.getElementById('rn-save-settings-btn');
+                btn.disabled = true;
+                try {
+                    const r = await fetch(`${API}/app-update`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        body: JSON.stringify({ version, autoUpdateEnabled })
+                    });
+                    if (!r.ok) throw new Error();
+                    rnFeedback('✓ Update settings saved.', '#22c55e');
+                } catch {
+                    rnFeedback('⚠ Failed to save update settings.', '#ef4444');
                 } finally {
                     btn.disabled = false;
                 }
