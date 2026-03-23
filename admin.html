@@ -1229,7 +1229,7 @@
                     style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
                 <div style="flex:1">
                     <label for="rn-autoupdate"
-                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Enable forced auto-updates</label>
+                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Force client updates on version mismatch</label>
                     <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
                 </div>
             </div>
@@ -1795,7 +1795,6 @@
                 const notes = document.getElementById('rn-notes').value.trim();
                 if (!notes) { rnFeedback('⚠ Please enter release notes.', '#f59e0b'); return; }
                 const version = document.getElementById('rn-version').value.trim();
-                if (!version) { rnFeedback('⚠ Version is required.', '#f59e0b'); return; }
                 const announce = document.getElementById('rn-announce').checked;
                 const btn = document.getElementById('rn-post-btn');
                 btn.disabled = true;

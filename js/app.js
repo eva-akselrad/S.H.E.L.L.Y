@@ -38,6 +38,7 @@
     const dotsContainer = document.getElementById('slide-dots');
 
     const VERSION_COOKIE = 'shelly_app_version';
+    const VERSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 2; // 2 years
 
     function getCookie(name) {
         const prefix = `${name}=`;
@@ -45,8 +46,7 @@
     }
 
     function setVersionCookie(version) {
-        const maxAge = 60 * 60 * 24 * 365 * 20; // 20 years (effectively no expiry for app use)
-        document.cookie = `${VERSION_COOKIE}=${encodeURIComponent(version)}; path=/; max-age=${maxAge}; samesite=lax`;
+        document.cookie = `${VERSION_COOKIE}=${encodeURIComponent(version)}; path=/; max-age=${VERSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
     }
 
     function showUpdatingScreen() {
@@ -84,7 +84,8 @@
                         console.warn('Service worker update check failed:', err);
                     }
                 }
-                setTimeout(() => window.location.reload(true), 1200);
+                // Brief pause so users can see the updating state before reload.
+                setTimeout(() => window.location.reload(), 1200);
                 return true;
             }
         } catch (err) {

@@ -133,7 +133,6 @@ app.use('/api/announce', adminLimiter);
 app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
-app.use('/api/app-update', adminLimiter);
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
@@ -405,12 +404,12 @@ app.get('/api/health', (_, res) => res.json({
 // ── App update settings ───────────────────────────────────────
 // Public read endpoint used by clients at startup.
 app.get('/api/app-update', (_, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store');
     res.json(appUpdateSettings);
 });
 
 // Admin write endpoint used by admin panel.
-app.put('/api/app-update', (req, res) => {
+app.put('/api/app-update', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const version = String(req.body?.version ?? '').trim();
     if (!version || version.length > 30) {
