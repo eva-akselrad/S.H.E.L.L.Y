@@ -365,7 +365,7 @@ export async function onRequest({ request, env }) {
         const body = await request.json();
         const version = String(body?.version ?? '').trim();
         if (!version || version.length > MAX_APP_VERSION_LENGTH) {
-            return json({ error: 'valid version required (1-30 chars)' }, 400);
+            return json({ error: 'valid non-whitespace version required (1-30 chars)' }, 400);
         }
         const existing = await getAppUpdateSettings(env);
         const autoUpdateEnabled = typeof body?.autoUpdateEnabled === 'boolean'
