@@ -23,18 +23,21 @@ const RadarMap = (() => {
   let pendingLon = null;
   let refreshTimer = null;
   let building = false; // in-flight guard for buildFrames
-  let radarMode = "classic"; // classic | app
+  let radarModeActive = false;
   let warningsEnabled = false;
   let warningsLayer = null;
   let warningsBusy = false;
+  let testPolygonsEnabled = false;
   let currentLat = null;
   let currentLon = null;
-  let baseLayer = null;
 
   const FRAME_COUNT = 6;
   const ANIM_INTERVAL = 700; // ms per animation step
   const RADAR_OPACITY = 0.7;
-  const RADAR_OPACITY_APP = 0.85;
+  const WATCH_FILL_OPACITY = 0.08;
+  const WARNING_FILL_OPACITY = 0.12;
+  const TEST_POLYGON_LAT_OFFSET = 0.18;
+  const TEST_POLYGON_LON_OFFSET = 0.22;
 
   // RainViewer public API – no key required
   const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
@@ -51,6 +54,11 @@ const RadarMap = (() => {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+
+  function shouldDisplayAlert(properties) {
+    const eventName = (properties?.event || "").toLowerCase();
+    return eventName.includes("warning") || eventName.includes("watch");
   }
 
   // ── Fetch available radar frames from RainViewer ───────────────
@@ -125,8 +133,7 @@ const RadarMap = (() => {
   function showFrame(idx) {
     if (!frames.length) return;
     idx = ((idx % frames.length) + frames.length) % frames.length;
-    const opacity = radarMode === "app" ? RADAR_OPACITY_APP : RADAR_OPACITY;
-    frames.forEach((f, i) => f.layer.setOpacity(i === idx ? opacity : 0));
+    frames.forEach((f, i) => f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0));
     currentFrame = idx;
     updateTimestamp();
     updateDots();
@@ -153,59 +160,28 @@ const RadarMap = (() => {
   }
 
   function toggleAnimation() {
-    if (radarMode === "app") {
-      stopAnimation();
-      showFrame(frames.length - 1);
-      return;
-    }
     if (animating) stopAnimation();
     else startAnimation();
   }
 
   function jumpToLive() {
     showFrame(frames.length - 1);
-    if (radarMode !== "app" && !animating) startAnimation();
+    if (!animating) startAnimation();
   }
 
   function updateRadarModeUI() {
     const btn = document.getElementById("radar-mode");
-    const dots = document.getElementById("radar-frame-dots");
     if (btn) {
-      const isApp = radarMode === "app";
-      btn.textContent = `RADAR MODE: ${isApp ? "APP" : "CLASSIC"}`;
-      btn.classList.toggle("active", isApp);
+      btn.classList.toggle("active", radarModeActive);
     }
-    if (dots) dots.style.display = radarMode === "app" ? "none" : "";
-  }
-
-  function setBaseMap() {
-    if (!map) return;
-    if (baseLayer && map.hasLayer(baseLayer)) map.removeLayer(baseLayer);
-    const isApp = radarMode === "app";
-    const url = isApp
-      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-    baseLayer = L.tileLayer(url, {
-      attribution:
-        '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 15,
-    });
-    baseLayer.addTo(map);
   }
 
   function toggleRadarMode() {
-    radarMode = radarMode === "classic" ? "app" : "classic";
+    radarModeActive = !radarModeActive;
+    document.body.classList.toggle("radar-mode", radarModeActive);
+    document.dispatchEvent(new CustomEvent(radarModeActive ? "radar-mode-enter" : "radar-mode-exit"));
     updateRadarModeUI();
-    setBaseMap();
-    if (!frames.length) return;
-    showFrame(currentFrame);
-    if (radarMode === "app") {
-      stopAnimation();
-      showFrame(frames.length - 1);
-    } else if (!animating) {
-      startAnimation();
-    }
+    if (radarModeActive && map) map.invalidateSize();
   }
 
   // ── Timestamp display ─────────────────────────────────────────
@@ -243,6 +219,80 @@ const RadarMap = (() => {
       .forEach((d, i) => d.classList.toggle("active", i === currentFrame));
   }
 
+  function renderTestPolygons() {
+    if (
+      !warningsLayer ||
+      currentLat === null ||
+      currentLat === undefined ||
+      currentLon === null ||
+      currentLon === undefined
+    )
+      return;
+    warningsLayer.clearLayers();
+    const dLat = TEST_POLYGON_LAT_OFFSET;
+    const dLon = TEST_POLYGON_LON_OFFSET;
+    const features = [
+      {
+        type: "Feature",
+        properties: { event: "Test Severe Thunderstorm Warning", severity: "Severe" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [currentLon - dLon, currentLat - dLat],
+            [currentLon - dLon, currentLat + dLat],
+            [currentLon, currentLat + dLat * 1.2],
+            [currentLon + dLon * 0.2, currentLat],
+            [currentLon - dLon, currentLat - dLat],
+          ]],
+        },
+      },
+      {
+        type: "Feature",
+        properties: { event: "Test Tornado Watch", severity: "Moderate" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [currentLon + dLon * 0.1, currentLat - dLat * 1.1],
+            [currentLon + dLon * 0.9, currentLat - dLat * 1.1],
+            [currentLon + dLon * 1.2, currentLat + dLat * 0.8],
+            [currentLon + dLon * 0.3, currentLat + dLat * 1.1],
+            [currentLon + dLon * 0.1, currentLat - dLat * 1.1],
+          ]],
+        },
+      },
+    ];
+    L.geoJSON(features, {
+      style: (feature) => alertStyle(feature?.properties || {}),
+      onEachFeature: (feature, layer) => {
+        const p = feature?.properties || {};
+        layer.bindPopup(`<strong>${escHtml(p.event || "Test Alert")}</strong><div>Test polygon</div>`);
+      },
+    }).addTo(warningsLayer);
+  }
+
+  function alertStyle(properties) {
+    const eventName = (properties?.event || "").toLowerCase();
+    const isWatch = eventName.includes("watch");
+    const isWarning = eventName.includes("warning");
+    const sev = (properties?.severity || "").toLowerCase();
+    const color = isWarning
+      ? "#ef4444"
+      : isWatch
+        ? "#f59e0b"
+        : sev === "severe"
+          ? "#f97316"
+          : sev === "moderate"
+            ? "#f59e0b"
+            : "#fde047";
+    return {
+      color,
+      weight: isWatch ? 2 : 3,
+      dashArray: isWatch ? "6 6" : "",
+      fillColor: color,
+      fillOpacity: isWatch ? WATCH_FILL_OPACITY : WARNING_FILL_OPACITY,
+    };
+  }
+
   async function refreshWarnings() {
     if (
       !map ||
@@ -271,22 +321,11 @@ const RadarMap = (() => {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       if (warningsLayer) warningsLayer.clearLayers();
-      const features = (data.features || []).filter((f) => f?.geometry);
+      const features = (data.features || []).filter((f) => f?.geometry && shouldDisplayAlert(f.properties));
       if (!features.length) return;
 
       L.geoJSON(features, {
-        style: (feature) => {
-          const sev = (feature?.properties?.severity || "").toLowerCase();
-          const color =
-            sev === "extreme"
-              ? "#ef4444"
-              : sev === "severe"
-                ? "#f97316"
-                : sev === "moderate"
-                  ? "#f59e0b"
-                  : "#fde047";
-          return { color, weight: 2, fillColor: color, fillOpacity: 0.12 };
-        },
+        style: (feature) => alertStyle(feature?.properties || {}),
         onEachFeature: (feature, layer) => {
           const p = feature?.properties || {};
           const title = escHtml(p.event || "Weather Alert");
@@ -308,7 +347,19 @@ const RadarMap = (() => {
       if (warningsEnabled && map && !map.hasLayer(warningsLayer)) warningsLayer.addTo(map);
       if (!warningsEnabled) warningsLayer.clearLayers();
     }
-    if (warningsEnabled) refreshWarnings();
+    if (warningsEnabled) {
+      if (testPolygonsEnabled) renderTestPolygons();
+      else refreshWarnings();
+    }
+  }
+
+  function toggleTestPolygons() {
+    testPolygonsEnabled = !testPolygonsEnabled;
+    const btn = document.getElementById("radar-test");
+    if (btn) btn.classList.toggle("active", testPolygonsEnabled);
+    if (!warningsEnabled || !warningsLayer) return;
+    if (testPolygonsEnabled) renderTestPolygons();
+    else refreshWarnings();
   }
 
   // ── Init Leaflet map (once) ───────────────────────────────────
@@ -338,7 +389,15 @@ const RadarMap = (() => {
 
     warningsLayer = L.layerGroup().addTo(map);
 
-    setBaseMap();
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      {
+        attribution:
+          '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+        subdomains: "abcd",
+        maxZoom: 15,
+      },
+    ).addTo(map);
 
     // Location marker
     const icon = L.divIcon({
@@ -367,6 +426,17 @@ const RadarMap = (() => {
     document
       .getElementById("radar-mode")
       ?.addEventListener("click", toggleRadarMode);
+    document
+      .getElementById("radar-mode-exit")
+      ?.addEventListener("click", () => {
+        if (radarModeActive) toggleRadarMode();
+      });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && radarModeActive) toggleRadarMode();
+    });
+    document
+      .getElementById("radar-test")
+      ?.addEventListener("click", toggleTestPolygons);
     document.getElementById("radar-warnings")?.addEventListener("change", (e) => {
       setWarningsEnabled(e.target.checked);
     });
@@ -375,7 +445,10 @@ const RadarMap = (() => {
     // Refresh frames every 5 minutes
     refreshTimer = setInterval(() => {
       refreshAll();
-      if (warningsEnabled) refreshWarnings();
+      if (warningsEnabled) {
+        if (testPolygonsEnabled) renderTestPolygons();
+        else refreshWarnings();
+      }
     }, 5 * 60_000);
   }
 
@@ -397,7 +470,10 @@ const RadarMap = (() => {
       currentLon = lon;
       map.setView([lat, lon], map.getZoom());
       refreshAll();
-      if (warningsEnabled) refreshWarnings();
+      if (warningsEnabled) {
+        if (testPolygonsEnabled) renderTestPolygons();
+        else refreshWarnings();
+      }
     }
   }
 
