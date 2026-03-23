@@ -23,10 +23,18 @@ const RadarMap = (() => {
   let pendingLon = null;
   let refreshTimer = null;
   let building = false; // in-flight guard for buildFrames
+  let radarMode = "classic"; // classic | app
+  let warningsEnabled = false;
+  let warningsLayer = null;
+  let warningsBusy = false;
+  let currentLat = null;
+  let currentLon = null;
+  let baseLayer = null;
 
   const FRAME_COUNT = 6;
   const ANIM_INTERVAL = 700; // ms per animation step
   const RADAR_OPACITY = 0.7;
+  const RADAR_OPACITY_APP = 0.85;
 
   // RainViewer public API – no key required
   const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
@@ -35,6 +43,15 @@ const RadarMap = (() => {
   // color 6 = RAINBOW @ SELEX-SI (primarily green for light/moderate precip), smooth+snow flags = 1_1
   const RV_TILE = (path) =>
     `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/6/1_1.png`;
+
+  function escHtml(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
 
   // ── Fetch available radar frames from RainViewer ───────────────
   async function fetchRainViewerFrames() {
@@ -108,9 +125,8 @@ const RadarMap = (() => {
   function showFrame(idx) {
     if (!frames.length) return;
     idx = ((idx % frames.length) + frames.length) % frames.length;
-    frames.forEach((f, i) =>
-      f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0),
-    );
+    const opacity = radarMode === "app" ? RADAR_OPACITY_APP : RADAR_OPACITY;
+    frames.forEach((f, i) => f.layer.setOpacity(i === idx ? opacity : 0));
     currentFrame = idx;
     updateTimestamp();
     updateDots();
@@ -137,13 +153,59 @@ const RadarMap = (() => {
   }
 
   function toggleAnimation() {
+    if (radarMode === "app") {
+      stopAnimation();
+      showFrame(frames.length - 1);
+      return;
+    }
     if (animating) stopAnimation();
     else startAnimation();
   }
 
   function jumpToLive() {
     showFrame(frames.length - 1);
-    if (!animating) startAnimation();
+    if (radarMode !== "app" && !animating) startAnimation();
+  }
+
+  function updateRadarModeUI() {
+    const btn = document.getElementById("radar-mode");
+    const dots = document.getElementById("radar-frame-dots");
+    if (btn) {
+      const isApp = radarMode === "app";
+      btn.textContent = `RADAR MODE: ${isApp ? "APP" : "CLASSIC"}`;
+      btn.classList.toggle("active", isApp);
+    }
+    if (dots) dots.style.display = radarMode === "app" ? "none" : "";
+  }
+
+  function setBaseMap() {
+    if (!map) return;
+    if (baseLayer && map.hasLayer(baseLayer)) map.removeLayer(baseLayer);
+    const isApp = radarMode === "app";
+    const url = isApp
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    baseLayer = L.tileLayer(url, {
+      attribution:
+        '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 15,
+    });
+    baseLayer.addTo(map);
+  }
+
+  function toggleRadarMode() {
+    radarMode = radarMode === "classic" ? "app" : "classic";
+    updateRadarModeUI();
+    setBaseMap();
+    if (!frames.length) return;
+    showFrame(currentFrame);
+    if (radarMode === "app") {
+      stopAnimation();
+      showFrame(frames.length - 1);
+    } else if (!animating) {
+      startAnimation();
+    }
   }
 
   // ── Timestamp display ─────────────────────────────────────────
@@ -181,6 +243,74 @@ const RadarMap = (() => {
       .forEach((d, i) => d.classList.toggle("active", i === currentFrame));
   }
 
+  async function refreshWarnings() {
+    if (
+      !map ||
+      !warningsEnabled ||
+      warningsBusy ||
+      currentLat === null ||
+      currentLat === undefined ||
+      currentLon === null ||
+      currentLon === undefined
+    )
+      return;
+    warningsBusy = true;
+    try {
+      const params = new URLSearchParams({
+        point: `${currentLat.toFixed(4)},${currentLon.toFixed(4)}`,
+        status: "actual",
+        message_type: "alert",
+      });
+      const url = `https://api.weather.gov/alerts/active?${params.toString()}`;
+      const resp = await fetch(url, {
+        headers: {
+          Accept: "application/geo+json",
+          "User-Agent": "WeatherNow/1.0",
+        },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (warningsLayer) warningsLayer.clearLayers();
+      const features = (data.features || []).filter((f) => f?.geometry);
+      if (!features.length) return;
+
+      L.geoJSON(features, {
+        style: (feature) => {
+          const sev = (feature?.properties?.severity || "").toLowerCase();
+          const color =
+            sev === "extreme"
+              ? "#ef4444"
+              : sev === "severe"
+                ? "#f97316"
+                : sev === "moderate"
+                  ? "#f59e0b"
+                  : "#fde047";
+          return { color, weight: 2, fillColor: color, fillOpacity: 0.12 };
+        },
+        onEachFeature: (feature, layer) => {
+          const p = feature?.properties || {};
+          const title = escHtml(p.event || "Weather Alert");
+          const headline = p.headline ? `<div>${escHtml(p.headline)}</div>` : "";
+          const severity = p.severity ? `<div>Severity: ${escHtml(p.severity)}</div>` : "";
+          layer.bindPopup(`<strong>${title}</strong>${severity}${headline}`);
+        },
+      }).addTo(warningsLayer);
+    } catch (e) {
+      console.warn("Warning polygons fetch failed:", e);
+    } finally {
+      warningsBusy = false;
+    }
+  }
+
+  function setWarningsEnabled(enabled) {
+    warningsEnabled = Boolean(enabled);
+    if (warningsLayer) {
+      if (warningsEnabled && map && !map.hasLayer(warningsLayer)) warningsLayer.addTo(map);
+      if (!warningsEnabled) warningsLayer.clearLayers();
+    }
+    if (warningsEnabled) refreshWarnings();
+  }
+
   // ── Init Leaflet map (once) ───────────────────────────────────
   function initMap(lat, lon) {
     if (initialized) {
@@ -203,16 +333,12 @@ const RadarMap = (() => {
       scrollWheelZoom: true,
     });
 
-    // Dark base map
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {
-        attribution:
-          '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 15,
-      },
-    ).addTo(map);
+    currentLat = lat;
+    currentLon = lon;
+
+    warningsLayer = L.layerGroup().addTo(map);
+
+    setBaseMap();
 
     // Location marker
     const icon = L.divIcon({
@@ -238,9 +364,19 @@ const RadarMap = (() => {
     document
       .getElementById("radar-live")
       ?.addEventListener("click", jumpToLive);
+    document
+      .getElementById("radar-mode")
+      ?.addEventListener("click", toggleRadarMode);
+    document.getElementById("radar-warnings")?.addEventListener("change", (e) => {
+      setWarningsEnabled(e.target.checked);
+    });
+    updateRadarModeUI();
 
     // Refresh frames every 5 minutes
-    refreshTimer = setInterval(refreshAll, 5 * 60_000);
+    refreshTimer = setInterval(() => {
+      refreshAll();
+      if (warningsEnabled) refreshWarnings();
+    }, 5 * 60_000);
   }
 
   function refreshAll() {
@@ -257,8 +393,11 @@ const RadarMap = (() => {
       pendingLon = lon;
       setTimeout(() => initMap(lat, lon), 150);
     } else {
+      currentLat = lat;
+      currentLon = lon;
       map.setView([lat, lon], map.getZoom());
       refreshAll();
+      if (warningsEnabled) refreshWarnings();
     }
   }
 

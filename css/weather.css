@@ -2142,6 +2142,26 @@ body {
     color: var(--accent);
 }
 
+.radar-ctrl-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.18);
+}
+
+.radar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    user-select: none;
+}
+
+.radar-toggle input {
+    accent-color: var(--accent);
+}
+
 /* Frame timeline dots */
 .radar-frames {
     flex: 1;
