@@ -131,7 +131,6 @@ app.use('/api/verify', adminLimiter);
 app.use('/api/announce', adminLimiter);
 app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
-app.use('/api/release-notes', adminLimiter);
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
@@ -354,12 +353,12 @@ app.get('/api/health', (_, res) => res.json({
 }));
 
 // ── Release Notes ─────────────────────────────────────────────
-app.get('/api/release-notes', (req, res) => {
+app.get('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     res.json(releaseNotes);
 });
 
-app.post('/api/release-notes', (req, res) => {
+app.post('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { version = '', notes = '' } = req.body;
     if (!notes.trim()) return res.status(400).json({ error: 'notes required' });
@@ -369,13 +368,13 @@ app.post('/api/release-notes', (req, res) => {
     res.json(note);
 });
 
-app.delete('/api/release-notes/:id', (req, res) => {
+app.delete('/api/release-notes/:id', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = releaseNotes.filter(n => n.id !== parseInt(req.params.id));
     res.json({ ok: true });
 });
 
-app.delete('/api/release-notes', (req, res) => {
+app.delete('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = [];
     res.json({ ok: true });
