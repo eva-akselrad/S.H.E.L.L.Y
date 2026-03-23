@@ -29,6 +29,7 @@ const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
 const KV_ARMAGEDDON_KEY = 'armageddon';
 const KV_MSG_SEQ_KEY = 'msg_next_id'; // persistent counter — never resets on message delete
 const KV_ACKS_KEY = 'msg_acks'; // { [msgId]: [visitorId, ...] }
+const MAX_APP_VERSION_LENGTH = 30;
 
 // ── Helpers ────────────────────────────────────────────────────────
 async function getMessages(env) {
@@ -53,7 +54,7 @@ async function getAppUpdateSettings(env) {
     return (await env.WEATHERNOW_KV.get(KV_APP_UPDATE_SETTINGS_KEY, 'json')) ?? {
         version: 'build-cloudflare-pages',
         autoUpdateEnabled: true,
-        updatedAt: Date.now(),
+        updatedAt: 0,
     };
 }
 async function saveAppUpdateSettings(env, settings) {
@@ -363,7 +364,7 @@ export async function onRequest({ request, env }) {
         if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const body = await request.json();
         const version = String(body?.version ?? '').trim();
-        if (!version || version.length > 30) {
+        if (!version || version.length > MAX_APP_VERSION_LENGTH) {
             return json({ error: 'valid version required (1-30 chars)' }, 400);
         }
         const existing = await getAppUpdateSettings(env);
