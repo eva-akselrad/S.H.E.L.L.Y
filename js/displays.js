@@ -218,6 +218,24 @@ const Displays = (() => {
         txt('alm-daylength', a.dayLength);
         txt('alm-solarnoon', a.solarNoon);
         txt('alm-dayofyear', a.dayOfYear);
+        // Live countdown to next solar event
+        const countdownEl = el('alm-sun-countdown');
+        function updateAlmanacCountdown() {
+            if (!countdownEl || !a.sunriseISO || !a.sunsetISO) return;
+            const now = Date.now();
+            const rise = new Date(a.sunriseISO).getTime();
+            const set = new Date(a.sunsetISO).getTime();
+            let target, label;
+            if (now < rise) { target = rise; label = '🌅 Sunrise'; }
+            else if (now < set) { target = set; label = '🌇 Sunset'; }
+            else { target = rise + 86400000; label = '🌅 Tomorrow\'s Sunrise'; }
+            const diff = Math.max(0, target - now);
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            countdownEl.textContent = `${label} in ${h}h ${String(m).padStart(2,'0')}m`;
+        }
+        updateAlmanacCountdown();
+        setInterval(updateAlmanacCountdown, 60000);
     }
 
     // ── On This Day – Climate History ──────────────────────────────
@@ -715,6 +733,76 @@ const Displays = (() => {
         }
     }
 
+    // ── Clock Slide ────────────────────────────────────────────────
+    let clockInterval = null;
+    function renderClock(data) {
+        const DAYS = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+        const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE',
+                        'JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+
+        const almanac = data?.almanac;
+        const cond = data?.conditions;
+        const loc = typeof WeatherAPI !== 'undefined' ? WeatherAPI.getLocation() : {};
+
+        // Moon
+        const moonEl = el('clock-moon');
+        if (moonEl && almanac?.moon) moonEl.textContent = `${almanac.moon}`;
+
+        // Conditions
+        const condEl = el('clock-conditions');
+        if (condEl) {
+            const temp = cond?.tempF !== undefined
+                ? (typeof Settings !== 'undefined' && Settings.getState().units === 'celsius'
+                    ? `${Math.round((cond.tempF - 32) * 5/9)}°C`
+                    : `${cond.tempF}°F`)
+                : '';
+            const desc = cond?.desc || '';
+            const label = loc?.label || '';
+            condEl.textContent = [temp, desc, label ? `— ${label}` : ''].filter(Boolean).join('  ');
+        }
+
+        function sunCountdown() {
+            if (!almanac?.sunriseISO || !almanac?.sunsetISO) return '';
+            const now = Date.now();
+            const rise = new Date(almanac.sunriseISO).getTime();
+            const set = new Date(almanac.sunsetISO).getTime();
+            let target, emoji, label;
+            if (now < rise) { target = rise; emoji = '🌅'; label = 'Sunrise'; }
+            else if (now < set) { target = set; emoji = '🌇'; label = 'Sunset'; }
+            else {
+                // After sunset — show tomorrow's sunrise (approx +24h)
+                target = rise + 86400000;
+                emoji = '🌅'; label = 'Sunrise';
+            }
+            const diff = Math.max(0, target - now);
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            return `${emoji} ${label} in ${h}h ${String(m).padStart(2,'0')}m`;
+        }
+
+        function tick() {
+            const now = new Date();
+            const timeEl = el('clock-time');
+            const dateEl = el('clock-date');
+            const sunEl = el('clock-sun');
+            if (timeEl) {
+                const hh = String(now.getHours()).padStart(2,'0');
+                const mm = String(now.getMinutes()).padStart(2,'0');
+                const ss = String(now.getSeconds()).padStart(2,'0');
+                timeEl.textContent = `${hh}:${mm}:${ss}`;
+            }
+            if (dateEl) {
+                dateEl.textContent =
+                    `${DAYS[now.getDay()]}  ${MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+            }
+            if (sunEl) sunEl.textContent = sunCountdown();
+        }
+
+        tick();
+        if (clockInterval) clearInterval(clockInterval);
+        clockInterval = setInterval(tick, 1000);
+    }
+
     // ── Render all ─────────────────────────────────────────────────
     function renderAll(weatherData, alerts, lat, lon, onTTS) {
         renderConditions(weatherData);
@@ -724,6 +812,7 @@ const Displays = (() => {
         renderPrecipChart(weatherData);
         renderAlmanac(weatherData);
         renderClimateHistory(weatherData);
+        renderClock(weatherData);
         renderAirQuality(weatherData);
         renderRadar(lat, lon);
         renderAlerts(alerts, onTTS);
@@ -737,7 +826,7 @@ const Displays = (() => {
 
     return {
         renderAll, renderConditions, renderObservations, renderHourly, renderExtended,
-        renderPrecipChart, renderAlmanac, renderAirQuality, renderClimateHistory,
+        renderPrecipChart, renderAlmanac, renderAirQuality, renderClimateHistory, renderClock,
         renderRadar, renderAlerts, renderCustomForecast, updateTicker,
         renderTravel, renderRegionalObs, renderRegionalFcst, renderSPCOutlook,
         onRegionalObsVisible, onRegionalFcstVisible,

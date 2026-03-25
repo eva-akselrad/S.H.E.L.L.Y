@@ -226,6 +226,8 @@ const WeatherAPI = (() => {
             dayOfYear: `Day ${dayOfYear} of 365`,
             dawnCivil: fmtTime(dawnCivil),
             duskCivil: fmtTime(duskCivil),
+            sunriseISO: sunrise.toISOString(),
+            sunsetISO: sunset.toISOString(),
         };
     }
 

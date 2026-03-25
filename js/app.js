@@ -38,20 +38,9 @@
 
     // ── Clock ──────────────────────────────────────────────────────
     function startClock() {
-        function tick() {
-            const now = new Date();
-            const h = now.getHours();
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const h12 = ((h % 12) || 12);
-            if (clockTime) clockTime.textContent = `${h12}:${m}:${s} ${ampm}`;
-            const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-            if (clockDate) clockDate.textContent = `${days[now.getDay()]} ${months[now.getMonth()]} ${now.getDate()}`;
-        }
-        tick();
-        setInterval(tick, 1000);
+        // Clock display is now handled by Displays.renderClock (displays.js)
+        // which runs in 24h format and updates every second with weather context.
+        // This function is retained for compatibility but is no longer called.
     }
 
     // ── Build slide list from active displays ──────────────────────
@@ -74,6 +63,7 @@
             { id: 'slide-radar', display: 'radar', label: 'RADAR' },
             { id: 'slide-alerts', display: 'alerts', label: 'ALERTS' },
             { id: 'slide-customforecast', display: 'customforecast', label: 'CUSTOM FORECAST' },
+            { id: 'slide-clock', display: 'clock', label: 'CLOCK' },
         ];
 
         slideIds = allSlides.filter(s => active.includes(s.display));
@@ -357,6 +347,31 @@
                 loc.lat, loc.lon,
                 alert => AlertsManager.announceOne(alert, MusicPlayer.duck, MusicPlayer.unduck)
             );
+
+            // Auto Night Mode: switch to dark theme at night if enabled
+            if (typeof Settings !== 'undefined' && Settings.getAutoNightMode()) {
+                const almanac = weather.almanac;
+                if (almanac?.sunriseISO && almanac?.sunsetISO) {
+                    const now = Date.now();
+                    const rise = new Date(almanac.sunriseISO).getTime();
+                    const set = new Date(almanac.sunsetISO).getTime();
+                    const isNight = now < rise || now >= set;
+                    const state = Settings.getState();
+                    if (isNight && state.theme !== 'dark') {
+                        document.body.className = document.body.className.replace(/theme-\S+/g, '').trim();
+                        document.body.classList.add('theme-dark');
+                    } else if (!isNight && state.theme === 'dark') {
+                        // Restore default if auto-switched to dark but now it's daytime
+                        try {
+                            const saved = JSON.parse(localStorage.getItem('weathernow_settings') || '{}');
+                            if (saved.autoNightMode && saved.theme && saved.theme !== 'dark') {
+                                document.body.className = document.body.className.replace(/theme-\S+/g, '').trim();
+                                document.body.classList.add(`theme-${saved.theme}`);
+                            }
+                        } catch { }
+                    }
+                }
+            }
 
             // Show/hide alert banner
             AlertsManager.showBanner(alerts);

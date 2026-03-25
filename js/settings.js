@@ -230,6 +230,7 @@ const Settings = (() => {
             duck: document.getElementById('duck-toggle')?.checked ?? true,
             shuffle: document.getElementById('shuffle-toggle')?.checked ?? true,
             kioskAutoplayMusic: document.getElementById('kiosk-autoplay-music')?.checked ?? false,
+            autoNightMode: document.getElementById('auto-night-mode')?.checked ?? true,
             suppressedTtsTypes: suppressedTypes
         };
     }
@@ -292,6 +293,9 @@ const Settings = (() => {
             const kioskAutoplayT = document.getElementById('kiosk-autoplay-music');
             if (kioskAutoplayT && state.kioskAutoplayMusic !== undefined) kioskAutoplayT.checked = state.kioskAutoplayMusic;
 
+            const autoNightT = document.getElementById('auto-night-mode');
+            if (autoNightT && state.autoNightMode !== undefined) autoNightT.checked = state.autoNightMode;
+
             // Restore suppressed alert types
             if (state.suppressedTtsTypes) {
                 document.querySelectorAll('[data-tts-type]').forEach(cb => {
@@ -306,5 +310,8 @@ const Settings = (() => {
         return parseInt(document.getElementById('speed-slider')?.value || 12) * 1000;
     }
 
-    return { init, openPanel, closePanel, getActiveDisplays, bindDisplayToggles, getSpeed, saveToStorage, getState, enterKiosk };
+    function getAutoNightMode() {
+        return document.getElementById('auto-night-mode')?.checked ?? true;
+    }
+    return { init, openPanel, closePanel, getActiveDisplays, bindDisplayToggles, getSpeed, saveToStorage, getState, enterKiosk, getAutoNightMode };
 })();

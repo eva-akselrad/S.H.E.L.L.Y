@@ -79,6 +79,7 @@
                 <label><input type="checkbox" data-display="radar" checked /> Radar</label>
                 <label><input type="checkbox" data-display="alerts" checked /> Severe Alerts</label>
                 <label><input type="checkbox" data-display="customforecast" checked /> Custom Forecast</label>
+                <label><input type="checkbox" data-display="clock" checked /> Clock</label>
             </div>
         </section>
 
@@ -190,6 +191,13 @@
                 <span>Autoplay music on entry</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="kiosk-autoplay-music" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row" style="margin-bottom:10px">
+                <span>Auto Night Mode (dark theme after sunset)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="auto-night-mode" checked />
                     <span class="toggle-slider"></span>
                 </label>
             </div>
@@ -367,6 +375,7 @@
                         <div id="alm-dayofyear" class="almanac-value">---</div>
                     </div>
                 </div>
+                <div id="alm-sun-countdown" class="alm-countdown"></div>
             </div>
 
             <!-- On This Day – Climate History -->
@@ -522,6 +531,17 @@
             <!-- SPC Outlook -->
             <div class="slide hidden slide-no-pad" id="slide-spc" data-display="spc">
                 <div id="spc-chart" class="ws4k-spc-layout"></div>
+            </div>
+
+            <!-- Clock -->
+            <div class="slide hidden" id="slide-clock" data-display="clock">
+                <div class="clock-slide">
+                    <div class="clock-date-row" id="clock-date"></div>
+                    <div class="clock-time" id="clock-time">--:--:--</div>
+                    <div class="clock-conditions-row" id="clock-conditions"></div>
+                    <div class="clock-sun-row" id="clock-sun"></div>
+                    <div class="clock-moon-row" id="clock-moon"></div>
+                </div>
             </div>
 
         </div><!-- /slide-viewport -->
