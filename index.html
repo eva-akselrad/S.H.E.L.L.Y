@@ -70,6 +70,7 @@
                 <label><input type="checkbox" data-display="extended" checked /> Extended Forecast</label>
                 <label><input type="checkbox" data-display="precipchart" checked /> Precipitation</label>
                 <label><input type="checkbox" data-display="almanac" checked /> Almanac</label>
+                <label><input type="checkbox" data-display="climate" checked /> On This Day</label>
                 <label><input type="checkbox" data-display="airquality" checked /> Air Quality</label>
                 <label><input type="checkbox" data-display="travel" checked /> Travel Forecast</label>
                 <label><input type="checkbox" data-display="regionalobs" checked /> Regional Observations</label>
@@ -185,6 +186,13 @@
         <section class="settings-section">
             <h3>🖥 Kiosk Mode</h3>
             <p class="hint-text">Fullscreen, hides all controls. Press <kbd>Esc</kbd> to exit.</p>
+            <div class="toggle-row" style="margin-bottom:10px">
+                <span>Autoplay music on entry</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="kiosk-autoplay-music" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <button id="kiosk-btn" class="btn-kiosk">⛶ Enter Kiosk Mode</button>
         </section>
 
@@ -361,6 +369,17 @@
                 </div>
             </div>
 
+            <!-- On This Day – Climate History -->
+            <div class="slide hidden" id="slide-climate" data-display="climate">
+                <div class="slide-header">
+                    <span class="slide-title">On This Day</span>
+                    <span id="climate-history-date" class="slide-badge" style="background:rgba(251,191,36,0.12);color:var(--text-accent);border:1px solid rgba(251,191,36,0.3)"></span>
+                    <span class="slide-badge" style="background:rgba(59,130,246,0.1);color:var(--text-secondary);border:1px solid rgba(59,130,246,0.2);font-size:0.6rem">Archive · 30 yr</span>
+                    <span id="climate-history-years" class="slide-badge" style="background:rgba(100,116,139,0.1);color:var(--text-secondary);border:1px solid rgba(100,116,139,0.2);font-size:0.6rem"></span>
+                </div>
+                <div id="climate-history-container" class="ch-layout"></div>
+            </div>
+
             <!-- Air Quality -->
             <div class="slide hidden" id="slide-airquality" data-display="airquality">
                 <div class="slide-header">
@@ -459,109 +478,5 @@
                     <span class="slide-title">Custom Forecast</span>
                     <span class="slide-badge" style="background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)">CUSTOM</span>
                 </div>
-                <div id="customforecast-container" class="extended-container"></div>
-                <div id="customforecast-updated" style="text-align:center;font-size:0.65rem;color:var(--text-secondary);margin-top:8px;padding-bottom:4px"></div>
-            </div>
-
-            <!-- Travel Forecast -->
-            <div class="slide hidden slide-no-pad" id="slide-travel" data-display="travel">
-                <div class="ws4k-travel-layout">
-                    <div class="ws4k-travel-header">
-                        <span id="travel-day-label" class="ws4k-travel-day">Travel Forecast</span>
-                        <div class="ws4k-col-headers">
-                            <span class="col-lo">LOW</span>
-                            <span class="col-hi">HIGH</span>
-                        </div>
-                    </div>
-                    <div id="travel-rows" class="ws4k-travel-rows"></div>
-                    <div id="travel-footer" class="ws4k-footer-bar">Humidity: &#8212;&nbsp;&nbsp;&nbsp;Dewpoint: &#8212;</div>
-                </div>
-            </div>
-
-            <!-- Regional Observations -->
-            <div class="slide hidden slide-no-pad" id="slide-regional-obs" data-display="regionalobs">
-                <div id="regional-obs-map" class="ws4k-map-container">
-                    <div class="ws4k-map-title-bar">
-                        <span class="ws4k-map-title">Regional Observations</span>
-                        <span class="ws4k-map-badge">LIVE</span>
-                    </div>
-                </div>
-                <div id="regional-obs-footer" class="ws4k-footer-bar">Temp: &#8212;&nbsp;&nbsp;&nbsp;Wind Chill: &#8212;</div>
-            </div>
-
-            <!-- Regional Forecast -->
-            <div class="slide hidden slide-no-pad" id="slide-regional-fcst" data-display="regionalfcst">
-                <div id="regional-fcst-map" class="ws4k-map-container">
-                    <div class="ws4k-map-title-bar">
-                        <span id="regional-fcst-map-title" class="ws4k-map-title">Regional Forecast</span>
-                        <span class="ws4k-map-badge" style="background:rgba(59,130,246,.18);color:#60a5fa;border-color:rgba(59,130,246,.35)">NWS</span>
-                    </div>
-                </div>
-                <div id="regional-fcst-footer" class="ws4k-footer-bar">Temp: &#8212;&nbsp;&nbsp;&nbsp;Wind Chill: &#8212;</div>
-            </div>
-
-            <!-- SPC Outlook -->
-            <div class="slide hidden slide-no-pad" id="slide-spc" data-display="spc">
-                <div id="spc-chart" class="ws4k-spc-layout"></div>
-            </div>
-
-        </div><!-- /slide-viewport -->
-
-        <!-- PROGRESS BAR -->
-        <div class="progress-bar-container" id="progress-bar-container">
-            <div id="slide-progress" class="slide-progress"></div>
-            <div id="slide-dots" class="slide-dots"></div>
-        </div>
-
-        <!-- BOTTOM TICKER BAR -->
-        <footer class="bottom-bar" id="bottom-bar">
-            <div class="ticker-left">
-                <span id="ticker-label" class="ticker-label">CONDITIONS</span>
-                <div class="ticker-scroll-container">
-                    <div id="ticker-text" class="ticker-text">Loading weather data...</div>
-                </div>
-            </div>
-            <div class="music-controls" id="music-controls">
-                <button id="mc-prev" class="mc-btn" title="Previous">⏮</button>
-                <button id="mc-play" class="mc-btn" title="Play/Pause">▶</button>
-                <button id="mc-next" class="mc-btn" title="Next">⏭</button>
-                <div class="mc-track-info">
-                    <div id="mc-track-name" class="mc-track-name">No music loaded</div>
-                    <div id="mc-progress-bar" class="mc-progress-bar">
-                        <div id="mc-progress-fill" class="mc-progress-fill"></div>
-                    </div>
-                </div>
-                <button id="mc-mute" class="mc-btn" title="Mute">🔊</button>
-            </div>
-        </footer>
-
-        <!-- NAV CONTROLS (shown on hover in kiosk, always visible otherwise) -->
-        <div class="slide-nav" id="slide-nav">
-            <button id="nav-prev" class="nav-btn" title="Previous slide">‹</button>
-            <button id="nav-pause" class="nav-btn" title="Pause/Resume">⏸</button>
-            <button id="nav-next" class="nav-btn" title="Next slide">›</button>
-            <button id="nav-refresh" class="nav-btn" title="Refresh data">↺</button>
-            <button id="nav-fullscreen" class="nav-btn" title="Fullscreen">⛶</button>
-        </div>
-
-    </main>
-
-    <!-- Hidden audio element for music -->
-    <audio id="bg-audio" preload="auto"></audio>
-
-    <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="js/cities.js"></script>
-    <script src="js/settings.js"></script>
-    <script src="js/music.js"></script>
-    <script src="js/weather.js"></script>
-    <script src="js/alerts.js"></script>
-    <script src="js/radar.js"></script>
-    <script src="js/displays.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/announcements.js"></script>
-    <script src="js/pwa.js"></script>
-</body>
-
-</html>
+                <div id="customforecast-container" class="cf-container"></div>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.3.3/dist/purify.min.js"></script>
