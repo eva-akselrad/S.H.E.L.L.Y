@@ -151,6 +151,7 @@ setInterval(() => {
     }
 }, 5 * 60_000); // run every 5 minutes
 
+
 // ── Build hash (automatic cache busting) ───────────────────────
 // Hash all local JS, CSS, and HTML files so that any code change
 // produces a new CACHE_VERSION in the service worker, forcing the
@@ -240,7 +241,16 @@ let pushSubscriptions = []; // { endpoint, keys: { auth, p256dh } }
 let releaseNotes = [];
 let releaseNoteId = 1;
 
-let customForecast = { periods: [], targeting: { mode: 'all' }, updatedAt: null };
+let customForecasts = [];  // array of { id, label, periods, targeting, updatedAt }
+let customForecastId = 1;
+
+// Armageddon mode – when set, overrides the entire display with a single message
+// Shape: { title, text, type, activatedAt, expiresAt } or null when inactive
+let armageddonState = null;
+
+// Acknowledgements: tracks which visitor IDs have acknowledged each message
+// Map<msgId, Set<visitorId>>
+const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
 
@@ -258,12 +268,6 @@ app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
 app.use('/api/security', adminLimiter);
-app.use('/api/custom-forecast', (req, res, next) => {
-    if (req.method === 'GET') {
-        return next();
-    }
-    return adminLimiter(req, res, next);
-});
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
@@ -281,7 +285,25 @@ function checkAuth(req, res) {
 // ── GET /api/messages?since=ID ─────────────────────────────────
 app.get('/api/messages', (req, res) => {
     const since = parseInt(req.query.since) || 0;
-    res.json(messages.filter(m => m.id > since));
+    res.json(messages.filter(m => m.id > since).map(m => ({
+        ...m,
+        ackCount: acknowledgements.get(m.id)?.size || 0,
+    })));
+});
+
+// ── GET /api/poll?since=ID ─────────────────────────────────────
+// Combined endpoint: returns messages + armageddon state in one request
+app.get('/api/poll', (req, res) => {
+    const since = parseInt(req.query.since) || 0;
+    if (armageddonState?.expiresAt && Date.now() > armageddonState.expiresAt) {
+        armageddonState = null;
+        console.log('[Admin] Armageddon mode auto-expired');
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({
+        messages: messages.filter(m => m.id > since),
+        armageddon: armageddonState ? { active: true, ...armageddonState } : { active: false },
+    });
 });
 
 // ── GET /api/verify ────────────────────────────────────────────
@@ -291,10 +313,10 @@ app.get('/api/verify', (req, res) => {
 });
 
 // ── POST /api/announce ─────────────────────────────────────────
-// Body: { password, text, type, display, duration, title, tts, push }
+// Body: { password, text, type, display, duration, title, tts, push, targeting }
 app.post('/api/announce', async (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { text, type = 'info', display = 'banner', duration = 0, title = '', tts = false, push = false } = req.body;
+    const { text, type = 'info', display = 'banner', duration = 0, title = '', tts = false, push = false, targeting = { mode: 'all' } } = req.body;
     if (!text?.trim()) return res.status(400).json({ error: 'text required' });
 
     const msg = {
@@ -306,6 +328,7 @@ app.post('/api/announce', async (req, res) => {
         duration,
         tts: !!tts,
         push: !!push,
+        targeting,
         created: Date.now()
     };
     messages.push(msg);
@@ -326,11 +349,28 @@ app.post('/api/announce', async (req, res) => {
     res.json(msg);
 });
 
+// ── POST /api/messages/:id/acknowledge ────────────────────────
+// Public – no admin auth required. Body: { visitorId: string }
+app.post('/api/messages/:id/acknowledge', (req, res) => {
+    const id = parseInt(req.params.id);
+    const { visitorId } = req.body;
+    if (!visitorId || typeof visitorId !== 'string' || visitorId.length > 128 || !/^[\w\-]+$/.test(visitorId)) {
+        return res.status(400).json({ error: 'visitorId required' });
+    }
+    if (!messages.find(m => m.id === id)) return res.status(404).json({ error: 'not found' });
+    if (!acknowledgements.has(id)) acknowledgements.set(id, new Set());
+    acknowledgements.get(id).add(visitorId);
+    const ackCount = acknowledgements.get(id).size;
+    console.log(`[Ack] Message ${id}: ${ackCount} acknowledged`);
+    res.json({ ok: true, ackCount });
+});
+
 // ── DELETE /api/messages/:id ───────────────────────────────────
 app.delete('/api/messages/:id', (req, res) => {
     if (!checkAuth(req, res)) return;
     const id = parseInt(req.params.id);
     messages = messages.filter(m => m.id !== id);
+    acknowledgements.delete(id);
     res.json({ ok: true });
 });
 
@@ -338,6 +378,41 @@ app.delete('/api/messages/:id', (req, res) => {
 app.delete('/api/messages', (req, res) => {
     if (!checkAuth(req, res)) return;
     messages = [];
+    acknowledgements.clear();
+    res.json({ ok: true });
+});
+
+// ── GET /api/armageddon ────────────────────────────────────────
+// Public – display clients poll this to check override state
+app.get('/api/armageddon', (req, res) => {
+    if (armageddonState?.expiresAt && Date.now() > armageddonState.expiresAt) {
+        armageddonState = null;
+        console.log('[Admin] Armageddon mode auto-expired');
+    }
+    res.json(armageddonState ? { active: true, ...armageddonState } : { active: false });
+});
+
+// ── POST /api/armageddon ───────────────────────────────────────
+// Body: { title, text, type, duration }  duration = minutes (0 = manual)
+app.post('/api/armageddon', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const { title = '', text, type = 'emergency', duration = 0 } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+    const durationMs = Math.max(0, parseInt(duration) || 0) * 60 * 1000;
+    armageddonState = {
+        title: title.trim(), text: text.trim(), type,
+        activatedAt: Date.now(),
+        expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
+    };
+    console.log('[Admin] Armageddon mode ACTIVATED');
+    res.json({ ok: true, ...armageddonState });
+});
+
+// ── DELETE /api/armageddon ─────────────────────────────────────
+app.delete('/api/armageddon', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    armageddonState = null;
+    console.log('[Admin] Armageddon mode deactivated');
     res.json({ ok: true });
 });
 
@@ -345,8 +420,6 @@ app.delete('/api/messages', (req, res) => {
 app.get('/api/push/vapid-key', (_, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
-
-// ── GET /api/push/count (admin) ────────────────────────────────
 app.get('/api/push/count', (req, res) => {
     if (!checkAuth(req, res)) return;
     res.json({ count: pushSubscriptions.length });
@@ -475,26 +548,57 @@ app.delete('/api/release-notes', adminLimiter, (req, res) => {
 });
 
 // ── Custom Forecast ───────────────────────────────────────────
+// Returns array of all custom forecasts
 app.get('/api/custom-forecast', (_, res) => {
-    res.json(customForecast);
+    // Short public cache — display clients refresh every 10 min anyway.
+    // Use stale-while-revalidate so the browser reuses the cached response.
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(customForecasts);
 });
 
+// Add a new forecast (or replace one with same label if label provided)
 app.post('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { periods = [], targeting = { mode: 'all' } } = req.body;
-    customForecast = { periods, targeting, updatedAt: Date.now() };
-    console.log(`[Admin] Custom forecast updated: ${periods.length} period(s), targeting: ${targeting.mode}`);
-    res.json(customForecast);
+    const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = req.body;
+    const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+    if (!periods.length) return res.status(400).json({ error: 'periods required' });
+    // If a non-empty label is given and a forecast with that label already exists, replace it
+    const existing = label ? customForecasts.findIndex(c => c.label === label) : -1;
+    const entry = { id: existing >= 0 ? customForecasts[existing].id : customForecastId++, label, periods, targeting, updatedAt: Date.now() };
+    if (existing >= 0) {
+        customForecasts[existing] = entry;
+    } else {
+        customForecasts.push(entry);
+    }
+    console.log(`[Admin] Custom forecast ${existing >= 0 ? 'updated' : 'added'}: "${label || entry.id}" — ${periods.length} period(s), targeting: ${targeting.mode}`);
+    res.json(entry);
 });
 
+// Delete a single forecast by id
+app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const id = parseInt(req.params.id, 10);
+    const before = customForecasts.length;
+    customForecasts = customForecasts.filter(c => c.id !== id);
+    if (customForecasts.length === before) return res.status(404).json({ error: 'not found' });
+    res.json({ ok: true });
+});
+
+// Delete all forecasts
 app.delete('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    customForecast = { periods: [], targeting: { mode: 'all' }, updatedAt: null };
+    customForecasts = [];
     res.json({ ok: true });
 });
 
 // ── GET /api/spc-outlook?day=1|2|3 ───────────────────────────
 // Proxies SPC categorical outlook GeoJSON to avoid browser CORS restrictions.
+// In-memory TTL cache (15 min) so repeated client refreshes don't hammer SPC.
+// The cache is permanently bounded to 3 entries (days 1, 2, 3) — no cleanup needed.
+const spcCache = {}; // { [day]: { data, expiresAt } }
+const SPC_TTL_MS = 15 * 60 * 1000;
+
+
 app.get('/api/spc-outlook', async (req, res) => {
     const day = req.query.day || '1';
     const validFiles = {
@@ -505,6 +609,14 @@ app.get('/api/spc-outlook', async (req, res) => {
     const file = validFiles[day];
     if (!file) return res.status(400).json({ error: 'Invalid day parameter. Use 1, 2, or 3.' });
 
+    // Serve from cache if fresh
+    const cached = spcCache[day];
+    if (cached && Date.now() < cached.expiresAt) {
+        res.setHeader('Cache-Control', 'public, max-age=900');
+        return res.json(cached.data);
+    }
+
+
     const url = `https://www.spc.noaa.gov/products/outlook/${file}`;
     try {
         const upstream = await fetch(url, {
@@ -512,13 +624,24 @@ app.get('/api/spc-outlook', async (req, res) => {
             signal: AbortSignal.timeout(10000),
         });
         if (!upstream.ok) {
+            // On upstream error, serve stale cache if available
+            if (cached) {
+                res.setHeader('Cache-Control', 'public, max-age=900');
+                return res.json(cached.data);
+            }
             return res.status(502).json({ error: `SPC returned ${upstream.status}` });
         }
         const data = await upstream.json();
-        res.setHeader('Cache-Control', 'public, max-age=900'); // 15-minute cache
+        spcCache[day] = { data, expiresAt: Date.now() + SPC_TTL_MS };
+        res.setHeader('Cache-Control', 'public, max-age=900');
         res.json(data);
     } catch (err) {
         console.error('[SPC] Proxy error:', err.message);
+        // Serve stale cache rather than returning an error
+        if (cached) {
+            res.setHeader('Cache-Control', 'public, max-age=900');
+            return res.json(cached.data);
+        }
         res.status(502).json({ error: 'Failed to fetch SPC outlook data' });
     }
 });

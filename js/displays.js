@@ -47,38 +47,71 @@ const Displays = (() => {
         const c = data.conditions;
         const a = data.almanac;
 
-        const items = [
-            { icon: '🌡', label: 'Temperature', value: c.temp },
-            { icon: '🤔', label: 'Feels Like', value: c.feelsLike },
-            { icon: '💧', label: 'Humidity', value: c.humidity },
-            { icon: '🌫', label: 'Dewpoint', value: c.dewpoint },
-            { icon: '💨', label: 'Wind', value: c.wind },
-            { icon: '💨', label: 'Wind Direction', value: `${c.windDeg ?? '--'}° (${windDirArrow(c.windDeg)})` },
-            { icon: '🌬', label: 'Gusts', value: c.gusts },
-            { icon: '👀', label: 'Visibility', value: c.visibility },
-            { icon: '📊', label: 'Pressure', value: c.pressure },
-            { icon: '📈', label: 'Trend', value: c.pressureTrend || '--' },
-            { icon: '☁️', label: 'Cloud Cover', value: c.cloudCover },
-            { icon: '☀️', label: 'UV Index', value: c.uv },
-            { icon: '🌧', label: 'Precip (1h)', value: c.precipitation24h },
-            { icon: '❄️', label: 'Snow Depth', value: c.snowDepth },
-            { icon: '🔥', label: 'Heat Index', value: c.heatIndex !== '--' ? c.heatIndex : 'N/A' },
-            { icon: '🥶', label: 'Wind Chill', value: c.windChill !== '--' ? c.windChill : 'N/A' },
-            { icon: '🌅', label: 'Sunrise', value: a?.sunrise || '--' },
-            { icon: '🌇', label: 'Sunset', value: a?.sunset || '--' },
-            { icon: '🌕', label: 'Moon Phase', value: a?.moon || '--' },
-            { icon: '🕛', label: 'Solar Noon', value: a?.solarNoon || '--' },
-            { icon: '🌄', label: 'Civil Dawn', value: a?.dawnCivil || '--' },
-            { icon: '🌆', label: 'Civil Dusk', value: a?.duskCivil || '--' },
-            { icon: '📅', label: 'Day Length', value: a?.dayLength || '--' },
-            { icon: '🔢', label: 'Day of Year', value: a?.dayOfYear || '--' },
+        const sections = [
+            {
+                label: '🌤 Current Conditions',
+                cls: 'obs-section-conditions',
+                items: [
+                    { icon: '🌡', label: 'Temperature', value: c.temp },
+                    { icon: '🤔', label: 'Feels Like', value: c.feelsLike },
+                    { icon: '💧', label: 'Humidity', value: c.humidity },
+                    { icon: '🌫', label: 'Dewpoint', value: c.dewpoint },
+                    { icon: '☁️', label: 'Cloud Cover', value: c.cloudCover },
+                    { icon: '☀️', label: 'UV Index', value: c.uv },
+                ]
+            },
+            {
+                label: '💨 Wind & Atmosphere',
+                cls: 'obs-section-wind',
+                items: [
+                    { icon: '💨', label: 'Wind', value: c.wind },
+                    { icon: '🧭', label: 'Direction', value: `${c.windDeg ?? '--'}° (${windDirArrow(c.windDeg)})` },
+                    { icon: '🌬', label: 'Gusts', value: c.gusts },
+                    { icon: '👀', label: 'Visibility', value: c.visibility },
+                    { icon: '📊', label: 'Pressure', value: c.pressure },
+                    { icon: '📈', label: 'Trend', value: c.pressureTrend || '--' },
+                ]
+            },
+            {
+                label: '🌧 Precipitation & Extremes',
+                cls: 'obs-section-precip',
+                items: [
+                    { icon: '🌧', label: 'Precip (24h)', value: c.precipitation24h },
+                    { icon: '❄️', label: 'Snow Depth', value: c.snowDepth },
+                    { icon: '🔥', label: 'Heat Index', value: c.heatIndex !== '--' ? c.heatIndex : 'N/A' },
+                    { icon: '🥶', label: 'Wind Chill', value: c.windChill !== '--' ? c.windChill : 'N/A' },
+                ]
+            },
+            {
+                label: '🌅 Sun & Almanac',
+                cls: 'obs-section-almanac',
+                items: [
+                    { icon: '🌅', label: 'Sunrise', value: a?.sunrise || '--' },
+                    { icon: '🌇', label: 'Sunset', value: a?.sunset || '--' },
+                    { icon: '🕛', label: 'Solar Noon', value: a?.solarNoon || '--' },
+                    { icon: '📅', label: 'Day Length', value: a?.dayLength || '--' },
+                    { icon: '🌄', label: 'Civil Dawn', value: a?.dawnCivil || '--' },
+                    { icon: '🌆', label: 'Civil Dusk', value: a?.duskCivil || '--' },
+                    { icon: '🌕', label: 'Moon Phase', value: a?.moon || '--' },
+                    { icon: '🔢', label: 'Day of Year', value: a?.dayOfYear || '--' },
+                ]
+            },
         ];
 
-        container.innerHTML = items.map(item => `
-          <div class="obs-card">
-            <span class="obs-icon">${item.icon}</span>
-            <span class="obs-label">${item.label}</span>
-            <span class="obs-value">${item.value}</span>
+        container.innerHTML = sections.map(sec => `
+          <div class="obs-section ${sec.cls}">
+            <div class="obs-section-header">${sec.label}</div>
+            <div class="obs-section-grid">
+              ${sec.items.map(item => `
+                <div class="obs-card">
+                  <span class="obs-icon">${item.icon}</span>
+                  <div class="obs-card-body">
+                    <span class="obs-label">${item.label}</span>
+                    <span class="obs-value">${item.value}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
           </div>
         `).join('');
     }
@@ -103,6 +136,7 @@ const Displays = (() => {
               <div class="hourly-temp">${h.temp}</div>
               <div class="hourly-desc">${h.desc}</div>
               ${h.precip ? `<div class="hourly-precip">${h.precip}</div>` : ''}
+              ${h.humidity ? `<div class="hourly-humidity">💧 ${h.humidity}</div>` : ''}
               ${h.wind ? `<div class="hourly-wind">💨 ${h.wind}</div>` : ''}
             `;
             container.appendChild(card);
@@ -114,6 +148,17 @@ const Displays = (() => {
         const container = el('extended-container');
         if (!container) return;
         container.innerHTML = '';
+
+        // Trend badge
+        const trend = data.extendedTrend;
+        if (trend) {
+            const badge = document.createElement('div');
+            badge.className = `extended-trend-badge trend-${trend.dir}`;
+            const sign = trend.diff > 0 ? '+' : '';
+            badge.textContent = `${trend.symbol} ${trend.label} Trend${trend.diff !== 0 ? ` (${sign}${trend.diff}°)` : ''}`;
+            container.appendChild(badge);
+        }
+
         (data.daily || []).forEach(d => {
             const card = document.createElement('div');
             card.className = 'day-card' + (d.isToday ? ' today' : '');
@@ -175,6 +220,75 @@ const Displays = (() => {
         txt('alm-dayofyear', a.dayOfYear);
     }
 
+    // ── On This Day – Climate History ──────────────────────────────
+    function renderClimateHistory(data) {
+        const container = el('climate-history-container');
+        if (!container) return;
+
+        const ch = data.climateHistory;
+
+        if (!ch) {
+            container.innerHTML = `
+              <div class="ch-unavailable">
+                <div class="ch-unavail-icon">📅</div>
+                <div class="ch-unavail-text">Historical climate data is unavailable for this location.</div>
+              </div>`;
+            return;
+        }
+
+        const dateLabel = el('climate-history-date');
+        if (dateLabel) dateLabel.textContent = ch.date;
+
+        const yearsLabel = el('climate-history-years');
+        if (yearsLabel) yearsLabel.textContent = ch.years > 0
+            ? `${ch.startYear}–${new Date().getFullYear() - 1} (${ch.years} yr)`
+            : '';
+
+        container.innerHTML = `
+          <div class="ch-section">
+            <div class="ch-section-header">🌡 Temperature Records</div>
+            <div class="ch-grid">
+              <div class="ch-record-card ch-record-hot">
+                <div class="ch-record-label">Record High</div>
+                <div class="ch-record-value">${esc(ch.recordHigh?.temp ?? '--')}</div>
+                ${ch.recordHigh?.year ? `<div class="ch-record-year">${ch.recordHigh.year}</div>` : ''}
+              </div>
+              <div class="ch-record-card ch-record-cold">
+                <div class="ch-record-label">Record Low</div>
+                <div class="ch-record-value">${esc(ch.recordLow?.temp ?? '--')}</div>
+                ${ch.recordLow?.year ? `<div class="ch-record-year">${ch.recordLow.year}</div>` : ''}
+              </div>
+              <div class="ch-avg-card">
+                <div class="ch-avg-row">
+                  <span class="ch-avg-label">Avg High</span>
+                  <span class="ch-avg-value ch-avg-hot">${esc(ch.avgHigh)}</span>
+                </div>
+                <div class="ch-avg-row">
+                  <span class="ch-avg-label">Avg Low</span>
+                  <span class="ch-avg-value ch-avg-cold">${esc(ch.avgLow)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ch-section">
+            <div class="ch-section-header">🌧 Precipitation Records</div>
+            <div class="ch-grid">
+              <div class="ch-record-card ch-record-precip">
+                <div class="ch-record-label">Record Precip</div>
+                <div class="ch-record-value ch-precip-val">${esc(ch.recordPrecip?.amount ?? 'None on record')}</div>
+                ${ch.recordPrecip?.year ? `<div class="ch-record-year">${ch.recordPrecip.year}</div>` : ''}
+              </div>
+              <div class="ch-avg-card ch-avg-card-full">
+                <div class="ch-avg-row">
+                  <span class="ch-avg-label">Avg Precip</span>
+                  <span class="ch-avg-value">${esc(ch.avgPrecip)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+    }
+
     // ── Air Quality ────────────────────────────────────────────────
     function renderAirQuality(data) {
         const aq = data.airQuality;
@@ -232,30 +346,56 @@ const Displays = (() => {
     }
 
     // ── Custom Forecast ────────────────────────────────────────────
-    function renderCustomForecast(cf) {        const container = el('customforecast-container');
+    function renderCustomForecast(forecasts) {
+        const container = el('customforecast-container');
         if (!container) return;
         container.innerHTML = '';
-        const periods = cf?.periods || [];
-        if (!periods.length) return;
-        periods.forEach(p => {
-            const card = document.createElement('div');
-            card.className = 'day-card';
-            const hiLoHtml = (p.hi || p.lo)
-                ? `<div class="day-hi-lo">${p.hi ? `<span class="day-hi">${esc(p.hi)}</span>` : ''}${p.lo ? `<span class="day-lo">${esc(p.lo)}</span>` : ''}</div>`
-                : '';
-            card.innerHTML = `
-              <div class="day-name">${esc(p.name || '')}</div>
-              <div class="day-icon">${esc(p.icon || '🌤')}</div>
-              ${p.desc ? `<div class="day-desc markdown-body">${(typeof marked !== 'undefined' ? marked.parse(p.desc, { breaks: true }) : esc(p.desc))}</div>` : ''}
-              ${hiLoHtml}
-              ${p.precip ? `<div class="day-precip">💧 ${esc(String(p.precip))}%</div>` : ''}
-              ${p.wind ? `<div class="day-wind">💨 ${esc(p.wind)}</div>` : ''}
-            `;
-            container.appendChild(card);
+        // Accept array (new) or single object (legacy)
+        const all = Array.isArray(forecasts) ? forecasts : (forecasts?.periods?.length ? [forecasts] : []);
+        if (!all.length) return;
+
+        all.forEach((cf, cfIdx) => {
+            const periods = cf?.periods || [];
+            if (!periods.length) return;
+
+            const section = document.createElement('div');
+            section.className = 'cf-section';
+            section.dataset.count = String(periods.length);
+
+            // Label header when multiple forecasts are active
+            if (all.length > 1 && cf.label) {
+                const header = document.createElement('div');
+                header.className = 'cf-section-label';
+                header.textContent = cf.label;
+                section.appendChild(header);
+            }
+
+            periods.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'day-card';
+                const hiLoHtml = (p.hi || p.lo)
+                    ? `<div class="day-hi-lo">${p.hi ? `<span class="day-hi">${esc(p.hi)}</span>` : ''}${p.lo ? `<span class="day-lo">${esc(p.lo)}</span>` : ''}</div>`
+                    : '';
+                card.innerHTML = `
+                  <div class="day-name">${esc(p.name || '')}</div>
+                  <div class="day-icon">${esc(p.icon || '🌤')}</div>
+                  ${p.desc ? `<div class="day-desc markdown-body">${(typeof marked !== 'undefined' ? marked.parse(p.desc, { breaks: true }) : esc(p.desc))}</div>` : ''}
+                  ${hiLoHtml}
+                  ${p.precip ? `<div class="day-precip">💧 ${esc(String(p.precip))}%</div>` : ''}
+                  ${p.wind ? `<div class="day-wind">💨 ${esc(p.wind)}</div>` : ''}
+                `;
+                section.appendChild(card);
+            });
+
+            container.appendChild(section);
         });
+
         const updatedEl = el('customforecast-updated');
-        if (updatedEl && cf?.updatedAt) {
-            updatedEl.textContent = `Updated: ${new Date(cf.updatedAt).toLocaleString()}`;
+        if (updatedEl && all.length) {
+            const latest = all.reduce((a, b) => ((a?.updatedAt ?? 0) > (b?.updatedAt ?? 0) ? a : b), all[0]);
+            if (latest?.updatedAt) {
+                updatedEl.textContent = `Updated: ${new Date(latest.updatedAt).toLocaleString()}`;
+            }
         }
     }
 
@@ -527,7 +667,35 @@ const Displays = (() => {
         const ticker = el('ticker-text');
         const label = el('ticker-label');
         if (label) label.textContent = slideTitle || 'CONDITIONS';
-        if (ticker && data.ticker) ticker.textContent = data.ticker;
+        if (ticker && data.ticker) {
+            ticker.textContent = data.ticker;
+            // Scale scroll duration with text length so long condition strings don't fly by (~80 px/s)
+            requestAnimationFrame(() => {
+                const containerW = ticker.parentElement?.clientWidth || 800;
+                const textW = ticker.scrollWidth;
+                // Animation travels from +100% to -100% of container = containerW + textW pixels total
+                const totalPx = containerW + textW;
+                const duration = Math.max(15, Math.round(totalPx / 80));
+                ticker.style.animationDuration = `${duration}s`;
+            });
+        }
+    }
+
+    // ── Map visibility callbacks (called from app.js) ───────────────
+    function onRegionalObsVisible() {
+        if (!obsMap) obsMap = createRegionalMap('regional-obs-map');
+        if (obsMap) {
+            obsMap.invalidateSize();
+            if (pendingObsData) renderRegionalObs(pendingObsData);
+        }
+    }
+
+    function onRegionalFcstVisible() {
+        if (!fcstMap) fcstMap = createRegionalMap('regional-fcst-map');
+        if (fcstMap) {
+            fcstMap.invalidateSize();
+            if (pendingFcstData) renderRegionalFcst(pendingFcstData);
+        }
     }
 
     // ── Map visibility callbacks (called from app.js) ───────────────
@@ -555,10 +723,11 @@ const Displays = (() => {
         renderExtended(weatherData);
         renderPrecipChart(weatherData);
         renderAlmanac(weatherData);
+        renderClimateHistory(weatherData);
         renderAirQuality(weatherData);
         renderRadar(lat, lon);
         renderAlerts(alerts, onTTS);
-        renderCustomForecast(weatherData.customForecast);
+        renderCustomForecast(weatherData.customForecasts);
         renderTravel(weatherData);
         renderRegionalObs(weatherData);
         renderRegionalFcst(weatherData);
@@ -568,7 +737,7 @@ const Displays = (() => {
 
     return {
         renderAll, renderConditions, renderObservations, renderHourly, renderExtended,
-        renderPrecipChart, renderAlmanac, renderAirQuality,
+        renderPrecipChart, renderAlmanac, renderAirQuality, renderClimateHistory,
         renderRadar, renderAlerts, renderCustomForecast, updateTicker,
         renderTravel, renderRegionalObs, renderRegionalFcst, renderSPCOutlook,
         onRegionalObsVisible, onRegionalFcstVisible,

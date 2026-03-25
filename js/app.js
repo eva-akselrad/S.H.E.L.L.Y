@@ -64,6 +64,7 @@
             { id: 'slide-extended', display: 'extended', label: 'EXTENDED' },
             { id: 'slide-precipchart', display: 'precipchart', label: 'PRECIPITATION' },
             { id: 'slide-almanac', display: 'almanac', label: 'ALMANAC' },
+            { id: 'slide-climate', display: 'climate', label: 'ON THIS DAY' },
             { id: 'slide-airquality', display: 'airquality', label: 'AIR QUALITY' },
             { id: 'slide-pollen', display: 'pollen', label: 'POLLEN' },
             { id: 'slide-travel', display: 'travel', label: 'TRAVEL FORECAST' },
@@ -250,12 +251,9 @@
 
         // Custom Forecast slide – skip if no periods or viewer's location doesn't match targeting
         if (target.display === 'customforecast') {
-            const cf = WeatherAPI.getData()?.customForecast;
-            if (!cf?.periods?.length) {
-                setTimeout(() => goToSlide((idx + 1) % slideIds.length), 50);
-                return;
-            }
-            if (!isInForecastArea(cf.targeting)) {
+            const forecasts = WeatherAPI.getData()?.customForecasts || [];
+            const matching = forecasts.filter(cf => cf?.periods?.length && isInForecastArea(cf.targeting));
+            if (!matching.length) {
                 setTimeout(() => goToSlide((idx + 1) % slideIds.length), 50);
                 return;
             }
@@ -347,6 +345,11 @@
 
             // Build/rebuild slide list
             buildSlideList();
+
+            // Filter custom forecasts to only those that match viewer's location
+            if (weather.customForecasts) {
+                weather.customForecasts = weather.customForecasts.filter(cf => isInForecastArea(cf.targeting));
+            }
 
             // Render all displays
             Displays.renderAll(
@@ -504,11 +507,11 @@
         });
     }
 
-    // ── Auto-refresh every 5 minutes ──────────────────────────────
+    // ── Auto-refresh every 10 minutes ─────────────────────────────
     function startAutoRefresh() {
         setInterval(() => {
             if (locationSet) fetchAndRender(false);
-        }, 5 * 60 * 1000);
+        }, 10 * 60 * 1000);
     }
 
     // ── Settings callbacks ─────────────────────────────────────────

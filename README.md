@@ -3,7 +3,9 @@
 A modern, real-time weather client inspired by WeatherStar 4000. Vanilla HTML/CSS/JS, NOAA weather data, RainViewer animated radar, background music with TTS ducking, severe weather alerts, and a full admin control panel.
 
 ---
+> ⚠️ **Disclaimer:** S.H.E.L.L.Y. is an **unofficial**, hobbyist weather display project. It is **not** affiliated with, endorsed by, or a replacement for the National Weather Service (NWS), NOAA, or any official emergency management agency. **Do not rely solely on S.H.E.L.L.Y. for life-safety decisions.** Always monitor official sources (weather.gov, your local NWS office, Wireless Emergency Alerts, NOAA Weather Radio, and local emergency management) during severe weather or other emergencies. The admin E.S.T.O.P. mode is intended for informational display purposes only and is **not** a substitute for official emergency alert systems (EAS/WEA).
 
+---
 ## ✨ Features
 
 - Live NOAA/NWS weather + Open-Meteo data — no API key required
@@ -234,8 +236,38 @@ Send real-time messages to every connected display.
 | **Duration** | Manual dismiss or auto-dismiss after 15 s – 10 min |
 | **TTS** | Speak the message aloud on the display via text-to-speech |
 | **Push** | Send a push notification to all subscribed devices simultaneously |
+| **Location Targeting** | Restrict who sees the message: all viewers, map radius, ZIP codes, or counties |
 | **Security** | Password set via `ADMIN_PASSWORD` env var |
 
+### 🛑 E.S.T.O.P. (Exigent Site Take-down Operational Procedure)
+
+Push a system-wide, **undismissable** full-screen alert to every connected display instantly. Viewers cannot close it — only the admin can deactivate it. An EAS-style alarm sound plays on all displays and background music is automatically paused when E.S.T.O.P. is activated.
+
+#### Emergency types
+
+Nine preset types each provide a unique colour palette, icon, and default title:
+
+| Preset | Icon | Colour |
+|--------|------|--------|
+| Tornado Warning | 🌪️ | Red |
+| Hurricane Warning | 🌀 | Purple |
+| Flash Flood Warning | 🌊 | Blue |
+| Wildfire Emergency | 🔥 | Orange |
+| Winter Storm Warning | ❄️ | Icy blue |
+| Severe Thunderstorm | ⛈️ | Amber |
+| Nuclear Alert | ☢️ | Red |
+| Civil Emergency | 📻 | Orange |
+| Custom | 🚨 | Red (user-defined title) |
+
+#### Extra options
+
+| Option | Details |
+|--------|---------|
+| **Title** | Optional headline, pre-filled from the preset (editable) |
+| **Message** | Supports Markdown |
+| **Auto-deactivate** | Choose Manual, 5 / 15 / 30 / 60 / 120 minutes — a live countdown appears on the overlay and the admin status bar |
+| **Push notify** | Simultaneously push-notify all subscribed devices when activating |
+| **Confirmation modal** | A full-screen confirmation dialog shows a preview of the type, title, message, and expiry before activating — prevents accidental activation |
 ### Release Notes
 
 Post versioned changelogs that appear in the admin panel's history. Each entry has a version string, date, and free-text notes field with Markdown support.

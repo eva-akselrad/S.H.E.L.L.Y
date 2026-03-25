@@ -86,7 +86,7 @@ const WeatherAPI = (() => {
             wind_speed_unit: windU,
             precipitation_unit: precU,
             timezone: 'auto',
-            forecast_days: 8,
+            forecast_days: 14,
             forecast_hours: 48,
             past_hours: 2
         });
@@ -130,6 +130,7 @@ const WeatherAPI = (() => {
     // ── Helpers ───────────────────────────────────────────────────
     function fmtTime(d) { return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
     function fmtTemp(v) { return v == null ? '--' : `${Math.round(v)}°${useFahrenheit ? 'F' : 'C'}`; }
+    function fmtPrecip(v) { return v == null ? '--' : `${v.toFixed(2)} ${useFahrenheit ? 'in' : 'mm'}`; }
     function hPaToInHg(v) { return (v * 0.02953).toFixed(2); }
     function fmtVis(m) {
         if (m == null) return '--';
@@ -294,7 +295,7 @@ const WeatherAPI = (() => {
         // Hourly (next 48h, skip past_hours offset)
         const hourlyOffset = 2; // past_hours=2
         const hourly = [];
-        for (let i = hourlyOffset; i < Math.min(hourlyOffset + 24, h.time.length); i++) {
+        for (let i = hourlyOffset; i < Math.min(hourlyOffset + 48, h.time.length); i++) {
             const t = new Date(h.time[i]);
             const wxH = wmoToWeather(h.weather_code[i], t.getHours() >= 6 && t.getHours() < 20);
             hourly.push({
@@ -305,6 +306,7 @@ const WeatherAPI = (() => {
                 precip: h.precipitation_probability[i] > 5 ? `💧 ${h.precipitation_probability[i]}%` : '',
                 precipAmt: h.precipitation?.[i] > 0 ? `${h.precipitation[i].toFixed(2)}"` : '',
                 wind: h.wind_speed_10m?.[i] ? `${Math.round(h.wind_speed_10m[i])} ${windU}` : '',
+                humidity: h.relative_humidity_2m?.[i] != null ? `${h.relative_humidity_2m[i]}%` : '',
                 cloud: h.cloud_cover?.[i] != null ? `${h.cloud_cover[i]}%` : '',
                 isCurrent: i === hourlyOffset
             });
@@ -323,10 +325,10 @@ const WeatherAPI = (() => {
             });
         }
 
-        // Daily (7-day)
+        // Daily (up to 14 days)
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const daily = [];
-        for (let i = 0; i < Math.min(7, d.time.length); i++) {
+        for (let i = 0; i < Math.min(14, d.time.length); i++) {
             const dt = new Date(d.time[i] + 'T12:00:00');
             const wxD = wmoToWeather(d.weather_code[i]);
             daily.push({
@@ -334,6 +336,8 @@ const WeatherAPI = (() => {
                 icon: wxD.emoji, desc: wxD.desc,
                 hi: fmtTemp(d.temperature_2m_max[i]),
                 lo: fmtTemp(d.temperature_2m_min[i]),
+                hiRaw: d.temperature_2m_max[i],
+                loRaw: d.temperature_2m_min[i],
                 precip: d.precipitation_probability_max[i] > 5 ? `💧 ${d.precipitation_probability_max[i]}%` : '',
                 precipSum: d.precipitation_sum?.[i] > 0 ? `${d.precipitation_sum[i].toFixed(2)} ${useFahrenheit ? 'in' : 'mm'}` : '',
                 snowSum: d.snowfall_sum?.[i] > 0 ? `❄ ${d.snowfall_sum[i].toFixed(1)} ${useFahrenheit ? 'in' : 'cm'}` : '',
@@ -341,6 +345,18 @@ const WeatherAPI = (() => {
                 uvMax: d.uv_index_max?.[i] != null ? d.uv_index_max[i].toFixed(0) : '--',
                 isToday: i === 0
             });
+        }
+
+        // Temperature trend analysis over the forecast period
+        const hiTemps = daily.map(x => x.hiRaw).filter(v => v != null);
+        let extendedTrend = { dir: 'stable', symbol: '→', label: 'Stable', diff: 0 };
+        if (hiTemps.length >= 4) {
+            const half = Math.floor(hiTemps.length / 2);
+            const firstAvg = hiTemps.slice(0, half).reduce((s, v) => s + v, 0) / half;
+            const lastAvg = hiTemps.slice(-half).reduce((s, v) => s + v, 0) / half;
+            const diff = Math.round(lastAvg - firstAvg);
+            if (diff >= 3) extendedTrend = { dir: 'warming', symbol: '↑', label: 'Warming', diff };
+            else if (diff <= -3) extendedTrend = { dir: 'cooling', symbol: '↓', label: 'Cooling', diff };
         }
 
         // Almanac
@@ -384,7 +400,325 @@ const WeatherAPI = (() => {
         // Ticker
         const ticker = `${wx.emoji} ${wx.desc} | ${conditions.temp} (Feels ${conditions.feelsLike}) | Humidity: ${conditions.humidity} | Dewpoint: ${conditions.dewpoint} | Wind: ${conditions.wind} | Gusts: ${conditions.gusts} | Visibility: ${conditions.visibility} | Pressure: ${conditions.pressure} ${pressureTrend} | UV: ${conditions.uvRaw ?? '--'} | Cloud Cover: ${cloudPct}%${c.snow_depth > 0 ? ' | Snow Depth: ' + conditions.snowDepth : ''}`;
 
-        return { conditions, hourly, daily, almanac, airQuality, pollen, precipChart, ticker };
+        return { conditions, hourly, daily, extendedTrend, almanac, airQuality, pollen, precipChart, ticker };
+    }
+
+    // ── Multi-city helpers ────────────────────────────────────────
+
+    /** Haversine distance in miles between two lat/lon points */
+    function haversineMiles(lat1, lon1, lat2, lon2) {
+        const R = 3958.8;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    /**
+     * Fetch weather for a list of city objects { name, state, lat, lon } in a SINGLE
+     * Open-Meteo batch request instead of N individual requests.
+     * Returns array of { name, state, lat, lon, ...weatherData } in the same order.
+     */
+    async function fetchTravelCities(cities) {
+        if (!cities.length) return [];
+
+        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
+        const windU  = useFahrenheit ? 'mph' : 'kmh';
+
+        // Open-Meteo accepts comma-separated lat/lon arrays for batch requests
+        const params = new URLSearchParams({
+            latitude:         cities.map(c => c.lat).join(','),
+            longitude:        cities.map(c => c.lon).join(','),
+            current:          'temperature_2m,weather_code,is_day',
+            daily:            'temperature_2m_max,temperature_2m_min,weather_code',
+            temperature_unit: units,
+            wind_speed_unit:  windU,
+            timezone:         'auto',
+            forecast_days:    2,
+        });
+
+        try {
+            const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+            if (!resp.ok) throw new Error('Batch city fetch failed');
+            // Open-Meteo returns an array for multiple locations, a plain object for one.
+            // Normalise to array so the cities.map() below can always use results[i].
+            const raw = await resp.json();
+            const results = Array.isArray(raw) ? raw : [raw];
+
+            return cities.map((city, i) => {
+                try {
+                    const data = results[i];
+                    if (!data) throw new Error('missing');
+                    const c = data.current;
+                    const d = data.daily;
+                    const isDay = c.is_day === 1;
+                    const wx          = wmoToWeather(c.weather_code, isDay);
+                    const wxTomorrow  = wmoToWeather(d.weather_code?.[1] ?? d.weather_code?.[0], true);
+                    return {
+                        ...city,
+                        error:       false,
+                        temp:        fmtTemp(c.temperature_2m),
+                        tempRaw:     c.temperature_2m,
+                        hi:          fmtTemp(d.temperature_2m_max[0]),
+                        lo:          fmtTemp(d.temperature_2m_min[0]),
+                        tomorrowHi:  fmtTemp(d.temperature_2m_max[1] ?? d.temperature_2m_max[0]),
+                        tomorrowIcon: wxTomorrow.emoji,
+                        tomorrowDesc: wxTomorrow.desc,
+                        icon:        wx.emoji,
+                        desc:        wx.desc,
+                        weatherCode: c.weather_code,
+                        isDay,
+                    };
+                } catch {
+                    return { ...city, error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' };
+                }
+            });
+        } catch {
+            // Graceful fallback: mark all cities as errored
+            return cities.map(city => ({ ...city, error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' }));
+        }
+    }
+
+    /**
+     * Find the N cities closest to (lat, lon) from MAJOR_US_CITIES and fetch their weather.
+     * Excludes the user's own location if it matches a city within 10 miles.
+     */
+    async function fetchNearbyCities(lat, lon, count = 8) {
+        if (typeof MAJOR_US_CITIES === 'undefined') return [];
+        const sorted = MAJOR_US_CITIES
+            .map(c => ({ ...c, dist: haversineMiles(lat, lon, c.lat, c.lon) }))
+            .sort((a, b) => a.dist - b.dist)
+            .filter(c => c.dist > 10) // exclude user's immediate city
+            .slice(0, count);
+        return fetchTravelCities(sorted);
+    }
+
+    /**
+     * Fetch SPC categorical outlook for Days 1–3 via local proxy.
+     * Returns { day1, day2, day3 } where each is a GeoJSON FeatureCollection or null.
+     * Performs three separate requests (one per day); relies on the server's
+     * Cache-Control headers (max-age=900) to avoid hitting SPC upstream on every
+     * refresh cycle.
+     */
+    async function fetchSPCOutlook() {
+        const days = ['1', '2', '3'];
+        const results = await Promise.allSettled(
+            days.map(d =>
+                fetch(`/api/spc-outlook?day=${d}`)
+                    .then(r => r.ok ? r.json() : null)
+                    .catch(() => null)
+            )
+        );
+        return {
+            day1: results[0].status === 'fulfilled' ? results[0].value : null,
+            day2: results[1].status === 'fulfilled' ? results[1].value : null,
+            day3: results[2].status === 'fulfilled' ? results[2].value : null,
+        };
+    }
+
+    /**
+     * Point-in-ring test (ray casting, GeoJSON coordinate order: [lon, lat]).
+     */
+    function pointInRing(lon, lat, ring) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const [xi, yi] = ring[i];
+            const [xj, yj] = ring[j];
+            const intersect = ((yi > lat) !== (yj > lat))
+                && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    /**
+     * Given a GeoJSON FeatureCollection (SPC categorical outlook) and user coordinates,
+     * return the highest risk category label at that point.
+     * Order: TSTM < MRGL < SLGT < ENH < MDT < HIGH
+     */
+    function spcRiskAtPoint(geoJSON, lat, lon) {
+        if (!geoJSON?.features?.length) return null;
+        const ORDER = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
+        let maxIdx = -1;
+        for (const feature of geoJSON.features) {
+            const label = feature.properties?.LABEL;
+            if (!label) continue;
+            const geom = feature.geometry;
+            if (!geom) continue;
+            let hit = false;
+            if (geom.type === 'Polygon') {
+                hit = pointInRing(lon, lat, geom.coordinates[0]);
+            } else if (geom.type === 'MultiPolygon') {
+                hit = geom.coordinates.some(poly => pointInRing(lon, lat, poly[0]));
+            }
+            if (hit) {
+                const idx = ORDER.indexOf(label);
+                if (idx > maxIdx) maxIdx = idx;
+            }
+        }
+        return maxIdx >= 0 ? ORDER[maxIdx] : null;
+    }
+
+    /**
+     * Process SPC GeoJSON outlook into a structured object for rendering.
+     * Returns { days: [{ label, risk, riskLabel, color }, ...], valid: boolean }
+     */
+    function processSPCOutlook(spcData, lat, lon) {
+        const RISK_META = {
+            null:   { label: 'No Risk',   color: '#3a3a3a', pct: 0 },
+            TSTM:   { label: 'T-Storm',   color: '#2e7d32', pct: 14 },
+            MRGL:   { label: 'Marginal',  color: '#4caf50', pct: 28 },
+            SLGT:   { label: 'Slight',    color: '#cddc39', pct: 46 },
+            ENH:    { label: 'Enhanced',  color: '#ff9800', pct: 62 },
+            MDT:    { label: 'Moderate',  color: '#f44336', pct: 78 },
+            HIGH:   { label: 'High',      color: '#e91e63', pct: 95 },
+        };
+
+        const now = new Date();
+        const dayNames = [];
+        for (let i = 0; i < 3; i++) {
+            const d = new Date(now);
+            d.setDate(d.getDate() + i);
+            dayNames.push(d.toLocaleDateString('en-US', { weekday: 'long' }));
+        }
+
+        const datasets = [spcData.day1, spcData.day2, spcData.day3];
+        const days = datasets.map((data, i) => {
+            const risk = spcRiskAtPoint(data, lat, lon);
+            const meta = RISK_META[risk] ?? RISK_META[null];
+            return {
+                dayName: dayNames[i],
+                risk,
+                riskLabel: meta.label,
+                color: meta.color,
+                pct: meta.pct,
+                available: data !== null,
+            };
+        });
+
+        return { days, valid: datasets.some(d => d !== null) };
+    }
+
+    /**
+     * Fetch "On This Day" climate history for the current calendar date.
+     * Uses Open-Meteo Archive API to retrieve 30 years of daily data,
+     * then extracts records and averages for the current month/day.
+     * Results are cached in localStorage for 24 hours.
+     */
+    async function fetchClimateHistory(lat, lon) {
+        const today = new Date();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+
+        // Cache key includes coordinates (1 decimal ≈ 11 km — coarser than forecast cache,
+        // intentional since climate normals vary slowly with distance), month, and day
+        const cacheKey = `climate-history-${lat.toFixed(1)}-${lon.toFixed(1)}-${mm}${dd}`;
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                // Valid for 24 hours
+                if (Date.now() - parsed.timestamp < 86400000) return parsed.data;
+            }
+        } catch { /* ignore storage errors */ }
+
+        // Fetch last 30 years of daily data
+        const endDate = new Date(today);
+        endDate.setDate(endDate.getDate() - 1); // yesterday — today's data is incomplete
+        const startDate = new Date(endDate);
+        startDate.setFullYear(startDate.getFullYear() - 30);
+
+        const startStr = startDate.toISOString().slice(0, 10);
+        const endStr = endDate.toISOString().slice(0, 10);
+
+        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
+        const precU = useFahrenheit ? 'inch' : 'mm';
+
+        const params = new URLSearchParams({
+            latitude: lat, longitude: lon,
+            start_date: startStr,
+            end_date: endStr,
+            daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum',
+            temperature_unit: units,
+            precipitation_unit: precU,
+            timezone: 'auto',
+        });
+
+        const resp = await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`);
+        if (!resp.ok) throw new Error('Climate history fetch failed');
+        const raw = await resp.json();
+
+        const daily = raw.daily;
+        if (!daily?.time?.length) return null;
+
+        const times = daily.time;
+        const maxTemps = daily.temperature_2m_max;
+        const minTemps = daily.temperature_2m_min;
+        const precips = daily.precipitation_sum;
+
+        // Collect all entries for the current calendar day
+        const entries = [];
+        for (let i = 0; i < times.length; i++) {
+            const date = times[i]; // YYYY-MM-DD
+            if (date.slice(5, 7) === mm && date.slice(8, 10) === dd) {
+                entries.push({
+                    year: parseInt(date.slice(0, 4), 10),
+                    maxTemp: maxTemps[i],
+                    minTemp: minTemps[i],
+                    precip: precips[i],
+                });
+            }
+        }
+
+        if (!entries.length) return null;
+
+        // Entries come from a chronological time series; sort defensively
+        entries.sort((a, b) => a.year - b.year);
+
+        // Find records and compute averages
+        let recHigh = null, recLow = null, recPrecip = null;
+        let sumHigh = 0, sumLow = 0, sumPrecip = 0;
+        let countHigh = 0, countLow = 0, countPrecip = 0;
+
+        for (const e of entries) {
+            if (e.maxTemp != null) {
+                if (recHigh === null || e.maxTemp > recHigh.maxTemp) recHigh = e;
+                sumHigh += e.maxTemp;
+                countHigh++;
+            }
+            if (e.minTemp != null) {
+                if (recLow === null || e.minTemp < recLow.minTemp) recLow = e;
+                sumLow += e.minTemp;
+                countLow++;
+            }
+            if (e.precip != null) {
+                if (recPrecip === null || e.precip > recPrecip.precip) recPrecip = e;
+                sumPrecip += e.precip;
+                countPrecip++;
+            }
+        }
+
+        const result = {
+            date: today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+            years: entries.length,
+            startYear: entries[0]?.year ?? null,
+            recordHigh: recHigh ? { temp: fmtTemp(recHigh.maxTemp), year: recHigh.year } : null,
+            recordLow: recLow ? { temp: fmtTemp(recLow.minTemp), year: recLow.year } : null,
+            avgHigh: countHigh > 0 ? fmtTemp(sumHigh / countHigh) : '--',
+            avgLow: countLow > 0 ? fmtTemp(sumLow / countLow) : '--',
+            recordPrecip: recPrecip && recPrecip.precip > 0
+                ? { amount: fmtPrecip(recPrecip.precip), year: recPrecip.year }
+                : null,
+            avgPrecip: countPrecip > 0 ? fmtPrecip(sumPrecip / countPrecip) : '--',
+        };
+
+        // Persist processed result only (not the full raw dataset)
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: result }));
+        } catch { /* ignore storage quota errors */ }
+
+        return result;
     }
 
     // ── Multi-city helpers ────────────────────────────────────────
@@ -613,25 +947,27 @@ const WeatherAPI = (() => {
 
         // nearbyCities → Regional Obs/Forecast slides (position-dependent)
         // travelCities → Travel Forecast slide (fixed well-known cities)
-        const [raw, aq, alerts, cf, nearbyCities, travelCities, spcRaw] = await Promise.all([
+        const [raw, aq, alerts, cf, nearbyCities, travelCities, spcRaw, climateHistory] = await Promise.all([
             fetchWeather(currentLat, currentLon),
             fetchAirQuality(currentLat, currentLon),
             fetchAlerts(currentLat, currentLon),
-            fetch('/api/custom-forecast', { cache: 'no-store' })
-                .then(r => r.ok ? r.json() : { periods: [], updatedAt: null })
-                .catch(() => ({ periods: [], updatedAt: null })),
+            fetch('/api/custom-forecast')
+                .then(r => r.ok ? r.json() : [])
+                .catch(() => []),
             fetchNearbyCities(currentLat, currentLon, 8).catch(() => []),
             fetchTravelCities(
                 typeof DEFAULT_TRAVEL_CITIES !== 'undefined' ? DEFAULT_TRAVEL_CITIES : []
             ).catch(() => []),
             fetchSPCOutlook().catch(() => ({ day1: null, day2: null, day3: null })),
+            fetchClimateHistory(currentLat, currentLon).catch(() => null),
         ]);
 
         weatherData = processData(raw, aq);
-        weatherData.customForecast = cf;
+        weatherData.customForecasts = Array.isArray(cf) ? cf : (cf?.periods?.length ? [cf] : []);
         weatherData.nearbyCities = nearbyCities;
         weatherData.travelCities = travelCities;
         weatherData.spcOutlook = processSPCOutlook(spcRaw, currentLat, currentLon);
+        weatherData.climateHistory = climateHistory;
         alertsData = alerts;
         return { weather: weatherData, alerts: alertsData };
     }

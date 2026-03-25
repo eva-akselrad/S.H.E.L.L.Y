@@ -70,6 +70,7 @@
                 <label><input type="checkbox" data-display="extended" checked /> Extended Forecast</label>
                 <label><input type="checkbox" data-display="precipchart" checked /> Precipitation</label>
                 <label><input type="checkbox" data-display="almanac" checked /> Almanac</label>
+                <label><input type="checkbox" data-display="climate" checked /> On This Day</label>
                 <label><input type="checkbox" data-display="airquality" checked /> Air Quality</label>
                 <label><input type="checkbox" data-display="travel" checked /> Travel Forecast</label>
                 <label><input type="checkbox" data-display="regionalobs" checked /> Regional Observations</label>
@@ -185,6 +186,13 @@
         <section class="settings-section">
             <h3>🖥 Kiosk Mode</h3>
             <p class="hint-text">Fullscreen, hides all controls. Press <kbd>Esc</kbd> to exit.</p>
+            <div class="toggle-row" style="margin-bottom:10px">
+                <span>Autoplay music on entry</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="kiosk-autoplay-music" />
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <button id="kiosk-btn" class="btn-kiosk">⛶ Enter Kiosk Mode</button>
         </section>
 
@@ -361,6 +369,17 @@
                 </div>
             </div>
 
+            <!-- On This Day – Climate History -->
+            <div class="slide hidden" id="slide-climate" data-display="climate">
+                <div class="slide-header">
+                    <span class="slide-title">On This Day</span>
+                    <span id="climate-history-date" class="slide-badge" style="background:rgba(251,191,36,0.12);color:var(--text-accent);border:1px solid rgba(251,191,36,0.3)"></span>
+                    <span class="slide-badge" style="background:rgba(59,130,246,0.1);color:var(--text-secondary);border:1px solid rgba(59,130,246,0.2);font-size:0.6rem">Archive · 30 yr</span>
+                    <span id="climate-history-years" class="slide-badge" style="background:rgba(100,116,139,0.1);color:var(--text-secondary);border:1px solid rgba(100,116,139,0.2);font-size:0.6rem"></span>
+                </div>
+                <div id="climate-history-container" class="ch-layout"></div>
+            </div>
+
             <!-- Air Quality -->
             <div class="slide hidden" id="slide-airquality" data-display="airquality">
                 <div class="slide-header">
@@ -459,7 +478,7 @@
                     <span class="slide-title">Custom Forecast</span>
                     <span class="slide-badge" style="background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)">CUSTOM</span>
                 </div>
-                <div id="customforecast-container" class="extended-container"></div>
+                <div id="customforecast-container" class="cf-container"></div>
                 <div id="customforecast-updated" style="text-align:center;font-size:0.65rem;color:var(--text-secondary);margin-top:8px;padding-bottom:4px"></div>
             </div>
 
@@ -552,6 +571,7 @@
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.3.3/dist/purify.min.js"></script>
     <script src="js/cities.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/music.js"></script>
