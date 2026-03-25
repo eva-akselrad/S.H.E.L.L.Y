@@ -151,7 +151,6 @@ setInterval(() => {
     }
 }, 5 * 60_000); // run every 5 minutes
 
-
 // ── Build hash (automatic cache busting) ───────────────────────
 // Hash all local JS, CSS, and HTML files so that any code change
 // produces a new CACHE_VERSION in the service worker, forcing the
@@ -615,7 +614,6 @@ app.get('/api/spc-outlook', async (req, res) => {
         res.setHeader('Cache-Control', 'public, max-age=900');
         return res.json(cached.data);
     }
-
 
     const url = `https://www.spc.noaa.gov/products/outlook/${file}`;
     try {
