@@ -1,0 +1,4663 @@
+diff --git a/README.md b/README.md
+index 6ecbbd6..a4f2e66 100644
+--- a/README.md
++++ b/README.md
+@@ -24,158 +24,63 @@ A modern, real-time weather client inspired by WeatherStar 4000. Vanilla HTML/CS
+ 
+ ---
+ 
+-## 🐳 Running with Docker (Local or Server)
++## 🔒 Security Features
+ 
+-> **Requires:** [Docker Desktop](https://www.docker.com/products/docker-desktop/)
++S.H.E.L.L.Y. includes several layered defenses that demonstrate common web-application security concepts.
+ 
+-### 1 · Configure (optional)
++### HTTP Security Headers
+ 
+-Edit `docker-compose.yml` — change `ADMIN_PASSWORD` from the default before deploying:
++Every response is sent with a hardened set of headers:
+ 
+-```yaml
+-environment:
+-  - ADMIN_PASSWORD=yourSecurePassword
+-  # Optional: set VAPID keys so push subscriptions survive container restarts
+-  # Generate with: npx web-push generate-vapid-keys
+-  - VAPID_PUBLIC_KEY=
+-  - VAPID_PRIVATE_KEY=
+-  - VAPID_EMAIL=mailto:you@example.com
+-```
++| Header | Value / Purpose |
++|--------|----------------|
++| `Content-Security-Policy` | Allow-lists all script, style, font, image, and API connection sources; blocks resources from unlisted origins |
++| `X-Frame-Options` | `SAMEORIGIN` — prevents clickjacking by blocking the page from being embedded in a foreign `<iframe>` |
++| `X-Content-Type-Options` | `nosniff` — stops browsers from MIME-sniffing a response away from its declared Content-Type |
++| `X-XSS-Protection` | `1; mode=block` — legacy IE/Edge XSS auditor safety net |
++| `Referrer-Policy` | `strict-origin-when-cross-origin` — limits referer leakage to cross-origin requests |
++| `Permissions-Policy` | Disables camera, microphone, and payment APIs; restricts geolocation to this origin to support location-based weather features |
++| `Strict-Transport-Security` | 1-year HSTS; effective when served over TLS/HTTPS |
+ 
+-> If `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` are **not** set, the server auto-generates them and saves them to `.vapid-keys.json` on first run. This works fine for a single container, but means push subscriptions are lost if the container is recreated.
++### Rate Limiting
+ 
+-### 2 · Build and start
++Admin API routes are protected by a per-IP rate limiter (60 requests per minute) via `express-rate-limit`.  
++Responses include standard `RateLimit-*` headers so clients can see their remaining quota.  
++Exceeding the limit returns **HTTP 429** with a descriptive JSON error.
+ 
+-```bash
+-docker compose up -d --build
+-```
++### Brute-Force / Account-Lockout Protection
+ 
+-- **Weather display:** http://localhost:8080
+-- **Admin panel:** http://localhost:8080/admin.html
++Admin authentication routes track failed password attempts per source IP.  
++After **5 consecutive failures** the IP is **locked out for 15 minutes** and every subsequent request returns HTTP 429 with a `Retry-After` header.  
++A successful login resets the counter. Idle entries are periodically evicted to prevent unbounded memory growth.
+ 
+-### 3 · Add music
++> **Behind a proxy / Cloudflare Tunnel:** Set the `TRUST_PROXY=1` environment variable so `express` resolves the real client IP instead of the container/proxy address.
+ 
+-Drop MP3s into `music/`, regenerate the playlist, restart:
++### Security Event Logging
+ 
+-```bash
+-node generate-playlist.js
+-docker compose restart weathernow
+-```
++All notable security events are captured in an in-memory ring buffer (last 500 events) and tagged with a timestamp, source IP, path, user-agent, and event type:
+ 
+-### 4 · Stop
++| Event type | Meaning |
++|------------|---------|
++| `auth_success` | Admin password accepted (login only) |
++| `auth_failure` | Wrong password provided |
++| `lockout` | IP locked out after repeated failures |
++| `rate_limited` | Request rejected by the rate limiter |
++| `honeypot` | Request hit the honeypot endpoint |
+ 
+-```bash
+-docker compose down
+-```
++Events are visible in the **Admin Panel → 🔒 Security Log** section (auto-refreshes every 30 s).
+ 
+----
+-
+-## 📺 Weather Slides
+-
+-All 15 slides can be individually toggled on/off in the **Settings panel**. They cycle automatically at a configurable speed (6–20 seconds) or can be navigated manually.
+-
+-| Slide | Description |
+-|-------|-------------|
+-| **Current Conditions** | Temperature, feels-like, humidity, dewpoint, wind & gusts, visibility, pressure trend, UV index, cloud cover, precipitation, heat index / wind chill |
+-| **Detailed Observations** | 24-field ASOS-style grid including solar noon, civil twilight, day length, moon phase, day of year |
+-| **Hourly** | Next 24 hours — time, icon, temperature, description, precip chance, wind |
+-| **Extended** | 7-day forecast — name, icon, description, hi/lo, precip, snow, wind |
+-| **Precipitation Chart** | Dual-bar visualization of hourly precip probability + amount, CAPE-based thunder indicators |
+-| **Almanac** | Sunrise/sunset, solar noon, civil dawn/dusk, day length, moon phase |
+-| **Air Quality** | AQI (0–500+) with color slider + breakdown: PM2.5, PM10, O3, NO2, CO, SO2, dust |
+-| **Pollen** | Individual pollen counts (grass, birch, alder, ragweed, mugwort, olive) with level labels and color coding |
+-| **Travel Forecast** | WeatherStar-style vertical list of 8 major US cities — icon, lo/hi temperatures |
+-| **Regional Observations** | Current conditions for the 8 nearest cities to the viewer's location |
+-| **Regional Forecast** | Tomorrow's forecast for the same 8 nearest cities |
+-| **SPC Outlook** | NOAA Storm Prediction Center Days 1–3 categorical severe weather risk (Thunderstorm → High) with colored risk bars |
+-| **Radar** | RainViewer animated radar — 6 frames, 700 ms/frame, play/pause/jump-to-live controls |
+-| **Severe Alerts** | Active NWS alerts — event type, severity, area, description, expiration, manual TTS button |
+-| **Custom Forecast** | Admin-posted forecast periods with markdown descriptions and optional location targeting |
+-
+----
+-
+-## 📍 Location
+-
+-The display uses a two-stage location bootstrap for the fastest possible start:
+-
+-1. **IP geolocation** (ipapi.co) fires immediately on load for an instant location estimate.
+-2. **GPS / manual** search refines the location in the background.
+-
+-Location is saved in `localStorage` and restored on your next visit. To change location:
+-- Type a city name or address in the search bar and press **Enter** or click **Go**.
+-- Click the **📍** button to use your device's GPS.
+-
+----
+-
+-## ⚙️ Settings Panel
+-
+-Open the settings panel with the **⚙** button in the header.
+-
+-| Setting | Options |
+-|---------|---------|
+-| **Theme** | Light · Dark · Custom |
+-| **Units** | °F / °C |
+-| **Slide Speed** | 6–20 seconds slider |
+-| **Active Displays** | Toggle each of the 15 slides on/off |
+-| **Volume** | 0–100% |
+-| **Text-to-Speech** | Enable/disable TTS for severe alerts |
+-| **Audio Ducking** | Reduce music volume during TTS announcements |
+-| **Shuffle** | Shuffle music playlist |
+-| **Autoplay** | Auto-start music on load |
+-| **Push Notifications** | One-tap subscribe/unsubscribe |
+-| **Kiosk Mode** | Enter fullscreen kiosk mode |
+-| **Share Permalink** | Copy a URL that encodes your current settings, location, and kiosk preference |
+-
+-Settings are saved to `localStorage` and persist across sessions.
+-
+----
+-
+-## ⌨️ Keyboard Shortcuts
+-
+-| Key | Action |
+-|-----|--------|
+-| `→` Arrow Right | Next slide |
+-| `←` Arrow Left | Previous slide |
+-| `P` | Pause / resume slide cycling |
+-| `R` | Refresh weather data |
+-
+-Shortcuts are disabled when focus is in a text input.
+-
+----
+-
+-## 🔗 Permalink Sharing
+-
+-Click **Share Permalink** in the Settings panel to copy a URL that encodes:
+-- Your current settings (theme, units, speed, active slides, etc.)
+-- Your saved location
+-- Whether to auto-enter kiosk mode on open
+-
+-Share this link to send the exact same view to another device or person. Settings are applied on load and the `?s=` parameter is cleaned from the URL automatically.
+-
+----
+-
+-## 🖥 Kiosk Mode
+-
+-Enable **Kiosk Mode** from the Settings panel (or pass a permalink with `k: true`) to enter fullscreen mode. Press **Esc** to exit.
+-
+----
+-
+-## 📣 Admin Panel
++### Honeypot Endpoint
+ 
+-Navigate to `/admin.html` on any device on the same network.
++`/api/admin-backdoor` is a **honeypot** — a path that looks attractive to automated scanners but serves no legitimate function.  
++Any hit is immediately logged as a `honeypot` event, making it easy to spot port-scans, vulnerability probes, and poorly-written bots.
+ 
+-### Announcements
++### Security API Endpoints (admin-only)
+ 
+-Send real-time messages to every connected display.
+-
+-| Feature | Details |
+-|---------|---------|
+-| **Banner** | Slides in below the alert bar, color-coded by type |
+-| **Popup** | Full-screen blurred overlay with animated entrance |
+-| **Types** | Info · Warning · Emergency (emergency pulses like NWS alerts) |
+-| **Duration** | Manual dismiss or auto-dismiss after 15 s – 10 min |
+-| **TTS** | Speak the message aloud on the display via text-to-speech |
+-| **Push** | Send a push notification to all subscribed devices simultaneously |
++| Method | Path | Description |
++|--------|------|-------------|
++| `GET` | `/api/security/events?limit=N` | Returns the last N security events |
++| `GET` | `/api/security/stats` | Returns event-type counts and currently-locked IPs |
+ | **Location Targeting** | Restrict who sees the message: all viewers, map radius, ZIP codes, or counties |
+ | **Security** | Password set via `ADMIN_PASSWORD` env var |
+ 
+@@ -209,295 +114,3 @@ Nine preset types each provide a unique colour palette, icon, and default title:
+ | **Push notify** | Simultaneously push-notify all subscribed devices when activating |
+ | **Confirmation modal** | A full-screen confirmation dialog shows a preview of the type, title, message, and expiry before activating — prevents accidental activation |
+ 
+-### Release Notes
+-
+-Post versioned changelogs that appear in the admin panel's history. Each entry has a version string, date, and free-text notes field with Markdown support.
+-
+-1. Enter a **version** (e.g. `v2.4.0`), **date**, and **notes**.
+-2. Click **📋 Post Release Notes**.
+-3. All posted entries appear as a scrollable history below and can be individually deleted.
+-
+-### Push Notifications (Admin)
+-
+-- **Test Push** — send a test notification to all subscribed devices.
+-- **Subscriber count** — shows how many devices are currently subscribed.
+-- **Clear all subscriptions** — remove all push subscriptions (devices must re-subscribe).
+-
+-### Markdown support
+-
+-All admin messages (banners, popups), custom forecast descriptions, and release notes support **Markdown** formatting. Use it to add emphasis, lists, links, or code to any message.
+-
+-#### Example admin message (popup)
+-
+-> **Title:** ⚠️ Scheduled Maintenance  
+-> **Text:**
+-> ```markdown
+-> The weather display will be **offline for ~10 minutes** tonight at *11:00 PM*.
+->
+-> During this window:
+-> - Data refresh will be paused
+-> - Push notifications may be delayed
+->
+-> No action is required on your part. Thank you for your patience!
+-> ```
+-
+-#### Example custom forecast period description
+-
+-> **Period name:** Tonight  
+-> **Description:**
+-> ```markdown
+-> Partly cloudy with a **30% chance of showers** after midnight.
+-> Winds **SW 10–15 mph**, gusting to *25 mph* near the coast.
+-> Stay weather-aware — [NWS discussion](https://forecast.weather.gov) updated hourly.
+-> ```
+-
+-#### Example release notes
+-
+-> **Version:** v2.3.0  
+-> **Notes:**
+-> ```markdown
+-> ## What's New
+->
+-> - **Custom Forecast** descriptions now render **Markdown** — bold, italics, lists, and links all work.
+-> - Release notes history in the admin panel also renders Markdown.
+-> - Fixed a bug where the radar slide would briefly flash on slow connections.
+->
+-> > Upgrade by pulling the latest image: `docker compose pull && docker compose up -d`
+-> ```
+-
+----
+-
+-## 🗺 Custom Forecast & Location Targeting
+-
+-Admins can publish a hand-crafted forecast that appears as a dedicated slide on every weather display. The forecast can be restricted to a specific geographic area so that only viewers in that area see it.
+-
+-### Building a forecast
+-
+-1. Open the admin panel (`/admin.html`) and scroll to **Custom Forecast**.
+-2. Click **＋ Add Forecast Period** and fill in one or more periods (name is required; all other fields are optional).
+-3. Configure a **Target Area** (see below).
+-4. Click **📡 PUBLISH FORECAST**.
+-
+-To remove the forecast from all displays, click **Clear Forecast**.
+-
+-### Target Area modes
+-
+-| Mode | How it works |
+-|------|-------------|
+-| 🌍 **All Viewers** | Default — the slide appears on every display regardless of location. |
+-| 📍 **Map Area** | Click the interactive map to drop a center pin, then enter a radius in miles. Viewers within that circle see the slide. |
+-| 🏷 **ZIP Codes** | Enter a comma-separated list of 5-digit US ZIP codes. The slide appears only for viewers whose location reverse-geocodes to one of those ZIPs. |
+-| 🗺 **Counties** | Enter comma-separated county names with state abbreviation (e.g. `Jefferson County CO, Cook County IL`). The slide appears only for viewers in a matching county. |
+-
+-> **How location is resolved:** When a viewer sets their location (search, GPS, or IP), the display silently reverse-geocodes their coordinates via Nominatim to obtain a ZIP code and county. This information is used to evaluate Map Area, ZIP, and County targeting entirely on the client — no personal data is sent to the admin server.
+-
+----
+-
+-## 🌩 SPC Outlook
+-
+-The **SPC Outlook** slide displays NOAA Storm Prediction Center categorical severe weather risk for Days 1, 2, and 3. Risks are shown as color-coded bars ranging from General Thunderstorm (green) through Marginal, Slight, Enhanced, Moderate, and High (dark magenta).
+-
+-The slide fetches SPC GeoJSON data via the built-in `/api/spc-outlook?day=N` proxy endpoint (which handles CORS and caches responses for 15 minutes). The viewer's location is checked against each risk polygon using a ray-casting algorithm so only the highest applicable risk is displayed.
+-
+----
+-
+-## 🔄 Automatic Cache Busting
+-
+-S.H.E.L.L.Y. automatically ensures users always load the latest code after a deploy — no manual browser cache clearing required.
+-
+-**How it works:**
+-
+-1. At startup, the server computes a `BUILD_HASH` (SHA-256 of all JS, CSS, and HTML files).
+-2. The service worker (`/sw.js`) is served dynamically with `CACHE_VERSION` set to `shelly-<hash>`.
+-3. When any file changes, the hash changes, the browser detects a new service worker, installs it, and the old cache is purged automatically.
+-4. HTML files (`index.html`, `admin.html`) are served with `Cache-Control: no-cache` so the browser always re-fetches them, triggering the SW update check on every page load.
+-
+-> No action needed from you or your users — this happens automatically on every deploy.
+-
+----
+-
+-## ☁️ Hosting on a Central Server with Cloudflare
+-
+-### Option A — Cloudflare Tunnel (recommended)
+-
+-Exposes your Docker container publicly without opening firewall ports. Works with both the weather display **and** the admin panel, because the Node.js server handles everything.
+-
+-1. **Create a tunnel** in [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → Networks → Tunnels → Create tunnel.  Copy the token.
+-
+-2. **Add your token** to a `.env` file:
+-   ```env
+-   CLOUDFLARE_TUNNEL_TOKEN=<your token>
+-   ```
+-
+-3. **Uncomment** the `cloudflared` service in `docker-compose.yml`:
+-   ```yaml
+-   cloudflared:
+-     image: cloudflare/cloudflared:latest
+-     restart: unless-stopped
+-     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+-     depends_on:
+-       - weathernow
+-     environment:
+-       - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+-   ```
+-
+-4. In the Cloudflare dashboard, add a **Public Hostname**:
+-   - Service: `http://weathernow:3000`
+-   - Your URL: `https://weather.yourdomain.com`
+-
+-5. Start everything:
+-   ```bash
+-   docker compose up -d --build
+-   ```
+-
+-   ✅ App live at `https://weather.yourdomain.com`
+-   ✅ Admin at `https://weather.yourdomain.com/admin.html`
+-
+-> **Tip:** Protect `/admin.html` with Cloudflare Access (Zero Trust → Applications) so only you can reach it publicly.
+-
+----
+-
+-### Option B — Cloudflare Pages + Functions (fully serverless, with admin panel)
+-
+-This hosts the static app on **Cloudflare Pages** and runs the admin API as a **Cloudflare Pages Function** (a Worker under the hood), backed by **Cloudflare KV** for message storage. No Docker or VPS required.
+-
+-#### Prerequisites
+-- A free Cloudflare account  
+-- Your domain on Cloudflare (or use the free `*.pages.dev` subdomain)
+-- Repository pushed to GitHub
+-
+-#### 1 · Create a KV namespace
+-
+-In the [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages → KV → Create namespace**  
+-Name it `WEATHERNOW_KV` and note the **Namespace ID**.
+-
+-#### 2 · Deploy to Cloudflare Pages
+-
+-1. **Workers & Pages → Create → Pages → Connect to Git** → select your repo
+-2. Build settings:
+-   - Framework preset: **None**
+-   - Build command: *(leave blank)*
+-   - Build output directory: `/` (root)
+-3. Click **Save and Deploy**
+-
+-#### 3 · Bind KV to your Pages project
+-
+-After the first deploy:  (note: The reason is called weather now is i don't feel like updating the references in the code and my cf client GPU are welcome to put in a pr to change it)
+-**Pages project → Settings → Functions → KV namespace bindings → Add binding**
+-
+-| Variable name       | KV namespace     |
+-|---------------------|-----------------|
+-| `WEATHERNOW_KV`     | WEATHERNOW_KV   |
+-
+-#### 4 · Set your admin password
+-
+-**Settings → Environment variables → Add variable (Production)**
+-
+-| Name             | Value                |
+-|------------------|----------------------|
+-| `ADMIN_PASSWORD` | `yourSecurePassword` |
+-
+-#### 5 · Redeploy
+-
+-Trigger a new deploy (push a commit or use **Deployments → Retry deploy**).
+-
+-✅ Weather display: `https://your-project.pages.dev`  
+-✅ Admin panel:  `https://your-project.pages.dev/admin.html`
+-
+-> **How it works:** The file [`functions/api/[[route]].js`](functions/api/[[route]].js) is a catch-all Pages Function that intercepts all `/api/*` requests and handles the announcement API — identical contract to the Express server, so `announcements.js` and `admin.html` work without any changes.
+-
+-> **Protect admin access:** In **Pages → Settings → Access** you can add a Cloudflare Access policy so `/admin.html` requires login (your Google/GitHub account etc.) before anyone can reach it.
+-
+-#### 6 · Enable Push Notifications on Cloudflare Pages
+-
+-The Pages Function handles push notifications using the Web Crypto API (no npm required). You just need to set your VAPID keys as environment variables.
+-
+-**Generate VAPID keys** (run once locally, keep the output):
+-```bash
+-npx web-push generate-vapid-keys
+-```
+-
+-**Add these environment variables** in **Pages → Settings → Environment variables (Production)**:
+-
+-| Name               | Value                            |
+-|--------------------|----------------------------------|
+-| `VAPID_PUBLIC_KEY`  | `BExamplePublicKey...`          |
+-| `VAPID_PRIVATE_KEY` | `your-private-key`              |
+-| `VAPID_EMAIL`       | `mailto:you@example.com`        |
+-
+-> **Important:** Keep `VAPID_PRIVATE_KEY` secret — only set it in the Cloudflare dashboard, never commit it to your repo. The `.vapid-keys.json` file generated by the Docker server is in `.gitignore`.
+-
+-Trigger a redeploy after setting the variables. Push subscriptions are then stored in KV and survive redeployments.
+-
+-> **Heads up:** Push notification encryption (the payload body) requires additional Web Crypto work beyond VAPID signing. If you find push notifications arrive empty-bodied in some browsers, this is a known limitation of the serverless implementation. The notification title and badge will always show. For fully encrypted payloads, use the Docker + `web-push` npm route instead.
+-
+-
+-
+----
+-
+-## 🎵 Music Setup
+-
+-| Method | When to use |
+-|--------|-------------|
+-| **Server playlist** | Running via Docker. Tracks load automatically on start. |
+-| **Folder picker** | Opening `index.html` directly (`file://`). |
+-
+-```bash
+-node generate-playlist.js   # regenerate after adding tracks
+-```
+-
+----
+-
+-## 🛠 Dev (no Docker)
+-
+-```bash
+-npm install
+-node server.js
+-# → http://localhost:3000
+-# → http://localhost:3000/admin.html
+-```
+-
+-Or just open `index.html` in a browser for everything except music streaming and the admin panel.
+-
+----
+-
+-## 🌐 Environment Variables
+-
+-| Variable | Default | Description |
+-|----------|---------|-------------|
+-| `PORT` | `3000` | Port the Express server listens on |
+-| `ADMIN_PASSWORD` | `weathernow` | Password for the admin panel — **change this before deploying** |
+-| `VAPID_PUBLIC_KEY` | *(auto-generated)* | VAPID public key for Web Push. If not set, keys are auto-generated and saved to `.vapid-keys.json` |
+-| `VAPID_PRIVATE_KEY` | *(auto-generated)* | VAPID private key — keep this secret, never commit it |
+-| `VAPID_EMAIL` | `mailto:admin@shelly.local` | Contact email embedded in VAPID headers |
+-| `CLOUDFLARE_TUNNEL_TOKEN` | — | Cloudflare Tunnel token (optional, for public hosting) |
+-
+-> **Note:** VAPID keys are auto-generated on first run and persisted to `.vapid-keys.json` (gitignored). This is fine for a single container. To preserve push subscriptions across container recreations, set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` as environment variables instead.
+-
+----
+-
+-## 🔌 API Reference
+-
+-The Express server exposes the following endpoints (all `/api/*` routes are network-only — never cached by the service worker):
+-
+-| Endpoint | Method | Auth | Description |
+-|----------|--------|------|-------------|
+-| `/api/messages` | GET | No | Poll for announcements (optional `?since=ID`) |
+-| `/api/announce` | POST | ✅ | Create announcement (banner or popup) |
+-| `/api/messages/:id` | DELETE | ✅ | Delete a single announcement |
+-| `/api/messages` | DELETE | ✅ | Clear all announcements |
+-| `/api/push/vapid-key` | GET | No | Get the server's public VAPID key |
+-| `/api/push/subscribe` | POST | No | Register a push subscription |
+-| `/api/push/subscribe` | DELETE | No | Unsubscribe a push endpoint |
+-| `/api/push/count` | GET | ✅ | Count active push subscribers |
+-| `/api/push/send` | POST | ✅ | Send a test push to all subscribers |
+-| `/api/release-notes` | GET | ✅ | Fetch all release notes |
+-| `/api/release-notes` | POST | ✅ | Post a new release note |
+-| `/api/release-notes/:id` | DELETE | ✅ | Delete a release note |
+-| `/api/custom-forecast` | GET | No | Fetch the current custom forecast |
+-| `/api/custom-forecast` | POST | ✅ | Publish or clear the custom forecast |
+-| `/api/spc-outlook?day=N` | GET | No | Proxy NOAA SPC GeoJSON outlook (15 min cache) |
+-| `/api/health` | GET | No | Server uptime + subscriber count |
+-| `/api/verify` | GET | ✅ | Verify admin password |
+-
+-✅ = requires `X-Admin-Password` header or `password` in request body.
+diff --git a/admin.html b/admin.html
+index 1bc68ae..1366a5a 100644
+--- a/admin.html
++++ b/admin.html
+@@ -1330,6 +1330,18 @@
+             </div>
+         </div>
+ 
++        <!-- Security Log -->
++        <div class="card" id="security-card">
++            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
++                <span>🔒 Security Log</span>
++                <button class="send-btn" id="sec-refresh-btn" style="padding:6px 14px;font-size:.78rem">↻ Refresh</button>
++            </div>
++            <div id="sec-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;font-size:.78rem"></div>
++            <div id="sec-events" style="max-height:260px;overflow-y:auto;font-size:.75rem;font-family:'Roboto Mono',monospace">
++                <div class="no-msgs">Loading…</div>
++            </div>
++        </div>
++
+     </div>
+ 
+     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+@@ -1441,6 +1453,8 @@
+                 });
+                 initTargetingUI();
+                 initMsgTargetingUI();
++                // Security Log
++                document.getElementById('sec-refresh-btn').addEventListener('click', loadSecurityLog);
+ 
+                 checkHealth();
+                 loadMessages();
+@@ -1453,6 +1467,8 @@
+                 // Slow poll: push count (rarely changes), health check
+                 setInterval(loadPushCount, 60000);
+                 setInterval(checkHealth, 30000);
++                loadSecurityLog();
++                setInterval(loadSecurityLog, 30000);
+             }
+ 
+             async function sendAnnouncement() {
+@@ -2242,6 +2258,51 @@
+                 setTimeout(() => { sendFeedback.textContent = ''; }, 4000);
+             }
+ 
++            async function loadSecurityLog() {
++                const evEl = document.getElementById('sec-events');
++                const statsEl = document.getElementById('sec-stats');
++                const colors = { auth_failure: '#ef4444', auth_success: '#22c55e', rate_limited: '#f59e0b', honeypot: '#a855f7', lockout: '#ef4444' };
++                try {
++                    const [evRes, stRes] = await Promise.all([
++                        fetch(`${API}/security/events?limit=50`, { headers: { 'x-admin-password': adminPassword } }),
++                        fetch(`${API}/security/stats`, { headers: { 'x-admin-password': adminPassword } })
++                    ]);
++                    if (!evRes.ok || !stRes.ok) {
++                        statsEl.innerHTML = '';
++                        evEl.innerHTML = '<div class="no-msgs">Unavailable</div>';
++                        return;
++                    }
++                    const { events } = await evRes.json();
++                    const { counts, lockedIps } = await stRes.json();
++
++                    // Stats chips
++                    const chips = Object.entries(counts).map(([k, v]) =>
++                        `<span style="background:${colors[k] || 'var(--card2)'};color:#fff;padding:3px 9px;border-radius:20px;white-space:nowrap">${esc(k)}: ${v}</span>`
++                    );
++                    if (lockedIps.length) {
++                        chips.push(`<span style="background:#ef4444;color:#fff;padding:3px 9px;border-radius:20px">🔒 ${lockedIps.length} locked IP(s)</span>`);
++                    }
++                    statsEl.innerHTML = chips.length ? chips.join('') : '<span style="color:var(--muted)">No events yet</span>';
++
++                    // Event rows
++                    if (!events.length) { evEl.innerHTML = '<div class="no-msgs">No security events recorded</div>'; return; }
++                    const typeIcon = { auth_failure: '⚠️', auth_success: '✅', rate_limited: '🚦', honeypot: '🍯', lockout: '🔒' };
++                    evEl.innerHTML = events.map(e => {
++                        const time = new Date(e.ts).toLocaleTimeString();
++                        return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">
++                            <span style="color:var(--muted);flex:0 0 60px">${time}</span>
++                            <span style="flex:0 0 16px">${typeIcon[e.type] || '•'}</span>
++                            <span style="color:${colors[e.type] || 'var(--text)'};flex:0 0 100px;overflow:hidden;text-overflow:ellipsis">${esc(e.type)}</span>
++                            <span style="color:var(--accent2);flex:0 0 110px;overflow:hidden;text-overflow:ellipsis">${esc(e.ip)}</span>
++                            <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis">${esc(e.path)}${e.detail ? ' · ' + esc(e.detail) : ''}</span>
++                        </div>`;
++                    }).join('');
++                } catch {
++                    statsEl.innerHTML = '';
++                    evEl.innerHTML = '<div class="no-msgs">Could not load security log</div>';
++                }
++            }
++
+             function esc(s) {
+                 return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+             }
+diff --git a/css/weather.css b/css/weather.css
+index 7cb4a5e..14a9e81 100644
+--- a/css/weather.css
++++ b/css/weather.css
+@@ -1633,1647 +1633,6 @@ body {
+     padding-bottom: 4px;
+     border-bottom: 1px solid var(--border);
+     margin-bottom: 4px;
+-}
+-
+-.day-card {
+-    background: var(--grad-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius);
+-    padding: 16px 12px;
+-    text-align: center;
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    gap: 8px;
+-    transition: border-color 0.2s, transform 0.2s;
+-}
+-
+-.day-card:hover {
+-    border-color: var(--accent);
+-    transform: translateY(-3px);
+-}
+-
+-.day-card.today {
+-    border-color: var(--text-accent);
+-    background: rgba(251, 191, 36, 0.07);
+-}
+-
+-.day-name {
+-    font-family: var(--font-display);
+-    font-size: 0.85rem;
+-    font-weight: 700;
+-    color: var(--text-secondary);
+-    text-transform: uppercase;
+-}
+-
+-.day-card.today .day-name {
+-    color: var(--text-accent);
+-}
+-
+-.day-icon {
+-    font-size: 2.2rem;
+-}
+-
+-.day-hi-lo {
+-    display: flex;
+-    gap: 8px;
+-    font-family: var(--font-mono);
+-    font-size: 0.9rem;
+-}
+-
+-.day-hi {
+-    color: var(--text-primary);
+-    font-weight: 700;
+-}
+-
+-.day-lo {
+-    color: var(--text-secondary);
+-}
+-
+-.day-desc {
+-    font-size: 0.73rem;
+-    color: var(--text-secondary);
+-    line-height: 1.3;
+-}
+-
+-.day-precip {
+-    font-size: 0.78rem;
+-    color: var(--accent2);
+-    font-weight: 600;
+-}
+-
+-/* ── Almanac ──────────────────────────────────────────────────── */
+-.almanac-layout {
+-    display: grid;
+-    grid-template-columns: repeat(3, 1fr);
+-    gap: 20px;
+-    margin-top: 10px;
+-}
+-
+-.almanac-card {
+-    background: var(--grad-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius);
+-    padding: 28px 20px;
+-    text-align: center;
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    gap: 12px;
+-    transition: border-color 0.2s, box-shadow 0.2s;
+-}
+-
+-.almanac-card:hover {
+-    border-color: var(--accent);
+-    box-shadow: var(--glow);
+-}
+-
+-.almanac-icon {
+-    font-size: 2.5rem;
+-}
+-
+-.almanac-label {
+-    font-size: 0.78rem;
+-    font-weight: 600;
+-    text-transform: uppercase;
+-    letter-spacing: 0.1em;
+-    color: var(--text-secondary);
+-}
+-
+-.almanac-value {
+-    font-family: var(--font-display);
+-    font-size: 1.3rem;
+-    font-weight: 700;
+-    color: var(--text-accent);
+-}
+-
+-/* ── On This Day – Climate History ───────────────────────────── */
+-.ch-layout {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 20px;
+-    margin-top: 8px;
+-    height: calc(100% - 70px);
+-    overflow-y: auto;
+-}
+-
+-.ch-section {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 12px;
+-}
+-
+-.ch-section-header {
+-    font-size: 0.75rem;
+-    font-weight: 700;
+-    text-transform: uppercase;
+-    letter-spacing: 0.12em;
+-    color: var(--text-secondary);
+-    padding: 4px 10px;
+-    border-left: 3px solid var(--text-accent);
+-    background: rgba(251, 191, 36, 0.05);
+-    border-radius: var(--radius-sm);
+-}
+-
+-.ch-grid {
+-    display: grid;
+-    grid-template-columns: 1fr 1fr 1fr;
+-    gap: 14px;
+-}
+-
+-.ch-record-card {
+-    background: var(--grad-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius);
+-    padding: 18px 16px;
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    gap: 6px;
+-    text-align: center;
+-    transition: border-color 0.2s, box-shadow 0.2s;
+-}
+-
+-.ch-record-card:hover {
+-    border-color: var(--accent);
+-    box-shadow: var(--glow);
+-}
+-
+-.ch-record-hot {
+-    border-color: rgba(239, 68, 68, 0.35);
+-}
+-.ch-record-hot:hover {
+-    border-color: rgba(239, 68, 68, 0.7);
+-    box-shadow: 0 0 18px rgba(239, 68, 68, 0.25);
+-}
+-
+-.ch-record-cold {
+-    border-color: rgba(56, 189, 248, 0.35);
+-}
+-.ch-record-cold:hover {
+-    border-color: rgba(56, 189, 248, 0.7);
+-    box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
+-}
+-
+-.ch-record-precip {
+-    border-color: rgba(99, 102, 241, 0.35);
+-}
+-.ch-record-precip:hover {
+-    border-color: rgba(99, 102, 241, 0.7);
+-    box-shadow: 0 0 18px rgba(99, 102, 241, 0.25);
+-}
+-
+-.ch-record-label {
+-    font-size: 0.7rem;
+-    font-weight: 700;
+-    text-transform: uppercase;
+-    letter-spacing: 0.1em;
+-    color: var(--text-secondary);
+-}
+-
+-.ch-record-value {
+-    font-family: var(--font-display);
+-    font-size: clamp(1.3rem, 3vw, 2rem);
+-    font-weight: 900;
+-    color: var(--text-accent);
+-    line-height: 1;
+-}
+-
+-.ch-record-hot .ch-record-value {
+-    color: #f87171;
+-}
+-
+-.ch-record-cold .ch-record-value {
+-    color: #7dd3fc;
+-}
+-
+-.ch-precip-val {
+-    color: #a78bfa !important;
+-}
+-
+-.ch-record-year {
+-    font-size: 0.85rem;
+-    font-weight: 600;
+-    color: var(--text-secondary);
+-    background: rgba(255, 255, 255, 0.06);
+-    padding: 2px 10px;
+-    border-radius: 20px;
+-}
+-
+-.ch-avg-card {
+-    background: var(--grad-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius);
+-    padding: 16px 18px;
+-    display: flex;
+-    flex-direction: column;
+-    justify-content: center;
+-    gap: 12px;
+-}
+-
+-.ch-avg-card-full {
+-    grid-column: span 2;
+-}
+-
+-.ch-avg-row {
+-    display: flex;
+-    justify-content: space-between;
+-    align-items: center;
+-    gap: 12px;
+-}
+-
+-.ch-avg-label {
+-    font-size: 0.72rem;
+-    font-weight: 600;
+-    text-transform: uppercase;
+-    letter-spacing: 0.08em;
+-    color: var(--text-secondary);
+-    white-space: nowrap;
+-}
+-
+-.ch-avg-value {
+-    font-family: var(--font-display);
+-    font-size: 1.1rem;
+-    font-weight: 700;
+-    color: var(--text-primary);
+-}
+-
+-.ch-avg-hot { color: #fca5a5; }
+-.ch-avg-cold { color: #bae6fd; }
+-
+-.ch-unavailable {
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    justify-content: center;
+-    gap: 16px;
+-    height: 100%;
+-    color: var(--text-secondary);
+-    text-align: center;
+-}
+-
+-.ch-unavail-icon {
+-    font-size: 3rem;
+-    opacity: 0.4;
+-}
+-
+-.ch-unavail-text {
+-    font-size: 0.9rem;
+-    max-width: 280px;
+-    opacity: 0.7;
+-}
+-
+-/* ── Air Quality ──────────────────────────────────────────────── */
+-.aqi-layout {
+-    display: grid;
+-    grid-template-columns: 1fr 1fr;
+-    gap: 30px;
+-    margin-top: 10px;
+-}
+-
+-.aqi-main {
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    justify-content: center;
+-    gap: 16px;
+-}
+-
+-.aqi-number {
+-    font-family: var(--font-display);
+-    font-size: clamp(3rem, 7vw, 5rem);
+-    font-weight: 900;
+-    color: var(--text-primary);
+-    line-height: 1;
+-}
+-
+-.aqi-label {
+-    font-size: 1.1rem;
+-    font-weight: 600;
+-    color: var(--text-accent);
+-}
+-
+-.aqi-bar-container {
+-    width: 100%;
+-}
+-
+-.aqi-bar-bg {
+-    height: 16px;
+-    border-radius: 8px;
+-    background: linear-gradient(90deg, #00c846, #ffd000, #ff6600, #cc0000, #7d0023);
+-    position: relative;
+-    margin-bottom: 6px;
+-    border: 1px solid var(--border);
+-}
+-
+-.aqi-indicator {
+-    position: absolute;
+-    top: -6px;
+-    width: 4px;
+-    height: 28px;
+-    background: #fff;
+-    border-radius: 2px;
+-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+-    transition: left 1s ease;
+-}
+-
+-.aqi-scale-labels {
+-    display: flex;
+-    justify-content: space-between;
+-    font-size: 0.65rem;
+-    color: var(--text-secondary);
+-}
+-
+-.aqi-detail-grid {
+-    display: grid;
+-    grid-template-columns: 1fr 1fr;
+-    gap: 14px;
+-    align-content: center;
+-}
+-
+-.aqi-detail-card {
+-    background: var(--bg-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius-sm);
+-    padding: 18px 14px;
+-    text-align: center;
+-    display: flex;
+-    flex-direction: column;
+-    gap: 8px;
+-}
+-
+-.aqi-detail-label {
+-    font-size: 0.75rem;
+-    color: var(--text-secondary);
+-    font-weight: 600;
+-    letter-spacing: 0.06em;
+-    text-transform: uppercase;
+-}
+-
+-.aqi-detail-value {
+-    font-family: var(--font-mono);
+-    font-size: 1.3rem;
+-    font-weight: 700;
+-    color: var(--text-primary);
+-}
+-
+-/* ── Radar (Leaflet + RainViewer) ─────────────────────────────── */
+-.radar-container {
+-    height: calc(100% - 80px);
+-    border-radius: var(--radius);
+-    overflow: hidden;
+-    position: relative;
+-    border: 1px solid var(--border);
+-    display: flex;
+-    flex-direction: column;
+-}
+-
+-/* The actual Leaflet map fills all space above controls */
+-.radar-map {
+-    flex: 1;
+-    min-height: 0;
+-    background: #1a1a2e;
+-}
+-
+-/* Override Leaflet's default attribution to match our theme */
+-.leaflet-control-attribution {
+-    background: rgba(0, 0, 0, 0.6) !important;
+-    color: var(--text-secondary) !important;
+-    font-size: 0.65rem !important;
+-}
+-
+-.leaflet-control-attribution a {
+-    color: var(--accent) !important;
+-}
+-
+-/* Legend bar – WeatherStar-style precip scale */
+-.radar-legend {
+-    position: absolute;
+-    top: 10px;
+-    right: 10px;
+-    background: rgba(10, 14, 26, 0.85);
+-    backdrop-filter: blur(6px);
+-    border: 1px solid var(--border-strong);
+-    border-radius: 8px;
+-    padding: 8px 12px;
+-    z-index: 1000;
+-    min-width: 160px;
+-}
+-
+-.radar-legend-title {
+-    display: block;
+-    font-family: var(--font-mono);
+-    font-size: 0.68rem;
+-    font-weight: 700;
+-    letter-spacing: 0.12em;
+-    color: var(--text-primary);
+-    text-align: center;
+-    margin-bottom: 5px;
+-}
+-
+-.radar-legend-bar {
+-    height: 12px;
+-    border-radius: 4px;
+-    background: linear-gradient(90deg,
+-            #00be00 0%, #009900 15%,
+-            #006600 25%, #cccc00 35%,
+-            #ffff00 45%, #ffaa00 55%,
+-            #ff6600 65%, #cc0000 75%,
+-            #aa0000 85%, #660000 100%);
+-    border: 1px solid rgba(255, 255, 255, 0.15);
+-    margin-bottom: 4px;
+-}
+-
+-.radar-legend-labels {
+-    display: flex;
+-    justify-content: space-between;
+-    font-size: 0.62rem;
+-    color: var(--text-secondary);
+-}
+-
+-/* Live badge pulse */
+-.live-badge {
+-    color: #ff4444 !important;
+-    border-color: #ff4444 !important;
+-    background: rgba(255, 68, 68, 0.1) !important;
+-    animation: live-pulse 1.5s infinite;
+-}
+-
+-@keyframes live-pulse {
+-
+-    0%,
+-    100% {
+-        opacity: 1;
+-    }
+-
+-    50% {
+-        opacity: 0.6;
+-    }
+-}
+-
+-/* Bottom radar controls bar */
+-.radar-controls {
+-    display: flex;
+-    align-items: center;
+-    gap: 10px;
+-    padding: 8px 14px;
+-    background: rgba(10, 14, 26, 0.9);
+-    border-top: 1px solid var(--border);
+-    flex-shrink: 0;
+-    z-index: 1000;
+-}
+-
+-.radar-ctrl-btn {
+-    background: var(--bg-card);
+-    border: 1px solid var(--border);
+-    border-radius: 6px;
+-    color: var(--text-primary);
+-    padding: 4px 12px;
+-    cursor: pointer;
+-    font-size: 0.82rem;
+-    font-family: var(--font-mono);
+-    font-weight: 700;
+-    transition: background 0.2s, border-color 0.2s;
+-}
+-
+-.radar-ctrl-btn:hover {
+-    background: var(--bg-card2);
+-    border-color: var(--accent);
+-    color: var(--accent);
+-}
+-
+-/* Frame timeline dots */
+-.radar-frames {
+-    flex: 1;
+-    display: flex;
+-    align-items: center;
+-    gap: 4px;
+-    overflow: hidden;
+-    padding: 0 4px;
+-}
+-
+-.radar-dot {
+-    width: 6px;
+-    height: 6px;
+-    border-radius: 50%;
+-    background: var(--text-secondary);
+-    opacity: 0.35;
+-    cursor: pointer;
+-    flex-shrink: 0;
+-    transition: opacity 0.15s, background 0.15s, transform 0.15s;
+-}
+-
+-.radar-dot:hover {
+-    opacity: 0.7;
+-}
+-
+-.radar-dot.active {
+-    background: var(--accent);
+-    opacity: 1;
+-    transform: scale(1.5);
+-}
+-
+-
+-/* ── Severe Alerts ────────────────────────────────────────────── */
+-.alert-slide-icon {
+-    font-size: 1.8rem;
+-    animation: spin-alert 3s infinite;
+-}
+-
+-@keyframes spin-alert {
+-
+-    0%,
+-    100% {
+-        transform: scale(1);
+-    }
+-
+-    50% {
+-        transform: scale(1.15);
+-    }
+-}
+-
+-.alerts-container {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 14px;
+-    overflow-y: auto;
+-    height: calc(100% - 80px);
+-}
+-
+-.no-alerts {
+-    font-size: 1.05rem;
+-    color: var(--accent2);
+-    text-align: center;
+-    padding: 40px 20px;
+-    border: 2px dashed var(--border);
+-    border-radius: var(--radius);
+-}
+-
+-.alert-card {
+-    background: rgba(127, 29, 29, 0.3);
+-    border: 1px solid var(--alert-border);
+-    border-left: 4px solid var(--alert-border);
+-    border-radius: var(--radius);
+-    padding: 18px 20px;
+-    cursor: pointer;
+-    transition: background 0.2s;
+-}
+-
+-.alert-card:hover {
+-    background: rgba(127, 29, 29, 0.5);
+-}
+-
+-.alert-card-header {
+-    display: flex;
+-    align-items: center;
+-    gap: 10px;
+-    margin-bottom: 8px;
+-}
+-
+-.alert-card-title {
+-    font-family: var(--font-display);
+-    font-size: 1rem;
+-    font-weight: 700;
+-    color: var(--alert-text);
+-    flex: 1;
+-}
+-
+-.alert-card-severity {
+-    font-size: 0.72rem;
+-    font-weight: 700;
+-    padding: 3px 8px;
+-    border-radius: 4px;
+-    text-transform: uppercase;
+-    letter-spacing: 0.08em;
+-    background: var(--alert-border);
+-    color: #fff;
+-}
+-
+-.alert-card-body {
+-    font-size: 0.85rem;
+-    color: var(--alert-text);
+-    line-height: 1.5;
+-    opacity: 0.85;
+-}
+-
+-.alert-card-meta {
+-    margin-top: 8px;
+-    font-size: 0.75rem;
+-    color: var(--text-secondary);
+-}
+-
+-.alert-tts-btn {
+-    float: right;
+-    font-size: 0.8rem;
+-    background: transparent;
+-    border: 1px solid var(--border);
+-    border-radius: 4px;
+-    padding: 2px 8px;
+-    color: var(--text-secondary);
+-    cursor: pointer;
+-    transition: all 0.2s;
+-}
+-
+-.alert-tts-btn:hover {
+-    border-color: var(--accent);
+-    color: var(--accent);
+-}
+-
+-/* ── Progress Bar & Dots ──────────────────────────────────────── */
+-.progress-bar-container {
+-    height: 3px;
+-    background: rgba(255, 255, 255, 0.05);
+-    position: relative;
+-    z-index: 5;
+-    flex-shrink: 0;
+-}
+-
+-.slide-progress {
+-    height: 100%;
+-    background: var(--accent);
+-    box-shadow: 0 0 8px var(--accent);
+-    transition: width linear;
+-    width: 0%;
+-}
+-
+-.slide-dots {
+-    position: absolute;
+-    top: 50%;
+-    left: 50%;
+-    transform: translate(-50%, -50%);
+-    display: flex;
+-    gap: 8px;
+-    align-items: center;
+-}
+-
+-.slide-dot {
+-    width: 8px;
+-    height: 8px;
+-    border-radius: 50%;
+-    background: var(--text-secondary);
+-    opacity: 0.4;
+-    cursor: pointer;
+-    transition: opacity 0.2s, background 0.2s, transform 0.2s;
+-}
+-
+-.slide-dot.active {
+-    background: var(--accent);
+-    opacity: 1;
+-    transform: scale(1.3);
+-}
+-
+-/* ── Bottom Bar ───────────────────────────────────────────────── */
+-.bottom-bar {
+-    display: flex;
+-    align-items: center;
+-    background: rgba(10, 14, 26, 0.9);
+-    backdrop-filter: blur(12px);
+-    border-top: 1px solid var(--border-strong);
+-    padding: 8px 16px;
+-    gap: 16px;
+-    z-index: 10;
+-    flex-shrink: 0;
+-    position: relative;
+-    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.4);
+-    min-height: 52px;
+-}
+-
+-.ticker-left {
+-    flex: 1;
+-    display: flex;
+-    align-items: center;
+-    gap: 10px;
+-    overflow: hidden;
+-    min-width: 0;
+-}
+-
+-.ticker-label {
+-    font-family: var(--font-mono);
+-    font-size: 0.68rem;
+-    font-weight: 700;
+-    color: var(--bg-primary);
+-    background: var(--accent);
+-    padding: 3px 8px;
+-    border-radius: 4px;
+-    white-space: nowrap;
+-    letter-spacing: 0.08em;
+-    flex-shrink: 0;
+-}
+-
+-.ticker-scroll-container {
+-    flex: 1;
+-    overflow: hidden;
+-    mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
+-}
+-
+-.ticker-text {
+-    font-size: 0.82rem;
+-    color: var(--text-secondary);
+-    white-space: nowrap;
+-    animation: ticker-scroll 30s linear infinite;
+-}
+-
+-@keyframes ticker-scroll {
+-    0% {
+-        transform: translateX(100%);
+-    }
+-
+-    100% {
+-        transform: translateX(-100%);
+-    }
+-}
+-
+-/* Music controls */
+-.music-controls {
+-    display: flex;
+-    align-items: center;
+-    gap: 8px;
+-    flex-shrink: 0;
+-}
+-
+-.mc-btn {
+-    background: var(--bg-card);
+-    border: 1px solid var(--border);
+-    border-radius: 6px;
+-    color: var(--text-primary);
+-    width: 32px;
+-    height: 32px;
+-    display: flex;
+-    align-items: center;
+-    justify-content: center;
+-    cursor: pointer;
+-    font-size: 0.9rem;
+-    transition: background 0.2s, border-color 0.2s;
+-}
+-
+-.mc-btn:hover {
+-    background: var(--bg-card2);
+-    border-color: var(--accent);
+-}
+-
+-.mc-btn.playing {
+-    color: var(--accent);
+-    border-color: var(--accent);
+-}
+-
+-.mc-track-info {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 4px;
+-    min-width: 0;
+-    max-width: 180px;
+-}
+-
+-.mc-track-name {
+-    font-size: 0.75rem;
+-    color: var(--text-secondary);
+-    white-space: nowrap;
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-}
+-
+-.mc-progress-bar {
+-    height: 3px;
+-    background: var(--border);
+-    border-radius: 2px;
+-    overflow: hidden;
+-}
+-
+-.mc-progress-fill {
+-    height: 100%;
+-    background: var(--accent);
+-    border-radius: 2px;
+-    width: 0%;
+-    transition: width 0.5s linear;
+-}
+-
+-/* ── Slide Nav Controls ───────────────────────────────────────── */
+-.slide-nav {
+-    position: fixed;
+-    right: 18px;
+-    top: 50%;
+-    transform: translateY(-50%);
+-    display: flex;
+-    flex-direction: column;
+-    gap: 8px;
+-    z-index: 20;
+-    opacity: 0.3;
+-    transition: opacity 0.3s;
+-}
+-
+-.slide-nav:hover {
+-    opacity: 1;
+-}
+-
+-.weather-main:hover .slide-nav {
+-    opacity: 1;
+-}
+-
+-.nav-btn {
+-    width: 42px;
+-    height: 42px;
+-    background: rgba(10, 14, 26, 0.8);
+-    backdrop-filter: blur(8px);
+-    border: 1px solid var(--border);
+-    border-radius: 10px;
+-    color: var(--text-primary);
+-    display: flex;
+-    align-items: center;
+-    justify-content: center;
+-    cursor: pointer;
+-    font-size: 1.2rem;
+-    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+-}
+-
+-.nav-btn:hover {
+-    background: var(--bg-card2);
+-    border-color: var(--accent);
+-    transform: scale(1.08);
+-}
+-
+-.nav-btn:active {
+-    transform: scale(0.95);
+-}
+-
+-/* ════════════════════════════════════════════════════════════════
+-   KIOSK MODE
+-   ════════════════════════════════════════════════════════════════ */
+-body.kiosk-mode .settings-panel,
+-body.kiosk-mode .settings-overlay {
+-    display: none !important;
+-}
+-
+-body.kiosk-mode #settings-open {
+-    display: none;
+-}
+-
+-body.kiosk-mode .slide-nav {
+-    opacity: 0;
+-}
+-
+-body.kiosk-mode .slide-nav:hover {
+-    opacity: 1;
+-}
+-
+-body.kiosk-mode #music-controls {
+-    display: none;
+-}
+-
+-/* Hide PWA install prompts in kiosk mode */
+-body.kiosk-mode #pwa-install-banner,
+-body.kiosk-mode #pwa-guide-modal {
+-    display: none !important;
+-}
+-
+-/* ════════════════════════════════════════════════════════════════
+-   ANIMATIONS & TRANSITIONS
+-   ════════════════════════════════════════════════════════════════ */
+-@keyframes fadeSlideIn {
+-    from {
+-        opacity: 0;
+-        transform: translateY(10px);
+-    }
+-
+-    to {
+-        opacity: 1;
+-        transform: translateY(0);
+-    }
+-}
+-
+-.stat-row,
+-.almanac-card,
+-.hourly-card,
+-.day-card,
+-.aqi-detail-card {
+-    animation: fadeSlideIn 0.4s ease both;
+-}
+-
+-/* Staggered animation delays for grid children */
+-.conditions-right .stat-row:nth-child(1) {
+-    animation-delay: 0.05s;
+-}
+-
+-.conditions-right .stat-row:nth-child(2) {
+-    animation-delay: 0.10s;
+-}
+-
+-.conditions-right .stat-row:nth-child(3) {
+-    animation-delay: 0.15s;
+-}
+-
+-.conditions-right .stat-row:nth-child(4) {
+-    animation-delay: 0.20s;
+-}
+-
+-.conditions-right .stat-row:nth-child(5) {
+-    animation-delay: 0.25s;
+-}
+-
+-.conditions-right .stat-row:nth-child(6) {
+-    animation-delay: 0.30s;
+-}
+-
+-.conditions-right .stat-row:nth-child(7) {
+-    animation-delay: 0.35s;
+-}
+-
+-.conditions-right .stat-row:nth-child(8) {
+-    animation-delay: 0.40s;
+-}
+-
+-.almanac-card:nth-child(1) {
+-    animation-delay: 0.05s;
+-}
+-
+-.almanac-card:nth-child(2) {
+-    animation-delay: 0.10s;
+-}
+-
+-.almanac-card:nth-child(3) {
+-    animation-delay: 0.15s;
+-}
+-
+-.almanac-card:nth-child(4) {
+-    animation-delay: 0.20s;
+-}
+-
+-.almanac-card:nth-child(5) {
+-    animation-delay: 0.25s;
+-}
+-
+-.almanac-card:nth-child(6) {
+-    animation-delay: 0.30s;
+-}
+-
+-/* ── Detailed Observations (dense grid) ───────────────────────── */
+-/* ── Detailed Observations (section-grouped grid) ─────────────── */
+-.obs-grid {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 16px;
+-    height: calc(100% - 80px);
+-    overflow-y: auto;
+-    padding-right: 4px;
+-}
+-
+-.obs-section {
+-    display: flex;
+-    flex-direction: column;
+-    gap: 8px;
+-}
+-
+-.obs-section-header {
+-    font-size: 0.75rem;
+-    font-weight: 700;
+-    text-transform: uppercase;
+-    letter-spacing: 0.1em;
+-    padding: 4px 10px;
+-    border-radius: var(--radius-sm);
+-    border-left: 3px solid;
+-    background: rgba(255, 255, 255, 0.04);
+-}
+-
+-.obs-section-conditions .obs-section-header {
+-    color: #93c5fd;
+-    border-color: #3b82f6;
+-}
+-
+-.obs-section-wind .obs-section-header {
+-    color: #a5f3c1;
+-    border-color: #22c55e;
+-}
+-
+-.obs-section-precip .obs-section-header {
+-    color: #7dd3fc;
+-    border-color: #0ea5e9;
+-}
+-
+-.obs-section-almanac .obs-section-header {
+-    color: #fde68a;
+-    border-color: #f59e0b;
+-}
+-
+-.obs-section-grid {
+-    display: grid;
+-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+-    gap: 8px;
+-}
+-
+-.obs-card {
+-    background: var(--grad-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius-sm);
+-    padding: 10px 14px;
+-    display: flex;
+-    align-items: center;
+-    gap: 10px;
+-    transition: border-color 0.2s, transform 0.15s, background 0.2s;
+-    animation: fadeSlideIn 0.35s ease both;
+-}
+-
+-.obs-section-conditions .obs-card { border-left: 2px solid rgba(59, 130, 246, 0.4); }
+-.obs-section-wind .obs-card       { border-left: 2px solid rgba(34, 197, 94, 0.4); }
+-.obs-section-precip .obs-card     { border-left: 2px solid rgba(14, 165, 233, 0.4); }
+-.obs-section-almanac .obs-card    { border-left: 2px solid rgba(245, 158, 11, 0.4); }
+-
+-.obs-card:hover {
+-    border-color: var(--accent);
+-    background: var(--bg-card2);
+-    transform: translateY(-2px);
+-}
+-
+-.obs-icon {
+-    font-size: 1.4rem;
+-    flex-shrink: 0;
+-    line-height: 1;
+-    filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.3));
+-}
+-
+-.obs-card-body {
+-    flex: 1;
+-    display: flex;
+-    flex-direction: column;
+-    gap: 2px;
+-    min-width: 0;
+-}
+-
+-.obs-label {
+-    font-size: 0.68rem;
+-    font-weight: 600;
+-    color: var(--text-secondary);
+-    text-transform: uppercase;
+-    letter-spacing: 0.06em;
+-    line-height: 1.2;
+-    white-space: nowrap;
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-}
+-
+-.obs-value {
+-    font-family: var(--font-mono);
+-    font-size: 0.95rem;
+-    font-weight: 700;
+-    color: var(--text-accent);
+-    white-space: nowrap;
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-}
+-
+-/* ── Precipitation Chart ──────────────────────────────────────── */
+-.precip-chart-wrap {
+-    display: flex;
+-    flex-direction: column;
+-    height: calc(100% - 80px);
+-    gap: 14px;
+-}
+-
+-.precip-chart {
+-    flex: 1;
+-    min-height: 0;
+-    background: var(--bg-card);
+-    border: 1px solid var(--border);
+-    border-radius: var(--radius);
+-    overflow: hidden;
+-    padding: 16px 16px 8px;
+-}
+-
+-.pc-bars {
+-    display: flex;
+-    align-items: flex-end;
+-    gap: 5px;
+-    height: 100%;
+-    padding-bottom: 30px;
+-}
+-
+-.pc-col {
+-    flex: 1;
+-    min-width: 0;
+-    display: flex;
+-    flex-direction: column;
+-    align-items: center;
+-    height: 100%;
+-    position: relative;
+-}
+-
+-.pc-prob-label {
+-    font-size: 0.6rem;
+-    font-family: var(--font-mono);
+-    color: var(--text-secondary);
+-    font-weight: 700;
+-    text-align: center;
+-    min-height: 13px;
+-    line-height: 1;
+-}
+-
+-.pc-bar-wrap {
+-    flex: 1;
+-    width: 100%;
+-    position: relative;
+-    display: flex;
+-    align-items: flex-end;
+-    min-height: 0;
+-    overflow: hidden;
+-}
+-
+-.pc-prob-bar {
+-    position: absolute;
+-    bottom: 0;
+-    left: 0;
+-    right: 0;
+-    border-radius: 3px 3px 0 0;
+-    transition: height 0.6s ease;
+-}
+-
+-.pc-amt-bar {
+-    position: absolute;
+-    bottom: 0;
+-    left: 20%;
+-    right: 20%;
+-    border-radius: 3px 3px 0 0;
+-    transition: height 0.6s ease;
+-}
+-
+-.pc-thunder {
+-    position: absolute;
+-    top: 4px;
+-    left: 50%;
+-    transform: translateX(-50%);
+-    font-size: 0.8rem;
+-    z-index: 1;
+-}
+-
+-.pc-time {
+-    position: absolute;
+-    bottom: -26px;
+-    left: 50%;
+-    transform: translateX(-50%);
+-    font-size: 0.58rem;
+-    font-family: var(--font-mono);
+-    color: var(--text-secondary);
+-    white-space: nowrap;
+-    font-weight: 700;
+-}
+-
+-.precip-legend {
+-    display: flex;
+-    justify-content: center;
+-    gap: 24px;
+-    font-size: 0.78rem;
+-    flex-shrink: 0;
+-    padding-bottom: 2px;
+-}
+-
+-.pl-rain {
+-    color: var(--accent);
+-    font-weight: 600;
+-}
+-
+-.pl-snow {
+-    color: var(--accent2);
+-    font-weight: 600;
+-}
+-
+-.pl-tstorm {
+-    color: #f59e0b;
+-    font-weight: 600;
+-}
+-
+-
+-/* ════════════════════════════════════════════════════════════════
+-   WEATHERSTAR 4000+ STYLE SLIDES
+-   Full-screen, no-padding layouts for Travel, Regional, SPC
+-   ════════════════════════════════════════════════════════════════ */
+-
+-/* Base: remove padding, become a flex column */
+-.slide.slide-no-pad {
+-    padding: 0;
+-    display: flex;
+-    flex-direction: column;
+-}
+-
+-/* ── Travel Forecast ──────────────────────────────────────────── */
+-/* ── Travel Forecast (WeatherStar 4000+ style) ────────────────── */
+-.ws4k-travel-layout {
+-    flex: 1;
+-    display: flex;
+-    flex-direction: column;
+-    overflow: hidden;
+-    background: linear-gradient(160deg, #0f1520 0%, #0a0d14 100%);
+-}
+-
+-/* Title banner */
+-.ws4k-travel-header {
+-    display: flex;
+-    align-items: center;
+-    justify-content: space-between;
+-    padding: 0 32px;
+-    height: 58px;
+-    flex-shrink: 0;
+-    background: linear-gradient(90deg, rgba(239, 68, 68, 0.18) 0%, transparent 60%);
+-    border-bottom: 2px solid rgba(239, 68, 68, 0.5);
+-}
+-
+-.ws4k-travel-day {
+-    font-family: var(--font-display);
+-    font-size: clamp(1rem, 2.2vw, 1.5rem);
+-    font-weight: 900;
+-    color: var(--text-accent);
+-    letter-spacing: 0.1em;
+-    text-transform: uppercase;
+-}
+-
+-/* Column header labels (LOW / HIGH) right-aligned over the temp columns */
+-.ws4k-col-headers {
+-    display: flex;
+-    gap: 0;
+-    flex-shrink: 0;
+-}
+-
+-.ws4k-col-headers .col-lo {
+-    font-family: var(--font-display);
+-    font-size: 0.85rem;
+-    font-weight: 800;
+-    color: #7dd3fc;   /* cool blue for lows */
+-    width: 96px;
+-    text-align: right;
+-    letter-spacing: 0.12em;
+-    text-transform: uppercase;
+-}
+-
+-.ws4k-col-headers .col-hi {
+-    font-family: var(--font-display);
+-    font-size: 0.85rem;
+-    font-weight: 800;
+-    color: #fb923c;   /* warm orange for highs */
+-    width: 96px;
+-    text-align: right;
+-    letter-spacing: 0.12em;
+-    text-transform: uppercase;
+-}
+-
+-/* Row list */
+-.ws4k-travel-rows {
+-    flex: 1;
+-    display: flex;
+-    flex-direction: column;
+-    justify-content: center;
+-    gap: 0;
+-    padding: 0;
+-}
+-
+-.ws4k-city-row {
+-    display: flex;
+-    align-items: center;
+-    gap: 0;
+-    padding: 0 32px;
+-    min-height: 0;
+-    flex: 1;
+-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+-}
+-
+-/* Alternating row tint for easy scanning */
+-.ws4k-city-row:nth-child(odd) {
+-    background: rgba(255, 255, 255, 0.03);
+-}
+-
+-.ws4k-city-row:last-child {
+-    border-bottom: none;
+-}
+-
+-.ws4k-city-name {
+-    flex: 1;
+-    font-family: var(--font-display);
+-    font-size: clamp(1.1rem, 2.8vw, 1.9rem);
+-    font-weight: 800;
+-    color: #e2e8f0;
+-    letter-spacing: 0.04em;
+-    text-transform: uppercase;
+-    white-space: nowrap;
+-    overflow: hidden;
+-    text-overflow: ellipsis;
+-    display: flex;
+-    align-items: baseline;
+-    gap: 8px;
+-}
+-
+-/* State abbreviation badge inline with city name */
+-.ws4k-city-state {
+-    font-family: var(--font-mono);
+-    font-size: 0.7em;
+-    font-weight: 700;
+-    color: rgba(255, 255, 255, 0.4);
+-    letter-spacing: 0.1em;
+-    flex-shrink: 0;
+-}
+-
+-.ws4k-city-icon {
+-    font-size: clamp(1.4rem, 3vw, 2.2rem);
+-    width: 62px;
+-    text-align: center;
+-    flex-shrink: 0;
+-    line-height: 1;
+-}
+-
+-/* Low temp — cool blue */
+-.ws4k-city-lo {
+-    font-family: var(--font-display);
+-    font-size: clamp(1.2rem, 3vw, 2.1rem);
+-    font-weight: 900;
+-    color: #7dd3fc;
+-    width: 96px;
+-    text-align: right;
+-    flex-shrink: 0;
+-    letter-spacing: -0.02em;
+-}
+-
+-/* High temp — warm orange */
+-.ws4k-city-hi {
+-    font-family: var(--font-display);
+-    font-size: clamp(1.2rem, 3vw, 2.1rem);
+-    font-weight: 900;
+-    color: #fb923c;
+-    width: 96px;
+-    text-align: right;
+-    flex-shrink: 0;
+-    letter-spacing: -0.02em;
+-}
+-
+-/* ── WS4K Footer bar (shared by travel + map slides) ─────────── */
+-.ws4k-footer-bar {
+-    font-family: var(--font-mono);
+-    font-size: clamp(0.8rem, 1.8vw, 1.05rem);
+-    font-weight: 700;
+-    color: var(--text-primary);
+-    background: var(--bg-card);
+-    border-top: 2px solid var(--accent);
+-    padding: 11px 28px;
+-    text-align: center;
+-    letter-spacing: 0.07em;
+-    flex-shrink: 0;
+-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+-}
+-
+-/* ── Regional Observation / Forecast maps ─────────────────────── */
+-.ws4k-map-container {
+-    flex: 1;
+-    min-height: 0;
+-    position: relative;
+-    background: #0d1117; /* dark fallback while CartoDB tiles load */
+-}
+-
+-/* Force Leaflet's own container background to dark so no white flash */
+-.ws4k-map-container .leaflet-container {
+-    background: #0d1117 !important;
+-}
+-
+-/* Attribution: barely visible so it doesn't clutter */
+-.ws4k-map-container .leaflet-control-attribution {
+-    font-size: 0.55rem;
+-    opacity: 0.35;
+-    background: rgba(0, 0, 0, 0.55) !important;
+-    color: #aaa !important;
+-}
+-
+-/* Map title/badge overlay */
+-.ws4k-map-title-bar {
+-    position: absolute;
+-    top: 12px;
+-    left: 16px;
+-    z-index: 500;
+-    display: flex;
+-    align-items: center;
+-    gap: 10px;
+-    pointer-events: none;
+-}
+-
+-.ws4k-map-title {
+-    font-family: var(--font-display);
+-    font-size: 1.1rem;
+-    font-weight: 700;
+-    color: var(--text-accent);
+-    text-shadow: 0 0 12px rgba(0, 0, 0, 0.9), 1px 1px 0 #000;
+-    letter-spacing: 0.05em;
+-    text-transform: uppercase;
+-}
+-
+-.ws4k-map-badge {
+-    font-family: var(--font-mono);
+-    font-size: 0.6rem;
+-    font-weight: 800;
+-    letter-spacing: 0.1em;
+-    padding: 3px 7px;
+-    border-radius: 4px;
+-    background: rgba(239, 68, 68, 0.2);
+-    color: #f87171;
+-    border: 1px solid rgba(239, 68, 68, 0.35);
+-}
+-
+-/* City markers */
+-.ws4k-marker {
+-    text-align: center;
+-    pointer-events: none;
+-    line-height: 1.15;
+-}
+-
+-.ws4k-marker-name {
+-    display: block;
+-    font-size: 0.72rem;
+-    font-weight: 700;
+-    color: #e2e8f0;
+-    background: rgba(0, 0, 0, 0.65);
+-    border-radius: 3px;
+-    padding: 1px 4px;
+-    white-space: nowrap;
+-    margin-bottom: 3px;
+-    letter-spacing: 0.02em;
+-}
+-
+-.ws4k-marker-row {
+-    display: flex;
+-    align-items: center;
+-    gap: 3px;
+-    justify-content: center;
+-}
+-
+-.ws4k-marker-temp {
+-    font-family: var(--font-display);
+-    font-size: 1.55rem;
+-    font-weight: 900;
+-    color: #fbbf24;
+-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 1), 0 0 10px rgba(0, 0, 0, 0.9);
+-    line-height: 1;
+-    letter-spacing: -0.02em;
+-}
+-
+-.ws4k-marker-icon {
+-    font-size: 1.2rem;
+-    line-height: 1;
+-    display: inline-block;
+-    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.9));
+-}
+-
+-/* ── SPC Outlook Chart ────────────────────────────────────────── */
+-.ws4k-spc-layout {
+-    flex: 1;
+-    display: flex;
+-    flex-direction: column;
+-    padding: 24px 36px 20px;
+-    gap: 20px;
+-    overflow: hidden;
+-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+-    --spc-day-col: 195px; /* width of the day-name column; keep in sync */
+-}
+-
+-/* Title row */
+-.ws4k-spc-heading {
+-    display: flex;
+-    align-items: baseline;
+-    gap: 14px;
+-    flex-shrink: 0;
+-}
+-
+-.ws4k-spc-heading-title {
+-    font-family: var(--font-display);
+-    font-size: clamp(1.1rem, 3vw, 1.8rem);
+-    font-weight: 900;
+-    color: var(--text-accent);
+-    letter-spacing: 0.06em;
+-    text-transform: uppercase;
+-}
+-
+-.ws4k-spc-heading-sub {
+-    font-family: var(--font-mono);
+-    font-size: 0.75rem;
+-    font-weight: 600;
+-    color: var(--text-secondary);
+-    letter-spacing: 0.08em;
+-    text-transform: uppercase;
+-}
+-
+-/* Scale legend row — aligns with bar tracks */
+-.ws4k-spc-scale-wrapper {
+-    display: flex;
+-    align-items: stretch;
+-    gap: 16px;
+-    flex-shrink: 0;
+-}
+-
+-.ws4k-spc-scale-spacer {
+-    width: var(--spc-day-col);
+-    flex-shrink: 0;
+-}
+-
+-.ws4k-spc-scale {
+-    flex: 1;
+-    display: flex;
+-    height: 36px;
+-    border-radius: 6px;
+-    overflow: hidden;
+-    border: 1px solid rgba(255, 255, 255, 0.18);
+-}
+-
+-.ws4k-spc-band {
+-    flex: 1;
+-    display: flex;
+-    align-items: center;
+-    justify-content: center;
+-    font-size: 0.65rem;
+-    font-weight: 800;
+-    font-family: var(--font-mono);
+-    text-transform: uppercase;
+-    letter-spacing: 0.05em;
+-    color: rgba(0, 0, 0, 0.9);
+-    border-right: 1px solid rgba(0, 0, 0, 0.25);
+-}
+-
+-.ws4k-spc-band:last-child {
+-    border-right: none;
+-}
+-
+-/* Day rows — packed together, no giant gaps */
+-.ws4k-spc-days {
+-    flex: 1;
+-    display: flex;
+-    flex-direction: column;
+-    justify-content: center;
+-    gap: 18px;
+-}
+-
+-.ws4k-spc-day-row {
+-    display: flex;
+-    align-items: center;
+-    gap: 16px;
+-}
+-
+-.ws4k-spc-day-name {
+-    font-family: var(--font-display);
+-    font-size: clamp(1.2rem, 2.6vw, 1.8rem);
+-    font-weight: 700;
+-    color: var(--text-primary);
+-    min-width: var(--spc-day-col);
+-    flex-shrink: 0;
+-    letter-spacing: 0.04em;
+-}
+-
+-.ws4k-spc-bar-track {
+-    flex: 1;
+-    height: 76px;
+-    background: var(--bg-card2);
+-    border-radius: 6px;
+-    overflow: hidden;
+-    position: relative;
+-    border: 1px solid var(--border);
+-}
+-
+-/* No gradient overlay — removed to keep chart clean */
+-.ws4k-spc-bar-track::after {
+-    display: none;
+-}
+-
+-.ws4k-spc-bar {
+-    height: 100%;
+-    display: flex;
+-    align-items: center;
+-    justify-content: center;
+-    padding: 0 16px;
+-    position: relative;
+-    z-index: 1;
+-    border-radius: 6px;
+-    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+-}
+-
+-/* Active risk bar: colored fill */
+-.ws4k-spc-bar-active {
+-    /* width set inline; background set inline */
+-}
+-
+-/* No-risk bar: full-width muted fill with centered label */
+-.ws4k-spc-bar-norisk {
+-    width: 100% !important;
+-    background: rgba(80, 87, 100, 0.35) !important;
+-    border: 1px solid rgba(120, 130, 150, 0.2);
+-}
+-
+-.ws4k-spc-bar-text {
+-    font-family: var(--font-mono);
+-    font-size: clamp(0.75rem, 1.5vw, 1rem);
+-    font-weight: 800;
+-    color: rgba(0, 0, 0, 0.9);
+-    text-transform: uppercase;
+-    letter-spacing: 0.08em;
+-    white-space: nowrap;
+-    text-shadow: none;
+-}
+-
+-.ws4k-spc-norisk-text {
+-    font-family: var(--font-mono);
+-    font-size: clamp(0.75rem, 1.5vw, 1rem);
+-    font-weight: 700;
+-    color: var(--text-secondary);
+-    text-transform: uppercase;
+-    letter-spacing: 0.12em;
+-}
+-
+ /* ── Extended Forecast: trend badge ──────────────────────────── */
+ .extended-trend-badge {
+     grid-column: 1 / -1;
+@@ -3316,276 +1675,3 @@ body.kiosk-mode #pwa-guide-modal {
+     font-weight: 500;
+ }
+ 
+-/* ════════════════════════════════════════════════════════════════
+-   RESPONSIVE
+-   ════════════════════════════════════════════════════════════════ */
+-@media (max-width: 768px) {
+-    .conditions-layout {
+-        grid-template-columns: 1fr;
+-    }
+-
+-    .conditions-left {
+-        padding: 20px 0 10px;
+-    }
+-
+-    .big-temp {
+-        font-size: 3rem;
+-    }
+-
+-    .almanac-layout {
+-        grid-template-columns: repeat(2, 1fr);
+-    }
+-
+-    .ch-grid {
+-        grid-template-columns: 1fr 1fr;
+-    }
+-
+-    .ch-avg-card-full {
+-        grid-column: span 1;
+-    }
+-
+-    .aqi-layout {
+-        grid-template-columns: 1fr;
+-    }
+-
+-    /* Observations: keep auto-fill grid, just tighter on medium mobile */
+-    .obs-section-grid {
+-        grid-template-columns: repeat(2, 1fr);
+-    }
+-
+-    /* Allow obs labels to wrap so text isn't cut off */
+-    .obs-label {
+-        white-space: normal;
+-        overflow: visible;
+-        text-overflow: clip;
+-    }
+-
+-    /* Precip chart: more breathing room & tighter bar gaps */
+-    .precip-chart-wrap {
+-        min-height: 280px;
+-    }
+-
+-    .precip-chart {
+-        padding: 10px 6px 4px;
+-    }
+-
+-    .pc-bars {
+-        gap: 2px;
+-        /* Extra bottom padding so rotated labels have room */
+-        padding-bottom: 46px;
+-    }
+-
+-    /* Rotate time labels to prevent overlap on mobile */
+-    .pc-time {
+-        bottom: -40px;
+-        font-size: 0.5rem;
+-        transform: translateX(-50%) rotate(-45deg);
+-        transform-origin: top center;
+-        white-space: nowrap;
+-    }
+-
+-    /* Smaller probability label text */
+-    .pc-prob-label {
+-        font-size: 0.52rem;
+-    }
+-
+-    .slide {
+-        padding: 16px;
+-    }
+-
+-    .mc-track-info {
+-        max-width: 120px;
+-    }
+-
+-    .clock-time {
+-        font-size: 1rem;
+-    }
+-
+-    .location-display {
+-        font-size: 0.75rem;
+-    }
+-
+-    .top-bar {
+-        padding: 8px 12px;
+-    }
+-
+-    /* ── Travel Forecast: tighten for tablet/large phone ──────────── */
+-    .ws4k-travel-header {
+-        padding: 0 16px;
+-        height: 48px;
+-    }
+-
+-    .ws4k-city-row {
+-        padding: 0 16px;
+-    }
+-
+-    .ws4k-city-lo,
+-    .ws4k-city-hi {
+-        width: 70px;
+-    }
+-
+-    .ws4k-col-headers .col-lo,
+-    .ws4k-col-headers .col-hi {
+-        width: 70px;
+-    }
+-
+-    .ws4k-city-icon {
+-        width: 44px;
+-    }
+-
+-    .ws4k-footer-bar {
+-        padding: 8px 16px;
+-    }
+-
+-    /* ── SPC Outlook: shrink day-name column so bars have room ──────── */
+-    .ws4k-spc-layout {
+-        --spc-day-col: 120px;
+-        padding: 16px 20px;
+-        gap: 14px;
+-    }
+-
+-    .ws4k-spc-bar-track {
+-        height: 60px;
+-    }
+-
+-    .ws4k-spc-days {
+-        gap: 12px;
+-    }
+-
+-    /* ── Regional map: smaller markers so they don't crowd the map ───── */
+-    .ws4k-marker-temp {
+-        font-size: 1.2rem;
+-    }
+-
+-    .ws4k-marker-icon {
+-        font-size: 1rem;
+-    }
+-
+-    .ws4k-marker-name {
+-        font-size: 0.65rem;
+-    }
+-}
+-
+-@media (max-width: 480px) {
+-    .almanac-layout {
+-        grid-template-columns: 1fr;
+-    }
+-
+-    .ch-grid {
+-        grid-template-columns: 1fr;
+-    }
+-
+-    .ch-avg-card-full {
+-        grid-column: span 1;
+-    }
+-
+-    .extended-container {
+-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+-    }
+-
+-    /* On very small screens, single-column observations for max readability */
+-    .obs-section-grid {
+-        grid-template-columns: 1fr;
+-    }
+-
+-    /* Make obs cards more compact in single-column layout */
+-    .obs-card {
+-        padding: 8px 12px;
+-    }
+-
+-    .obs-icon {
+-        font-size: 1.2rem;
+-    }
+-
+-    /* Hide every other time label on very narrow screens to prevent overlap */
+-    .pc-col:nth-child(even) .pc-time {
+-        display: none;
+-    }
+-
+-    /* Slide title smaller on phone */
+-    .slide-title {
+-        font-size: 1.1rem;
+-    }
+-
+-    /* ── Travel Forecast: compact for small phones ─────────────────── */
+-    .ws4k-travel-header {
+-        padding: 0 12px;
+-        height: 42px;
+-    }
+-
+-    .ws4k-travel-day {
+-        font-size: 0.9rem;
+-    }
+-
+-    .ws4k-city-row {
+-        padding: 0 12px;
+-    }
+-
+-    .ws4k-city-lo,
+-    .ws4k-city-hi {
+-        width: 54px;
+-        font-size: 1.1rem;
+-    }
+-
+-    .ws4k-col-headers .col-lo,
+-    .ws4k-col-headers .col-hi {
+-        width: 54px;
+-        font-size: 0.72rem;
+-    }
+-
+-    .ws4k-city-icon {
+-        width: 36px;
+-        font-size: 1.3rem;
+-    }
+-
+-    .ws4k-city-name {
+-        font-size: 1rem;
+-    }
+-
+-    /* ── SPC Outlook: minimal layout for phones ─────────────────────── */
+-    .ws4k-spc-layout {
+-        --spc-day-col: 88px;
+-        padding: 12px 14px;
+-        gap: 10px;
+-    }
+-
+-    /* Hide scale legend — too cramped on phone */
+-    .ws4k-spc-scale-wrapper {
+-        display: none;
+-    }
+-
+-    .ws4k-spc-bar-track {
+-        height: 52px;
+-    }
+-
+-    .ws4k-spc-days {
+-        gap: 8px;
+-    }
+-
+-    .ws4k-spc-day-name {
+-        font-size: 1rem;
+-    }
+-
+-    .ws4k-spc-norisk-text {
+-        font-size: 0.7rem;
+-    }
+-
+-    /* ── Regional map: tightest marker sizes ─────────────────────────── */
+-    .ws4k-marker-temp {
+-        font-size: 1rem;
+-    }
+-
+-    .ws4k-marker-icon {
+-        font-size: 0.9rem;
+-    }
+-
+-    .ws4k-marker-name {
+-        font-size: 0.58rem;
+-        padding: 0 2px;
+-    }
+-
+-    .ws4k-footer-bar {
+-        padding: 7px 12px;
+-        font-size: 0.72rem;
+-    }
+-}
+\ No newline at end of file
+diff --git a/functions/api/[[route]].js b/functions/api/[[route]].js
+index 319fbb7..a9b49e7 100644
+--- a/functions/api/[[route]].js
++++ b/functions/api/[[route]].js
+@@ -29,26 +29,6 @@ const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
+ const KV_ARMAGEDDON_KEY = 'armageddon';
+ const KV_MSG_SEQ_KEY = 'msg_next_id'; // persistent counter — never resets on message delete
+ const KV_ACKS_KEY = 'msg_acks'; // { [msgId]: [visitorId, ...] }
+-
+-// ── Helpers ────────────────────────────────────────────────────────
+-async function getMessages(env) {
+-    return (await env.WEATHERNOW_KV.get(KV_MESSAGES_KEY, 'json')) ?? [];
+-}
+-async function saveMessages(env, msgs) {
+-    await env.WEATHERNOW_KV.put(KV_MESSAGES_KEY, JSON.stringify(msgs));
+-}
+-async function getSubscriptions(env) {
+-    return (await env.WEATHERNOW_KV.get(KV_SUBSCRIPTIONS_KEY, 'json')) ?? [];
+-}
+-async function saveSubscriptions(env, subs) {
+-    await env.WEATHERNOW_KV.put(KV_SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+-}
+-async function getReleaseNotes(env) {
+-    return (await env.WEATHERNOW_KV.get(KV_RELEASE_NOTES_KEY, 'json')) ?? [];
+-}
+-async function saveReleaseNotes(env, notes) {
+-    await env.WEATHERNOW_KV.put(KV_RELEASE_NOTES_KEY, JSON.stringify(notes));
+-}
+ async function getCustomForecasts(env) {
+     const stored = await env.WEATHERNOW_KV.get(KV_CUSTOM_FORECAST_KEY, 'json');
+     // Migrate legacy single-object storage to array format
+@@ -77,290 +57,7 @@ async function saveArmageddonState(env, state) {
+     } else {
+         await env.WEATHERNOW_KV.put(KV_ARMAGEDDON_KEY, JSON.stringify(state));
+     }
+-}
+-
+-function checkAuth(request, env) {
+-    const pw = request.headers.get('x-admin-password') ?? '';
+-    return pw === (env.ADMIN_PASSWORD ?? 'weathernow');
+-}
+-
+-function json(data, status = 200) {
+-    return new Response(JSON.stringify(data), { status, headers: CORS });
+-}
+-
+-// ── VAPID / Web Push (Web Crypto — no npm needed) ──────────────────
+-
+-function base64UrlToUint8Array(base64Url) {
+-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+-    const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+-    const binary = atob(padded);
+-    return Uint8Array.from(binary, c => c.charCodeAt(0));
+-}
+-
+-function uint8ArrayToBase64Url(uint8Array) {
+-    let binary = '';
+-    uint8Array.forEach(b => binary += String.fromCharCode(b));
+-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+-}
+-
+-async function signVapidJwt(audience, privateKeyB64Url, email) {
+-    const now = Math.floor(Date.now() / 1000);
+-    const header = { typ: 'JWT', alg: 'ES256' };
+-    const payload = { aud: audience, exp: now + 12 * 3600, sub: email };
+-
+-    const encode = obj => uint8ArrayToBase64Url(
+-        new TextEncoder().encode(JSON.stringify(obj))
+-    );
+-    const headerPayload = `${encode(header)}.${encode(payload)}`;
+-
+-    const keyBytes = base64UrlToUint8Array(privateKeyB64Url);
+-    const cryptoKey = await crypto.subtle.importKey(
+-        'pkcs8', keyBytes,
+-        { name: 'ECDSA', namedCurve: 'P-256' },
+-        false, ['sign']
+-    );
+-    const sig = await crypto.subtle.sign(
+-        { name: 'ECDSA', hash: 'SHA-256' },
+-        cryptoKey,
+-        new TextEncoder().encode(headerPayload)
+-    );
+-    return `${headerPayload}.${uint8ArrayToBase64Url(new Uint8Array(sig))}`;
+-}
+-
+-async function sendPushMessage(sub, payload, env) {
+-    const vapidPublic = env.VAPID_PUBLIC_KEY;
+-    const vapidPrivate = env.VAPID_PRIVATE_KEY;
+-    const vapidEmail = env.VAPID_EMAIL || 'mailto:admin@shelly.local';
+-
+-    if (!vapidPublic || !vapidPrivate) throw new Error('VAPID keys not configured');
+-
+-    const endpoint = new URL(sub.endpoint);
+-    const audience = `${endpoint.protocol}//${endpoint.host}`;
+-    const jwt = await signVapidJwt(audience, vapidPrivate, vapidEmail);
+-
+-    const response = await fetch(sub.endpoint, {
+-        method: 'POST',
+-        headers: {
+-            'Content-Type': 'application/octet-stream',
+-            'Authorization': `vapid t=${jwt},k=${vapidPublic}`,
+-            'TTL': '86400',
+-        },
+-        body: typeof payload === 'string' ? new TextEncoder().encode(payload) : payload,
+-    });
+-    return response;
+-}
+-
+-async function fanOutPush(subs, payload, env) {
+-    let sent = 0, failed = 0;
+-    const stale = [];
+-    await Promise.all(subs.map(async sub => {
+-        try {
+-            const res = await sendPushMessage(sub, payload, env);
+-            if (res.status === 410 || res.status === 404) {
+-                stale.push(sub.endpoint);
+-                failed++;
+-            } else {
+-                sent++;
+-            }
+-        } catch { failed++; }
+-    }));
+-    const alive = subs.filter(s => !stale.includes(s.endpoint));
+-    if (stale.length) await saveSubscriptions(env, alive);
+-    return { sent, failed, total: alive.length };
+-}
+-
+-// ── Main handler ───────────────────────────────────────────────────
+-export async function onRequest({ request, env }) {
+-    const url = new URL(request.url);
+-    const path = url.pathname;
+-    const { method } = request;
+-
+-    if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+-
+-    // ── Health ──────────────────────────────────────────────────
+-    if (path === '/api/health' && method === 'GET') {
+-        const subs = await getSubscriptions(env);
+-        return json({ ok: true, pushSubscribers: subs.length });
+-    }
+-
+-    // ── Messages ────────────────────────────────────────────────
+-    if (path === '/api/messages' && method === 'GET') {
+-        const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
+-        const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
+-        return json(msgs.filter(m => m.id > since).map(m => ({
+-            ...m,
+-            ackCount: (acks[m.id] ?? []).length,
+-        })));
+-    }
+-
+-    // ── Poll (combined messages + armageddon in one request) ────
+-    if (path === '/api/poll' && method === 'GET') {
+-        const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
+-        const [msgs, armageddon] = await Promise.all([getMessages(env), getArmageddonState(env)]);
+-        let armState = armageddon;
+-        if (armState?.expiresAt && Date.now() > armState.expiresAt) {
+-            await saveArmageddonState(env, null);
+-            armState = null;
+-        }
+-        return json({
+-            messages: msgs.filter(m => m.id > since),
+-            armageddon: armState ? { active: true, ...armState } : { active: false },
+-        });
+-    }
+-
+-    if (path === '/api/verify' && method === 'GET') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        return json({ ok: true });
+-    }
+-
+-    if (path === '/api/announce' && method === 'POST') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const { text = '', title = '', type = 'info', display = 'banner',
+-            duration = 0, tts = false, push = false, targeting = { mode: 'all' } } = await request.json();
+-        if (!text.trim()) return json({ error: 'text is required' }, 400);
+-
+-        const msgs = await getMessages(env);
+-        // Use a persistent KV counter so IDs never recycle when messages are deleted.
+-        // Fall back to max(existing)+1 for legacy deployments where the counter is absent.
+-        const stored = parseInt(await env.WEATHERNOW_KV.get(KV_MSG_SEQ_KEY) || '0', 10);
+-        const maxExisting = msgs.length ? Math.max(...msgs.map(m => m.id)) : 0;
+-        const nextId = Math.max(stored, maxExisting) + 1;
+-        await env.WEATHERNOW_KV.put(KV_MSG_SEQ_KEY, String(nextId));
+-        const msg = { id: nextId, text: text.trim(), title: title.trim(), type, display, duration, tts: !!tts, push: !!push, targeting, created: Date.now() };
+-        msgs.push(msg);
+-        await saveMessages(env, msgs);
+-
+-        // Fan-out push if requested
+-        if (push) {
+-            const subs = await getSubscriptions(env);
+-            if (subs.length > 0) {
+-                const payload = JSON.stringify({
+-                    title: title.trim() || `S.H.E.L.L.Y. ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+-                    body: text.trim(), type, tag: `announce-${nextId}`, url: '/'
+-                });
+-                await fanOutPush(subs, payload, env);
+-            }
+-        }
+-
+-        return json(msg, 201);
+-    }
+-
+-    const oneMatch = path.match(/^\/api\/messages\/(\d+)$/);
+-    if (oneMatch && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const id = parseInt(oneMatch[1]);
+-        const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
+-        await saveMessages(env, msgs.filter(m => m.id !== id));
+-        delete acks[id];
+-        await saveAcks(env, acks);
+-        return json({ ok: true });
+-    }
+-
+-    if (path === '/api/messages' && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        await Promise.all([saveMessages(env, []), saveAcks(env, {})]);
+-        return json({ ok: true });
+-    }
+-
+-    // ── Acknowledge ──────────────────────────────────────────────
+-    // Public – no admin auth required. Body: { visitorId: string }
+-    const ackMatch = path.match(/^\/api\/messages\/(\d+)\/acknowledge$/);
+-    if (ackMatch && method === 'POST') {
+-        const id = parseInt(ackMatch[1]);
+-        let body;
+-        try { body = await request.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }
+-        const { visitorId } = body;
+-        if (!visitorId || typeof visitorId !== 'string' || visitorId.length > 128 || !/^[\w\-]+$/.test(visitorId)) {
+-            return json({ error: 'visitorId must be alphanumeric with optional hyphens, max 128 characters' }, 400);
+-        }
+-        const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
+-        if (!msgs.find(m => m.id === id)) return json({ error: 'not found' }, 404);
+-        if (!Array.isArray(acks[id])) acks[id] = [];
+-        if (!acks[id].includes(visitorId)) acks[id].push(visitorId);
+-        await saveAcks(env, acks);
+-        return json({ ok: true, ackCount: acks[id].length });
+-    }
+-
+-    // ── Push ────────────────────────────────────────────────────
+-    if (path === '/api/push/vapid-key' && method === 'GET') {
+-        const key = env.VAPID_PUBLIC_KEY;
+-        if (!key) return json({ error: 'VAPID keys not configured. See README.' }, 503);
+-        return json({ publicKey: key });
+-    }
+-
+-    if (path === '/api/push/count' && method === 'GET') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const subs = await getSubscriptions(env);
+-        return json({ count: subs.length });
+-    }
+-
+-    if (path === '/api/push/subscribe' && method === 'POST') {
+-        const sub = await request.json();
+-        if (!sub?.endpoint) return json({ error: 'invalid subscription' }, 400);
+-        const subs = await getSubscriptions(env);
+-        const idx = subs.findIndex(s => s.endpoint === sub.endpoint);
+-        if (idx >= 0) subs[idx] = sub; else subs.push(sub);
+-        await saveSubscriptions(env, subs);
+-        return json({ ok: true, total: subs.length });
+-    }
+-
+-    if (path === '/api/push/subscribe' && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const { endpoint } = await request.json();
+-        if (!endpoint) return json({ error: 'endpoint required' }, 400);
+-        const subs = await getSubscriptions(env);
+-        await saveSubscriptions(env, subs.filter(s => s.endpoint !== endpoint));
+-        return json({ ok: true });
+-    }
+-
+-    if (path === '/api/push/send' && method === 'POST') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const { title = 'S.H.E.L.L.Y. Test', body = 'Push notifications are working! 🌤', type = 'info' } = await request.json();
+-        const subs = await getSubscriptions(env);
+-        const payload = JSON.stringify({ title, body, type, tag: 'test-push', url: '/' });
+-        const results = await fanOutPush(subs, payload, env);
+-        return json(results);
+-    }
+-
+-    // ── Release Notes ────────────────────────────────────────────
+-    if (path === '/api/release-notes' && method === 'GET') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        return json(await getReleaseNotes(env));
+-    }
+-
+-    if (path === '/api/release-notes' && method === 'POST') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const { version = '', notes = '' } = await request.json();
+-        if (!notes.trim()) return json({ error: 'notes is required' }, 400);
+-        const existing = await getReleaseNotes(env);
+-        const nextId = existing.length ? Math.max(...existing.map(n => n.id)) + 1 : 1;
+-        const note = { id: nextId, version: version.trim(), notes: notes.trim(), created: Date.now() };
+-        await saveReleaseNotes(env, [note, ...existing]);
+-        return json(note, 201);
+-    }
+-
+-    const releaseNoteMatch = path.match(/^\/api\/release-notes\/(\d+)$/);
+-    if (releaseNoteMatch && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        const id = parseInt(releaseNoteMatch[1]);
+-        const existing = await getReleaseNotes(env);
+-        await saveReleaseNotes(env, existing.filter(n => n.id !== id));
+-        return json({ ok: true });
+-    }
+-
+-    if (path === '/api/release-notes' && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+-        await saveReleaseNotes(env, []);
+-        return json({ ok: true });
+-    }
+-
+-    // ── Custom Forecast ──────────────────────────────────────────
+-    if (path === '/api/custom-forecast' && method === 'GET') {
+         return json(await getCustomForecasts(env));
+-    }
+-
+-    if (path === '/api/custom-forecast' && method === 'POST') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+         const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = await request.json();
+         const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+         if (!periods.length) return json({ error: 'periods required' }, 400);
+@@ -387,10 +84,6 @@ export async function onRequest({ request, env }) {
+         if (updated.length === forecasts.length) return json({ error: 'not found' }, 404);
+         await saveCustomForecasts(env, updated);
+         return json({ ok: true });
+-    }
+-
+-    if (path === '/api/custom-forecast' && method === 'DELETE') {
+-        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+         await saveCustomForecasts(env, []);
+         return json({ ok: true });
+     }
+@@ -425,42 +118,3 @@ export async function onRequest({ request, env }) {
+     if (path === '/api/armageddon' && method === 'DELETE') {
+         if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+         await saveArmageddonState(env, null);
+-        return json({ ok: true });
+-    }
+-
+-    // ── SPC Outlook Proxy ────────────────────────────────────────
+-    // Proxies NOAA SPC categorical outlook GeoJSON to avoid browser CORS restrictions.
+-    if (path === '/api/spc-outlook' && method === 'GET') {
+-        const day = url.searchParams.get('day') || '1';
+-        const validFiles = {
+-            '1': 'day1otlk_cat.nolyr.geojson',
+-            '2': 'day2otlk_cat.nolyr.geojson',
+-            '3': 'day3otlk_cat.nolyr.geojson',
+-        };
+-        const file = validFiles[day];
+-        if (!file) return json({ error: 'Invalid day parameter. Use 1, 2, or 3.' }, 400);
+-
+-        const spcUrl = `https://www.spc.noaa.gov/products/outlook/${file}`;
+-        try {
+-            const upstream = await fetch(spcUrl, {
+-                headers: { 'User-Agent': 'S.H.E.L.L.Y.-WeatherClient/1.0 (weather display)' },
+-                signal: AbortSignal.timeout(10000),
+-            });
+-            if (!upstream.ok) {
+-                return json({ error: `SPC returned ${upstream.status}` }, 502);
+-            }
+-            const data = await upstream.json();
+-            return new Response(JSON.stringify(data), {
+-                status: 200,
+-                headers: {
+-                    ...CORS,
+-                    'Cache-Control': 'public, max-age=900',
+-                },
+-            });
+-        } catch (err) {
+-            return json({ error: 'Failed to fetch SPC outlook data' }, 502);
+-        }
+-    }
+-
+-    return json({ error: 'Not found' }, 404);
+-}
+diff --git a/index.html b/index.html
+index 40c5d56..e164947 100644
+--- a/index.html
++++ b/index.html
+@@ -479,109 +479,4 @@
+                     <span class="slide-badge" style="background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)">CUSTOM</span>
+                 </div>
+                 <div id="customforecast-container" class="cf-container"></div>
+-                <div id="customforecast-updated" style="text-align:center;font-size:0.65rem;color:var(--text-secondary);margin-top:8px;padding-bottom:4px"></div>
+-            </div>
+-
+-            <!-- Travel Forecast -->
+-            <div class="slide hidden slide-no-pad" id="slide-travel" data-display="travel">
+-                <div class="ws4k-travel-layout">
+-                    <div class="ws4k-travel-header">
+-                        <span id="travel-day-label" class="ws4k-travel-day">Travel Forecast</span>
+-                        <div class="ws4k-col-headers">
+-                            <span class="col-lo">LOW</span>
+-                            <span class="col-hi">HIGH</span>
+-                        </div>
+-                    </div>
+-                    <div id="travel-rows" class="ws4k-travel-rows"></div>
+-                    <div id="travel-footer" class="ws4k-footer-bar">Humidity: &#8212;&nbsp;&nbsp;&nbsp;Dewpoint: &#8212;</div>
+-                </div>
+-            </div>
+-
+-            <!-- Regional Observations -->
+-            <div class="slide hidden slide-no-pad" id="slide-regional-obs" data-display="regionalobs">
+-                <div id="regional-obs-map" class="ws4k-map-container">
+-                    <div class="ws4k-map-title-bar">
+-                        <span class="ws4k-map-title">Regional Observations</span>
+-                        <span class="ws4k-map-badge">LIVE</span>
+-                    </div>
+-                </div>
+-                <div id="regional-obs-footer" class="ws4k-footer-bar">Temp: &#8212;&nbsp;&nbsp;&nbsp;Wind Chill: &#8212;</div>
+-            </div>
+-
+-            <!-- Regional Forecast -->
+-            <div class="slide hidden slide-no-pad" id="slide-regional-fcst" data-display="regionalfcst">
+-                <div id="regional-fcst-map" class="ws4k-map-container">
+-                    <div class="ws4k-map-title-bar">
+-                        <span id="regional-fcst-map-title" class="ws4k-map-title">Regional Forecast</span>
+-                        <span class="ws4k-map-badge" style="background:rgba(59,130,246,.18);color:#60a5fa;border-color:rgba(59,130,246,.35)">NWS</span>
+-                    </div>
+-                </div>
+-                <div id="regional-fcst-footer" class="ws4k-footer-bar">Temp: &#8212;&nbsp;&nbsp;&nbsp;Wind Chill: &#8212;</div>
+-            </div>
+-
+-            <!-- SPC Outlook -->
+-            <div class="slide hidden slide-no-pad" id="slide-spc" data-display="spc">
+-                <div id="spc-chart" class="ws4k-spc-layout"></div>
+-            </div>
+-
+-        </div><!-- /slide-viewport -->
+-
+-        <!-- PROGRESS BAR -->
+-        <div class="progress-bar-container" id="progress-bar-container">
+-            <div id="slide-progress" class="slide-progress"></div>
+-            <div id="slide-dots" class="slide-dots"></div>
+-        </div>
+-
+-        <!-- BOTTOM TICKER BAR -->
+-        <footer class="bottom-bar" id="bottom-bar">
+-            <div class="ticker-left">
+-                <span id="ticker-label" class="ticker-label">CONDITIONS</span>
+-                <div class="ticker-scroll-container">
+-                    <div id="ticker-text" class="ticker-text">Loading weather data...</div>
+-                </div>
+-            </div>
+-            <div class="music-controls" id="music-controls">
+-                <button id="mc-prev" class="mc-btn" title="Previous">⏮</button>
+-                <button id="mc-play" class="mc-btn" title="Play/Pause">▶</button>
+-                <button id="mc-next" class="mc-btn" title="Next">⏭</button>
+-                <div class="mc-track-info">
+-                    <div id="mc-track-name" class="mc-track-name">No music loaded</div>
+-                    <div id="mc-progress-bar" class="mc-progress-bar">
+-                        <div id="mc-progress-fill" class="mc-progress-fill"></div>
+-                    </div>
+-                </div>
+-                <button id="mc-mute" class="mc-btn" title="Mute">🔊</button>
+-            </div>
+-        </footer>
+-
+-        <!-- NAV CONTROLS (shown on hover in kiosk, always visible otherwise) -->
+-        <div class="slide-nav" id="slide-nav">
+-            <button id="nav-prev" class="nav-btn" title="Previous slide">‹</button>
+-            <button id="nav-pause" class="nav-btn" title="Pause/Resume">⏸</button>
+-            <button id="nav-next" class="nav-btn" title="Next slide">›</button>
+-            <button id="nav-refresh" class="nav-btn" title="Refresh data">↺</button>
+-            <button id="nav-fullscreen" class="nav-btn" title="Fullscreen">⛶</button>
+-        </div>
+-
+-    </main>
+-
+-    <!-- Hidden audio element for music -->
+-    <audio id="bg-audio" preload="auto"></audio>
+-
+-    <!-- Scripts -->
+-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.3.3/dist/purify.min.js"></script>
+-    <script src="js/cities.js"></script>
+-    <script src="js/settings.js"></script>
+-    <script src="js/music.js"></script>
+-    <script src="js/weather.js"></script>
+-    <script src="js/alerts.js"></script>
+-    <script src="js/radar.js"></script>
+-    <script src="js/displays.js"></script>
+-    <script src="js/app.js"></script>
+-    <script src="js/announcements.js"></script>
+-    <script src="js/pwa.js"></script>
+-</body>
+-
+-</html>
+\ No newline at end of file
+diff --git a/js/app.js b/js/app.js
+index 24ea63d..9674c1f 100644
+--- a/js/app.js
++++ b/js/app.js
+@@ -254,412 +254,3 @@
+             const forecasts = WeatherAPI.getData()?.customForecasts || [];
+             const matching = forecasts.filter(cf => cf?.periods?.length && isInForecastArea(cf.targeting));
+             if (!matching.length) {
+-                setTimeout(() => goToSlide((idx + 1) % slideIds.length), 50);
+-                return;
+-            }
+-        }
+-
+-        // Radar: notify Leaflet the container is now visible
+-        if (target.display === 'radar' && typeof RadarMap !== 'undefined') {
+-            setTimeout(() => RadarMap.onSlideVisible(), 100);
+-        }
+-
+-        // Regional map slides: initialise / refresh Leaflet when container becomes visible
+-        if (target.display === 'regionalobs' && typeof Displays !== 'undefined') {
+-            setTimeout(() => Displays.onRegionalObsVisible(), 80);
+-        }
+-        if (target.display === 'regionalfcst' && typeof Displays !== 'undefined') {
+-            setTimeout(() => Displays.onRegionalFcstVisible(), 80);
+-        }
+-    }
+-
+-    function goToSlide(idx) {
+-        clearCycleTimer();
+-        if (idx < 0) idx = slideIds.length - 1;
+-        if (idx >= slideIds.length) idx = 0;
+-        showSlide(idx);
+-        if (!isPaused) startCycleTimer();
+-    }
+-
+-    function nextSlide() {
+-        goToSlide((currentSlide + 1) % slideIds.length);
+-    }
+-
+-    function prevSlide() {
+-        goToSlide((currentSlide - 1 + slideIds.length) % slideIds.length);
+-    }
+-
+-    // ── Progress bar ───────────────────────────────────────────────
+-    function startProgressBar(duration) {
+-        if (!progressFill) return;
+-        progressFill.style.transition = 'none';
+-        progressFill.style.width = '0%';
+-        progressStart = performance.now();
+-        progressDuration = duration;
+-        requestAnimationFrame(updateProgressBar);
+-    }
+-
+-    function updateProgressBar(now) {
+-        if (isPaused || !progressFill) return;
+-        const elapsed = now - progressStart;
+-        const pct = Math.min((elapsed / progressDuration) * 100, 100);
+-        progressFill.style.width = pct + '%';
+-        if (pct < 100) requestAnimationFrame(ts => updateProgressBar(ts));
+-    }
+-
+-    // ── Cycle timer ────────────────────────────────────────────────
+-    function startCycleTimer() {
+-        clearCycleTimer();
+-        startProgressBar(slideInterval);
+-        cycleTimer = setTimeout(() => {
+-            nextSlide();
+-        }, slideInterval);
+-    }
+-
+-    function clearCycleTimer() {
+-        clearTimeout(cycleTimer);
+-        cycleTimer = null;
+-    }
+-
+-    function pauseCycle() {
+-        isPaused = true;
+-        clearCycleTimer();
+-        if (navPause) navPause.textContent = '▶';
+-    }
+-
+-    function resumeCycle() {
+-        isPaused = false;
+-        if (navPause) navPause.textContent = '⏸';
+-        startCycleTimer();
+-    }
+-
+-    // ── Weather data fetch & render ────────────────────────────────
+-    async function fetchAndRender(showLoading = false) {
+-        if (showLoading) showLoadingSlide();
+-
+-        try {
+-            const { weather, alerts } = await WeatherAPI.fetchAll();
+-            const loc = WeatherAPI.getLocation();
+-
+-            hideLoadingSlide();
+-
+-            // Build/rebuild slide list
+-            buildSlideList();
+-
+-            // Filter custom forecasts to only those that match viewer's location
+-            if (weather.customForecasts) {
+-                weather.customForecasts = weather.customForecasts.filter(cf => isInForecastArea(cf.targeting));
+-            }
+-
+-            // Render all displays
+-            Displays.renderAll(
+-                weather, alerts,
+-                loc.lat, loc.lon,
+-                alert => AlertsManager.announceOne(alert, MusicPlayer.duck, MusicPlayer.unduck)
+-            );
+-
+-            // Show/hide alert banner
+-            AlertsManager.showBanner(alerts);
+-
+-            // Announce new alerts with TTS
+-            AlertsManager.announceNew(
+-                alerts,
+-                MusicPlayer.duck,
+-                MusicPlayer.unduck
+-            );
+-
+-            // Update location display
+-            if (locationDisplay) locationDisplay.textContent = loc.label;
+-
+-            // Start at first slide if coming from loading
+-            if (showLoading) {
+-                currentSlide = 0;
+-                showSlide(0);
+-                startCycleTimer();
+-            }
+-
+-        } catch (err) {
+-            console.error('Weather fetch error:', err);
+-            if (locationStatus) locationStatus.textContent = '⚠ Failed to load weather data.';
+-            hideLoadingSlide();
+-        }
+-    }
+-
+-    function showLoadingSlide() {
+-        clearCycleTimer();
+-        document.querySelectorAll('.slide.active').forEach(s => {
+-            s.classList.remove('active');
+-            s.classList.add('hidden');
+-        });
+-        if (loadingSlide) {
+-            loadingSlide.classList.remove('hidden');
+-            loadingSlide.style.opacity = '1';
+-            loadingSlide.style.transform = 'none';
+-        }
+-    }
+-
+-    function hideLoadingSlide() {
+-        if (loadingSlide) {
+-            loadingSlide.style.transition = 'opacity 0.3s';
+-            loadingSlide.style.opacity = '0';
+-            setTimeout(() => {
+-                loadingSlide.classList.add('hidden');
+-                loadingSlide.style.opacity = '';
+-                loadingSlide.style.transition = '';
+-            }, 300);
+-        }
+-    }
+-
+-    // ── Location handling ──────────────────────────────────────────
+-    async function setLocation(query) {
+-        if (!query.trim()) return;
+-        if (locationStatus) locationStatus.textContent = '🔍 Searching...';
+-        try {
+-            await WeatherAPI.loadLocation(query);
+-            locationSet = true;
+-            if (locationStatus) locationStatus.textContent = `✓ Set to: ${WeatherAPI.getLocation().label}`;
+-            fetchAndRender(true);
+-        } catch (err) {
+-            if (locationStatus) locationStatus.textContent = '⚠ Location not found. Try "City, State" format.';
+-        }
+-    }
+-
+-    async function setLocationGPS() {
+-        if (locationStatus) locationStatus.textContent = '📡 Getting GPS location...';
+-        try {
+-            await WeatherAPI.loadGPS();
+-            locationSet = true;
+-            if (locationStatus) locationStatus.textContent = `✓ Set to: ${WeatherAPI.getLocation().label}`;
+-            fetchAndRender(true);
+-        } catch {
+-            if (locationStatus) locationStatus.textContent = '⚠ GPS unavailable. Enter location manually.';
+-        }
+-    }
+-
+-    // ── Bind all event handlers ────────────────────────────────────
+-    function bindControls() {
+-        // Location
+-        locationGo?.addEventListener('click', () => setLocation(locationInput.value));
+-        locationInput?.addEventListener('keydown', e => { if (e.key === 'Enter') setLocation(locationInput.value); });
+-        locationGPS?.addEventListener('click', setLocationGPS);
+-
+-        // Nav controls
+-        navPrev?.addEventListener('click', () => { prevSlide(); });
+-        navNext?.addEventListener('click', () => { nextSlide(); });
+-        navPause?.addEventListener('click', () => {
+-            if (isPaused) resumeCycle(); else pauseCycle();
+-        });
+-        navRefresh?.addEventListener('click', () => {
+-            if (locationSet) fetchAndRender(false);
+-        });
+-
+-        // Settings callbacks
+-        Settings.bindDisplayToggles(() => {
+-            buildSlideList();
+-            if (currentSlide >= slideIds.length) currentSlide = 0;
+-            showSlide(currentSlide);
+-        });
+-
+-        // Permalink
+-        const btnCopy = document.getElementById('btn-copy-permalink');
+-        btnCopy?.addEventListener('click', async () => {
+-            const status = document.getElementById('permalink-status');
+-            try {
+-                const state = Settings.getState();
+-                const loc = { query: locationInput?.value || WeatherAPI.getLocation().label };
+-                const checkKiosk = document.getElementById('permalink-kiosk-toggle');
+-                const isKiosk = checkKiosk ? checkKiosk.checked : false;
+-
+-                const payload = { s: state, l: loc, k: isKiosk };
+-                const encoded = btoa(JSON.stringify(payload));
+-
+-                const url = new URL(window.location.href);
+-                url.searchParams.set('s', encoded);
+-
+-                await navigator.clipboard.writeText(url.toString());
+-
+-                if (status) {
+-                    status.textContent = '✓ Copied to clipboard!';
+-                    status.style.color = '#4ade80';
+-                    setTimeout(() => { if (status.textContent === '✓ Copied to clipboard!') status.textContent = ''; }, 3000);
+-                }
+-            } catch (err) {
+-                console.error('Failed to copy permalink', err);
+-                if (status) {
+-                    status.textContent = '❌ Failed to copy';
+-                    status.style.color = '#f87171';
+-                    setTimeout(() => { if (status.textContent === '❌ Failed to copy') status.textContent = ''; }, 3000);
+-                }
+-            }
+-        });
+-
+-        // Keyboard nav
+-        document.addEventListener('keydown', e => {
+-            if (e.target.tagName === 'INPUT') return;
+-            if (e.key === 'ArrowRight') nextSlide();
+-            if (e.key === 'ArrowLeft') prevSlide();
+-            if (e.key === 'p' || e.key === 'P') {
+-                if (isPaused) resumeCycle(); else pauseCycle();
+-            }
+-            if (e.key === 'r' || e.key === 'R') {
+-                if (locationSet) fetchAndRender(false);
+-            }
+-        });
+-    }
+-
+-    // ── Auto-refresh every 10 minutes ─────────────────────────────
+-    function startAutoRefresh() {
+-        setInterval(() => {
+-            if (locationSet) fetchAndRender(false);
+-        }, 10 * 60 * 1000);
+-    }
+-
+-    // ── Settings callbacks ─────────────────────────────────────────
+-    function onSettingsChange(change) {
+-        if (change.type === 'units') {
+-            WeatherAPI.setUnits(!change.celsius);
+-            if (locationSet) fetchAndRender(false);
+-        }
+-        if (change.type === 'speed') {
+-            slideInterval = change.seconds * 1000;
+-            if (!isPaused && locationSet) {
+-                clearCycleTimer();
+-                startCycleTimer();
+-            }
+-        }
+-    }
+-
+-    // ── Boot ───────────────────────────────────────────────────────
+-    let autoKiosk = false;
+-
+-    async function processPermalink() {
+-        try {
+-            const params = new URLSearchParams(window.location.search);
+-            const s = params.get('s');
+-            if (s) {
+-                const decoded = JSON.parse(atob(s));
+-                if (decoded.s) localStorage.setItem('weathernow_settings', JSON.stringify(decoded.s));
+-                if (decoded.l) localStorage.setItem('weathernow_location', JSON.stringify(decoded.l));
+-                if (decoded.k) autoKiosk = true;
+-
+-                // Clean URL
+-                const url = new URL(window.location.href);
+-                url.searchParams.delete('s');
+-                window.history.replaceState({}, document.title, url.pathname + url.search);
+-            }
+-        } catch (err) {
+-            console.error("Failed to process permalink", err);
+-        }
+-    }
+-
+-    async function boot() {
+-        await processPermalink();
+-
+-        startClock();
+-        Settings.init(onSettingsChange);
+-        MusicPlayer.init();
+-        bindControls();
+-        startAutoRefresh();
+-
+-        // Try to restore last location from storage
+-        const saved = (() => {
+-            try { return JSON.parse(localStorage.getItem('weathernow_location')); } catch { return null; }
+-        })();
+-
+-        if (saved?.query) {
+-            if (locationInput) locationInput.value = saved.query;
+-            await setLocation(saved.query);
+-        } else {
+-            // First, use IP geolocation as an instant initial estimate (no permission required)
+-            let ipSuccess = false;
+-            try {
+-                await WeatherAPI.loadIPLocation();
+-                locationSet = true;
+-                if (locationStatus) locationStatus.textContent = `✓ Set to: ${WeatherAPI.getLocation().label}`;
+-                fetchAndRender(true).catch(err => console.error('Weather fetch error after IP geolocation:', err));
+-                ipSuccess = true;
+-            } catch {
+-                // IP geolocation unavailable; fall through to GPS
+-            }
+-
+-            // Then try GPS for a more precise location
+-            if (ipSuccess) {
+-                // Weather is already loading; refine in the background without blocking
+-                setLocationGPS().catch(err => {
+-                    console.warn('GPS refinement failed, keeping IP-based location:', err);
+-                });
+-            } else {
+-                // No IP estimate available – must wait for GPS or fall back to default
+-                try {
+-                    await setLocationGPS();
+-                } catch {
+-                    await setLocation(DEFAULT_LOCATION);
+-                }
+-            }
+-        }
+-
+-        // Save location when user searches
+-        locationGo?.addEventListener('click', () => {
+-            try { localStorage.setItem('weathernow_location', JSON.stringify({ query: locationInput?.value })); } catch { }
+-        });
+-
+-        if (autoKiosk) {
+-            Settings.enterKiosk();
+-        }
+-    }
+-
+-    // ── Custom Forecast Location Targeting ─────────────────────────
+-    function haversineDistance(lat1, lon1, lat2, lon2) {
+-        const R = 3958.8; // Earth radius in miles
+-        const dLat = (lat2 - lat1) * Math.PI / 180;
+-        const dLon = (lon2 - lon1) * Math.PI / 180;
+-        const a = Math.sin(dLat / 2) ** 2
+-            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+-    }
+-
+-    function isInForecastArea(targeting) {
+-        if (!targeting || targeting.mode === 'all') return true;
+-        const loc = WeatherAPI.getLocation();
+-        if (!loc.lat) return true; // no viewer location → show by default
+-
+-        if (targeting.mode === 'radius') {
+-            const c = targeting.center;
+-            const r = parseFloat(targeting.radiusMiles);
+-            if (!c?.lat || !c?.lon || !r) return true;
+-            return haversineDistance(loc.lat, loc.lon, c.lat, c.lon) <= r;
+-        }
+-
+-        if (targeting.mode === 'zips') {
+-            const zips = (targeting.zips || []).map(z => String(z).trim()).filter(Boolean);
+-            if (!zips.length) return true;
+-            const details = WeatherAPI.getLocationDetails();
+-            if (!details?.zip) return true; // details not yet loaded → show
+-            return zips.includes(String(details.zip).trim());
+-        }
+-
+-        if (targeting.mode === 'counties') {
+-            const counties = (targeting.counties || []).map(c => c.trim().toLowerCase()).filter(Boolean);
+-            if (!counties.length) return true;
+-            const details = WeatherAPI.getLocationDetails();
+-            if (!details?.county) return true;
+-            // Build a normalized "County Name ST" string for exact-match comparison
+-            const viewerToken = `${details.county} ${details.stateCode || ''}`.trim().toLowerCase();
+-            return counties.some(c => {
+-                // Exact match on the full "County Name ST" token
+-                const adminToken = c.toLowerCase().trim();
+-                return viewerToken === adminToken;
+-            });
+-        }
+-
+-        return true;
+-    }
+-
+-    // ── Start ──────────────────────────────────────────────────────
+-    if (document.readyState === 'loading') {
+-        document.addEventListener('DOMContentLoaded', boot);
+-    } else {
+-        boot();
+-    }
+-
+-})();
+diff --git a/js/displays.js b/js/displays.js
+index f232a78..53357b1 100644
+--- a/js/displays.js
++++ b/js/displays.js
+@@ -396,333 +396,5 @@ const Displays = (() => {
+             if (latest?.updatedAt) {
+                 updatedEl.textContent = `Updated: ${new Date(latest.updatedAt).toLocaleString()}`;
+             }
+-        }
+-    }
+-
+-    function esc(s) {
+-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+-    }
+-
+-    /** Convert a 6-digit hex colour (#rrggbb) to "r,g,b" string for rgba(). */
+-    function hexToRgb(hex) {
+-        const n = parseInt(hex.replace('#', ''), 16);
+-        return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+-    }
+-
+-    // ── Travel Forecast ────────────────────────────────────────────
+-    // Full-screen WeatherStar-style vertical list: city / icon / lo / hi
+-    function renderTravel(data) {
+-        const rows = el('travel-rows');
+-        if (!rows) return;
+-
+-        const cities = data.travelCities || [];
+-        const dayLabel = el('travel-day-label');
+-        if (dayLabel) {
+-            const today = new Date();
+-            dayLabel.textContent = `Travel Forecast \u2014 ${today.toLocaleDateString('en-US', { weekday: 'long' })}`;
+-        }
+-
+-        if (!cities.length) {
+-            rows.innerHTML = '<div class="no-alerts" style="margin:auto">📡 Fetching city data…</div>';
+-        } else {
+-            rows.innerHTML = cities.map(city => {
+-                const stateBadge = city.state
+-                    ? `<span class="ws4k-city-state">${esc(city.state)}</span>`
+-                    : '';
+-                return `
+-                  <div class="ws4k-city-row">
+-                    <span class="ws4k-city-name">${esc(city.name)}${stateBadge}</span>
+-                    <span class="ws4k-city-icon">${city.icon || '?'}</span>
+-                    <span class="ws4k-city-lo">${esc(stripDeg(city.lo))}</span>
+-                    <span class="ws4k-city-hi">${esc(stripDeg(city.hi))}</span>
+-                  </div>`;
+-            }).join('');
+-        }
+-
+-        const footer = el('travel-footer');
+-        if (footer && data.conditions) {
+-            const c = data.conditions;
+-            footer.textContent = `Humidity: ${c.humidity}   \u2022   Dewpoint: ${c.dewpoint}`;
+-        }
+-    }
+-
+-    /** Strip trailing "°F" / "°C" suffix so numbers sit cleaner in the table. */
+-    function stripDeg(s) {
+-        if (!s) return '--';
+-        return String(s).replace(/°[FC]$/, '').replace(/°$/, '') || '--';
+-    }
+-
+-    // ── Shared Leaflet map factory ──────────────────────────────────
+-    /**
+-     * Create a Leaflet map inside `containerId` and return it.
+-     * Safe to call only once per container — callers guard with the
+-     * module-level `obsMap` / `fcstMap` null-check.
+-     * Returns null if the container element is missing.
+-     */
+-    function createRegionalMap(containerId) {
+-        const container = el(containerId);
+-        if (!container) return null;
+-
+-        const map = L.map(containerId, {
+-            zoomControl: false,
+-            attributionControl: true,
+-            dragging: false,
+-            touchZoom: false,
+-            doubleClickZoom: false,
+-            scrollWheelZoom: false,
+-            boxZoom: false,
+-            keyboard: false,
+-        });
+-
+-        // Same CartoDB Dark All tiles as the radar slide — already dark, no filter needed.
+-        L.tileLayer(
+-            'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+-            {
+-                attribution: '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+-                subdomains: 'abcd',
+-                maxZoom: 15,
+-            }
+-        ).addTo(map);
+-
+-        return map;
+-    }
+-
+-    /** Build a custom divIcon marker showing city name, temperature and icon. */
+-    function makeCityMarker(city, tempText, iconEmoji) {
+-        const html = `
+-          <div class="ws4k-marker">
+-            <span class="ws4k-marker-name">${esc(city.name)}</span>
+-            <span class="ws4k-marker-row">
+-              <span class="ws4k-marker-temp">${esc(tempText)}</span>
+-              <span class="ws4k-marker-icon">${iconEmoji || ''}</span>
+-            </span>
+-          </div>`;
+-        return L.marker([city.lat, city.lon], {
+-            icon: L.divIcon({ html, className: '', iconSize: [100, 55], iconAnchor: [50, 55] }),
+-            interactive: false,
+-        });
+-    }
+-
+-    /** Place markers on a map, fit bounds, and refresh size. */
+-    function populateMap(map, cities, getValue, getIcon) {
+-        // Clear old markers
+-        map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
+-
+-        const coords = [];
+-        cities.forEach(city => {
+-            if (city.error) return;
+-            const marker = makeCityMarker(city, getValue(city), getIcon(city));
+-            marker.addTo(map);
+-            coords.push([city.lat, city.lon]);
+-        });
+-
+-        if (coords.length) {
+-            const bounds = L.latLngBounds(coords).pad(0.25);
+-            map.fitBounds(bounds, { animate: false });
+-        }
+-
+-        map.invalidateSize();
+-    }
+-
+-    // ── Regional Observations ──────────────────────────────────────
+-    function renderRegionalObs(data) {
+-        pendingObsData = data;
+-
+-        const container = el('regional-obs-map');
+-        if (!container || container.offsetWidth === 0) return; // slide not visible yet
+-
+-        if (!obsMap) obsMap = createRegionalMap('regional-obs-map');
+-        if (!obsMap) return;
+-
+-        const cities = data.nearbyCities || [];
+-        if (!cities.length) return;
+-
+-        populateMap(obsMap, cities,
+-            c => stripDeg(c.temp),
+-            c => c.icon || '?'
+-        );
+-
+-        const footer = el('regional-obs-footer');
+-        if (footer && data.conditions) {
+-            const c = data.conditions;
+-            const extra = c.windChill !== '--'
+-                ? `Wind Chill: ${c.windChill}`
+-                : c.heatIndex !== '--' ? `Heat Index: ${c.heatIndex}` : '';
+-            footer.textContent = `Temp: ${c.temp}   \u2022   ${extra}`.replace(/\s*\u2022\s*$/, '').trim();
+-        }
+-    }
+-
+-    // ── Regional Forecast ──────────────────────────────────────────
+-    function renderRegionalFcst(data) {
+-        pendingFcstData = data;
+-
+-        const container = el('regional-fcst-map');
+-        if (!container || container.offsetWidth === 0) return;
+-
+-        if (!fcstMap) fcstMap = createRegionalMap('regional-fcst-map');
+-        if (!fcstMap) return;
+-
+-        const cities = data.nearbyCities || [];
+-        if (!cities.length) return;
+-
+-        populateMap(fcstMap, cities,
+-            c => stripDeg(c.tomorrowHi || c.hi),
+-            c => c.tomorrowIcon || c.icon || '?'
+-        );
+-
+-        const footer = el('regional-fcst-footer');
+-        const tomorrow = new Date();
+-        tomorrow.setDate(tomorrow.getDate() + 1);
+-        const dayName = tomorrow.toLocaleDateString('en-US', { weekday: 'long' });
+-
+-        // Update the map overlay title with the forecast day
+-        const mapTitle = el('regional-fcst-map-title');
+-        if (mapTitle) mapTitle.textContent = `Forecast for ${dayName}`;
+-
+-        if (footer && data.conditions) {
+-            const c = data.conditions;
+-            const extra = c.windChill !== '--'
+-                ? `Wind Chill: ${c.windChill}`
+-                : c.heatIndex !== '--' ? `Heat Index: ${c.heatIndex}` : '';
+-            footer.textContent = `${dayName}   \u2022   Temp: ${c.temp}   \u2022   ${extra}`.replace(/\s*\u2022\s*$/, '').trim();
+-        }
+-    }
+-
+-    // ── SPC Outlook ─────────────────────────────────────────────────
+-    // Horizontal bar chart — one row per day, bar width ∝ risk level.
+-    function renderSPCOutlook(data) {
+-        const container = el('spc-chart');
+-        if (!container) return;
+-
+-        const spc = data.spcOutlook;
+-        if (!spc || !spc.valid) {
+-            container.innerHTML = `
+-              <div style="flex:1;display:flex;align-items:center;justify-content:center">
+-                <div class="no-alerts">⛅ SPC outlook data unavailable.</div>
+-              </div>`;
+-            return;
+-        }
+-
+-        // Risk-level metadata — ascending severity order
+-        const RISK = [
+-            { key: null,   pct: 0,   label: 'No Risk',   color: null },
+-            { key: 'TSTM', pct: 14,  label: 'T-Storm',   color: '#607d8b' },
+-            { key: 'MRGL', pct: 28,  label: 'Marginal',  color: '#4caf50' },
+-            { key: 'SLGT', pct: 46,  label: 'Slight',    color: '#cddc39' },
+-            { key: 'ENH',  pct: 62,  label: 'Enhanced',  color: '#ff9800' },
+-            { key: 'MDT',  pct: 78,  label: 'Moderate',  color: '#f44336' },
+-            { key: 'HIGH', pct: 100, label: 'High',      color: '#e91e63' },
+-        ];
+-
+-        // Scale legend bands (skip the null/no-risk entry)
+-        const scaleBands = RISK.slice(1).map(r =>
+-            `<div class="ws4k-spc-band" style="background:${r.color}">${r.label}</div>`
+-        ).join('');
+-
+-        // Build day rows
+-        const dayRows = spc.days.map(day => {
+-            const meta = RISK.find(r => r.key === day.risk) || RISK[0];
+-            const isNoRisk = meta.pct === 0;
+-
+-            const barHtml = isNoRisk
+-                ? `<div class="ws4k-spc-bar ws4k-spc-bar-norisk">
+-                     <span class="ws4k-spc-norisk-text">No Thunderstorm Risk</span>
+-                   </div>`
+-                : `<div class="ws4k-spc-bar ws4k-spc-bar-active" data-w="${meta.pct}"
+-                        style="width:0%;background:${meta.color}">
+-                     <span class="ws4k-spc-bar-text">${esc(day.riskLabel || meta.label)}</span>
+-                   </div>`;
+-
+-            return `
+-              <div class="ws4k-spc-day-row">
+-                <span class="ws4k-spc-day-name">${esc(day.dayName)}</span>
+-                <div class="ws4k-spc-bar-track">${barHtml}</div>
+-              </div>`;
+-        }).join('');
+-
+-        container.innerHTML = `
+-          <div class="ws4k-spc-heading">
+-            <span class="ws4k-spc-heading-title">SPC Outlook</span>
+-            <span class="ws4k-spc-heading-sub">Convective Forecast</span>
+-          </div>
+-          <div class="ws4k-spc-scale-wrapper">
+-            <div class="ws4k-spc-scale-spacer"></div>
+-            <div class="ws4k-spc-scale">${scaleBands}</div>
+-          </div>
+-          <div class="ws4k-spc-days">${dayRows}</div>`;
+-
+-        // Animate active bars: start at 0% → expand to target after paint
+-        requestAnimationFrame(() => {
+-            requestAnimationFrame(() => {
+-                container.querySelectorAll('.ws4k-spc-bar-active').forEach(b => {
+-                    const w = b.dataset.w;
+-                    if (w) b.style.width = `${w}%`;
+-                });
+-            });
+-        });
+-    }
+-
+-    // ── Ticker ─────────────────────────────────────────────────────
+-    function updateTicker(data, slideTitle) {
+-        const ticker = el('ticker-text');
+-        const label = el('ticker-label');
+-        if (label) label.textContent = slideTitle || 'CONDITIONS';
+-        if (ticker && data.ticker) {
+-            ticker.textContent = data.ticker;
+-            // Scale scroll duration with text length so long condition strings don't fly by (~80 px/s)
+-            requestAnimationFrame(() => {
+-                const containerW = ticker.parentElement?.clientWidth || 800;
+-                const textW = ticker.scrollWidth;
+-                // Animation travels from +100% to -100% of container = containerW + textW pixels total
+-                const totalPx = containerW + textW;
+-                const duration = Math.max(15, Math.round(totalPx / 80));
+-                ticker.style.animationDuration = `${duration}s`;
+-            });
+-        }
+-    }
+-
+-    // ── Map visibility callbacks (called from app.js) ───────────────
+-    function onRegionalObsVisible() {
+-        if (!obsMap) obsMap = createRegionalMap('regional-obs-map');
+-        if (obsMap) {
+-            obsMap.invalidateSize();
+-            if (pendingObsData) renderRegionalObs(pendingObsData);
+-        }
+-    }
+-
+-    function onRegionalFcstVisible() {
+-        if (!fcstMap) fcstMap = createRegionalMap('regional-fcst-map');
+-        if (fcstMap) {
+-            fcstMap.invalidateSize();
+-            if (pendingFcstData) renderRegionalFcst(pendingFcstData);
+-        }
+-    }
+-
+-    // ── Render all ─────────────────────────────────────────────────
+-    function renderAll(weatherData, alerts, lat, lon, onTTS) {
+-        renderConditions(weatherData);
+-        renderObservations(weatherData);
+-        renderHourly(weatherData);
+-        renderExtended(weatherData);
+-        renderPrecipChart(weatherData);
+-        renderAlmanac(weatherData);
+-        renderClimateHistory(weatherData);
+-        renderAirQuality(weatherData);
+-        renderRadar(lat, lon);
+-        renderAlerts(alerts, onTTS);
+         renderCustomForecast(weatherData.customForecasts);
+-        renderTravel(weatherData);
+-        renderRegionalObs(weatherData);
+-        renderRegionalFcst(weatherData);
+-        renderSPCOutlook(weatherData);
+-        updateTicker(weatherData, 'CONDITIONS');
+-    }
+-
+-    return {
+-        renderAll, renderConditions, renderObservations, renderHourly, renderExtended,
+         renderPrecipChart, renderAlmanac, renderAirQuality, renderClimateHistory,
+-        renderRadar, renderAlerts, renderCustomForecast, updateTicker,
+-        renderTravel, renderRegionalObs, renderRegionalFcst, renderSPCOutlook,
+-        onRegionalObsVisible, onRegionalFcstVisible,
+-    };
+-})();
+diff --git a/js/radar.js b/js/radar.js
+index 103ac1b..72ab759 100644
+--- a/js/radar.js
++++ b/js/radar.js
+@@ -35,237 +35,3 @@ const RadarMap = (() => {
+   // color 6 = RAINBOW @ SELEX-SI (primarily green for light/moderate precip), smooth+snow flags = 1_1
+   const RV_TILE = (path) =>
+     `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/6/1_1.png`;
+-
+-  // ── Fetch available radar frames from RainViewer ───────────────
+-  async function fetchRainViewerFrames() {
+-    try {
+-      const resp = await fetch(RV_API);
+-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+-      const data = await resp.json();
+-      const past = data.radar?.past ?? [];
+-      return past.slice(-FRAME_COUNT);
+-    } catch (e) {
+-      console.warn("RainViewer fetch failed:", e);
+-      return [];
+-    }
+-  }
+-
+-  // ── Build a tile layer for one RainViewer frame ───────────────
+-  function makeRVLayer(path) {
+-    return L.tileLayer(RV_TILE(path), {
+-      tileSize: 256,
+-      opacity: 0, // hidden until showFrame makes it visible
+-      zIndex: 200,
+-      // RainViewer 256-px tiles are only rendered for zoom levels 0–6.
+-      // Setting maxNativeZoom prevents Leaflet from requesting unsupported
+-      // zoom levels (which return a "Zoom Level Not Supported" error image);
+-      // at higher map zooms Leaflet upscales the zoom-6 tile instead.
+-      maxNativeZoom: 6,
+-      attribution:
+-        '<a href="https://rainviewer.com" target="_blank" rel="noopener noreferrer">RainViewer</a>',
+-    });
+-  }
+-
+-  // ── Build all animation frames ─────────────────────────────────
+-  async function buildFrames() {
+-    // Prevent concurrent runs (two-stage location bootstrap fires render() twice)
+-    if (building) return;
+-    building = true;
+-    try {
+-      // Fetch new frames *before* touching existing layers so the radar stays
+-      // visible if the API call fails or returns nothing.
+-      const rvFrames = await fetchRainViewerFrames();
+-      if (!rvFrames.length) {
+-        console.warn("No radar frames available from RainViewer");
+-        return;
+-      }
+-
+-      // We have fresh frames – safe to replace the old ones.
+-      frames.forEach((f) => {
+-        if (map.hasLayer(f.layer)) map.removeLayer(f.layer);
+-      });
+-      frames = [];
+-
+-      rvFrames.forEach(({ time, path }) => {
+-        const layer = makeRVLayer(path);
+-        layer.addTo(map);
+-        frames.push({ dt: new Date(time * 1000), layer });
+-      });
+-
+-      currentFrame = frames.length - 1;
+-      showFrame(currentFrame);
+-      buildDots();
+-      updateTimestamp();
+-      if (animating) startAnimation();
+-    } catch (e) {
+-      console.warn("buildFrames error:", e);
+-    } finally {
+-      building = false;
+-    }
+-  }
+-
+-  // ── Show one frame ────────────────────────────────────────────
+-  function showFrame(idx) {
+-    if (!frames.length) return;
+-    idx = ((idx % frames.length) + frames.length) % frames.length;
+-    frames.forEach((f, i) =>
+-      f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0),
+-    );
+-    currentFrame = idx;
+-    updateTimestamp();
+-    updateDots();
+-
+-    const lv = document.getElementById("radar-updated");
+-    if (lv) lv.style.opacity = idx === frames.length - 1 ? "1" : "0.5";
+-  }
+-
+-  // ── Animation ─────────────────────────────────────────────────
+-  function startAnimation() {
+-    clearInterval(animTimer);
+-    const btn = document.getElementById("radar-play");
+-    if (btn) btn.textContent = "⏸";
+-    animating = true;
+-    animTimer = setInterval(() => showFrame(currentFrame + 1), ANIM_INTERVAL);
+-  }
+-
+-  function stopAnimation() {
+-    clearInterval(animTimer);
+-    animTimer = null;
+-    const btn = document.getElementById("radar-play");
+-    if (btn) btn.textContent = "▶";
+-    animating = false;
+-  }
+-
+-  function toggleAnimation() {
+-    if (animating) stopAnimation();
+-    else startAnimation();
+-  }
+-
+-  function jumpToLive() {
+-    showFrame(frames.length - 1);
+-    if (!animating) startAnimation();
+-  }
+-
+-  // ── Timestamp display ─────────────────────────────────────────
+-  function updateTimestamp() {
+-    const el = document.getElementById("radar-timestamp");
+-    if (!el || !frames[currentFrame]) return;
+-    el.textContent = frames[currentFrame].dt.toLocaleTimeString("en-US", {
+-      hour: "numeric",
+-      minute: "2-digit",
+-      hour12: true,
+-      timeZone: "UTC",
+-      timeZoneName: "short",
+-    });
+-  }
+-
+-  // ── Frame dots ────────────────────────────────────────────────
+-  function buildDots() {
+-    const c = document.getElementById("radar-frame-dots");
+-    if (!c) return;
+-    c.innerHTML = "";
+-    frames.forEach((_, i) => {
+-      const d = document.createElement("div");
+-      d.className = "radar-dot" + (i === currentFrame ? " active" : "");
+-      d.addEventListener("click", () => {
+-        stopAnimation();
+-        showFrame(i);
+-      });
+-      c.appendChild(d);
+-    });
+-  }
+-
+-  function updateDots() {
+-    document
+-      .querySelectorAll(".radar-dot")
+-      .forEach((d, i) => d.classList.toggle("active", i === currentFrame));
+-  }
+-
+-  // ── Init Leaflet map (once) ───────────────────────────────────
+-  function initMap(lat, lon) {
+-    if (initialized) {
+-      map.setView([lat, lon], map.getZoom());
+-      pendingLat = null;
+-      pendingLon = null;
+-      refreshAll();
+-      return;
+-    }
+-
+-    const container = document.getElementById("radar-map");
+-    if (!container) return;
+-    initialized = true;
+-
+-    map = L.map("radar-map", {
+-      center: [lat, lon],
+-      zoom: 7,
+-      zoomControl: true,
+-      attributionControl: true,
+-      scrollWheelZoom: true,
+-    });
+-
+-    // Dark base map
+-    L.tileLayer(
+-      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+-      {
+-        attribution:
+-          '© <a href="https://www.openstreetmap.org">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+-        subdomains: "abcd",
+-        maxZoom: 15,
+-      },
+-    ).addTo(map);
+-
+-    // Location marker
+-    const icon = L.divIcon({
+-      html: `<div style="
+-                width:12px;height:12px;
+-                background:#22c55e;
+-                border:3px solid #fff;border-radius:50%;
+-                box-shadow:0 0 10px rgba(34,197,94,.9);
+-            "></div>`,
+-      className: "",
+-      iconSize: [12, 12],
+-      iconAnchor: [6, 6],
+-    });
+-    L.marker([lat, lon], { icon }).addTo(map).bindPopup("Your Location");
+-
+-    // Build initial radar frames
+-    buildFrames();
+-
+-    // Wire controls
+-    document
+-      .getElementById("radar-play")
+-      ?.addEventListener("click", toggleAnimation);
+-    document
+-      .getElementById("radar-live")
+-      ?.addEventListener("click", jumpToLive);
+-
+-    // Refresh frames every 5 minutes
+-    refreshTimer = setInterval(refreshAll, 5 * 60_000);
+-  }
+-
+-  function refreshAll() {
+-    clearInterval(animTimer);
+-    animTimer = null;
+-    buildFrames();
+-  }
+-
+-  // ── Public ────────────────────────────────────────────────────
+-  function render(lat, lon) {
+-    if (!lat || !lon) return;
+-    if (!initialized) {
+-      pendingLat = lat;
+-      pendingLon = lon;
+-      setTimeout(() => initMap(lat, lon), 150);
+-    } else {
+-      map.setView([lat, lon], map.getZoom());
+-      refreshAll();
+-    }
+-  }
+-
+-  function onSlideVisible() {
+-    if (map) map.invalidateSize();
+-    else if (pendingLat) initMap(pendingLat, pendingLon);
+-  }
+-
+-  return { render, onSlideVisible };
+-})();
+diff --git a/js/weather.js b/js/weather.js
+index bf7592d..b2b0660 100644
+--- a/js/weather.js
++++ b/js/weather.js
+@@ -721,6 +721,189 @@ const WeatherAPI = (() => {
+         return result;
+     }
+ 
++    // ── Multi-city helpers ────────────────────────────────────────
++
++    /** Haversine distance in miles between two lat/lon points */
++    function haversineMiles(lat1, lon1, lat2, lon2) {
++        const R = 3958.8;
++        const dLat = (lat2 - lat1) * Math.PI / 180;
++        const dLon = (lon2 - lon1) * Math.PI / 180;
++        const a = Math.sin(dLat / 2) ** 2
++            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
++        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
++    }
++
++    /**
++     * Fetch minimal current + 2-day forecast for a single lat/lon.
++     * Returns { temp, hi, lo, icon, desc, weatherCode, isDay }
++     */
++    async function fetchCityWeather(lat, lon) {
++        const units = useFahrenheit ? 'fahrenheit' : 'celsius';
++        const windU = useFahrenheit ? 'mph' : 'kmh';
++        const params = new URLSearchParams({
++            latitude: lat, longitude: lon,
++            current: 'temperature_2m,weather_code,is_day',
++            daily: 'temperature_2m_max,temperature_2m_min,weather_code',
++            temperature_unit: units,
++            wind_speed_unit: windU,
++            timezone: 'auto',
++            forecast_days: 2,
++        });
++        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
++        if (!resp.ok) throw new Error('City weather fetch failed');
++        const data = await resp.json();
++        const c = data.current;
++        const d = data.daily;
++        const isDay = c.is_day === 1;
++        const wx = wmoToWeather(c.weather_code, isDay);
++        const wxTomorrow = wmoToWeather(d.weather_code?.[1] ?? d.weather_code?.[0], true);
++        return {
++            temp: fmtTemp(c.temperature_2m),
++            tempRaw: c.temperature_2m,
++            hi: fmtTemp(d.temperature_2m_max[0]),
++            lo: fmtTemp(d.temperature_2m_min[0]),
++            tomorrowHi: fmtTemp(d.temperature_2m_max[1] ?? d.temperature_2m_max[0]),
++            tomorrowIcon: wxTomorrow.emoji,
++            tomorrowDesc: wxTomorrow.desc,
++            icon: wx.emoji,
++            desc: wx.desc,
++            weatherCode: c.weather_code,
++            isDay,
++        };
++    }
++
++    /**
++     * Fetch weather for a list of city objects { name, state, lat, lon }.
++     * Returns array of { name, state, lat, lon, ...weatherData } in parallel.
++     */
++    async function fetchTravelCities(cities) {
++        const results = await Promise.allSettled(
++            cities.map(city =>
++                fetchCityWeather(city.lat, city.lon).then(wx => ({ ...city, ...wx, error: false }))
++            )
++        );
++        return results.map((r, i) =>
++            r.status === 'fulfilled' ? r.value : { ...cities[i], error: true, temp: '--', hi: '--', lo: '--', icon: '?', desc: '' }
++        );
++    }
++
++    /**
++     * Find the N cities closest to (lat, lon) from MAJOR_US_CITIES and fetch their weather.
++     * Excludes the user's own location if it matches a city within 10 miles.
++     */
++    async function fetchNearbyCities(lat, lon, count = 8) {
++        if (typeof MAJOR_US_CITIES === 'undefined') return [];
++        const sorted = MAJOR_US_CITIES
++            .map(c => ({ ...c, dist: haversineMiles(lat, lon, c.lat, c.lon) }))
++            .sort((a, b) => a.dist - b.dist)
++            .filter(c => c.dist > 10) // exclude user's immediate city
++            .slice(0, count);
++        return fetchTravelCities(sorted);
++    }
++
++    /**
++     * Fetch SPC categorical outlook for Days 1–3 via local proxy.
++     * Returns { day1, day2, day3 } where each is a GeoJSON FeatureCollection or null.
++     */
++    async function fetchSPCOutlook() {
++        const days = ['1', '2', '3'];
++        const results = await Promise.allSettled(
++            days.map(d =>
++                fetch(`/api/spc-outlook?day=${d}`, { cache: 'no-store' })
++                    .then(r => r.ok ? r.json() : null)
++                    .catch(() => null)
++            )
++        );
++        return {
++            day1: results[0].status === 'fulfilled' ? results[0].value : null,
++            day2: results[1].status === 'fulfilled' ? results[1].value : null,
++            day3: results[2].status === 'fulfilled' ? results[2].value : null,
++        };
++    }
++
++    /**
++     * Point-in-ring test (ray casting, GeoJSON coordinate order: [lon, lat]).
++     */
++    function pointInRing(lon, lat, ring) {
++        let inside = false;
++        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
++            const [xi, yi] = ring[i];
++            const [xj, yj] = ring[j];
++            const intersect = ((yi > lat) !== (yj > lat))
++                && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
++            if (intersect) inside = !inside;
++        }
++        return inside;
++    }
++
++    /**
++     * Given a GeoJSON FeatureCollection (SPC categorical outlook) and user coordinates,
++     * return the highest risk category label at that point.
++     * Order: TSTM < MRGL < SLGT < ENH < MDT < HIGH
++     */
++    function spcRiskAtPoint(geoJSON, lat, lon) {
++        if (!geoJSON?.features?.length) return null;
++        const ORDER = ['TSTM', 'MRGL', 'SLGT', 'ENH', 'MDT', 'HIGH'];
++        let maxIdx = -1;
++        for (const feature of geoJSON.features) {
++            const label = feature.properties?.LABEL;
++            if (!label) continue;
++            const geom = feature.geometry;
++            if (!geom) continue;
++            let hit = false;
++            if (geom.type === 'Polygon') {
++                hit = pointInRing(lon, lat, geom.coordinates[0]);
++            } else if (geom.type === 'MultiPolygon') {
++                hit = geom.coordinates.some(poly => pointInRing(lon, lat, poly[0]));
++            }
++            if (hit) {
++                const idx = ORDER.indexOf(label);
++                if (idx > maxIdx) maxIdx = idx;
++            }
++        }
++        return maxIdx >= 0 ? ORDER[maxIdx] : null;
++    }
++
++    /**
++     * Process SPC GeoJSON outlook into a structured object for rendering.
++     * Returns { days: [{ label, risk, riskLabel, color }, ...], valid: boolean }
++     */
++    function processSPCOutlook(spcData, lat, lon) {
++        const RISK_META = {
++            null:   { label: 'No Risk',   color: '#3a3a3a', pct: 0 },
++            TSTM:   { label: 'T-Storm',   color: '#2e7d32', pct: 14 },
++            MRGL:   { label: 'Marginal',  color: '#4caf50', pct: 28 },
++            SLGT:   { label: 'Slight',    color: '#cddc39', pct: 46 },
++            ENH:    { label: 'Enhanced',  color: '#ff9800', pct: 62 },
++            MDT:    { label: 'Moderate',  color: '#f44336', pct: 78 },
++            HIGH:   { label: 'High',      color: '#e91e63', pct: 95 },
++        };
++
++        const now = new Date();
++        const dayNames = [];
++        for (let i = 0; i < 3; i++) {
++            const d = new Date(now);
++            d.setDate(d.getDate() + i);
++            dayNames.push(d.toLocaleDateString('en-US', { weekday: 'long' }));
++        }
++
++        const datasets = [spcData.day1, spcData.day2, spcData.day3];
++        const days = datasets.map((data, i) => {
++            const risk = spcRiskAtPoint(data, lat, lon);
++            const meta = RISK_META[risk] ?? RISK_META[null];
++            return {
++                dayName: dayNames[i],
++                risk,
++                riskLabel: meta.label,
++                color: meta.color,
++                pct: meta.pct,
++                available: data !== null,
++            };
++        });
++
++        return { days, valid: datasets.some(d => d !== null) };
++    }
++
+     // ── Public ────────────────────────────────────────────────────
+     async function loadLocation(query) {
+         const geo = await geocode(query);
+@@ -771,11 +954,6 @@ const WeatherAPI = (() => {
+             fetch('/api/custom-forecast')
+                 .then(r => r.ok ? r.json() : [])
+                 .catch(() => []),
+-            fetchNearbyCities(currentLat, currentLon, 8).catch(() => []),
+-            fetchTravelCities(
+-                typeof DEFAULT_TRAVEL_CITIES !== 'undefined' ? DEFAULT_TRAVEL_CITIES : []
+-            ).catch(() => []),
+-            fetchSPCOutlook().catch(() => ({ day1: null, day2: null, day3: null })),
+             fetchClimateHistory(currentLat, currentLon).catch(() => null),
+         ]);
+ 
+@@ -785,18 +963,3 @@ const WeatherAPI = (() => {
+         weatherData.travelCities = travelCities;
+         weatherData.spcOutlook = processSPCOutlook(spcRaw, currentLat, currentLon);
+         weatherData.climateHistory = climateHistory;
+-        alertsData = alerts;
+-        return { weather: weatherData, alerts: alertsData };
+-    }
+-    function setUnits(f) { useFahrenheit = f; }
+-    function getLocation() { return { lat: currentLat, lon: currentLon, label: currentLocation }; }
+-    function getLocationDetails() { return locationDetails; }
+-    function getData() { return weatherData; }
+-    function getAlerts() { return alertsData; }
+-
+-    return {
+-        loadLocation, loadIPLocation, loadGPS, fetchAll, setUnits,
+-        getLocation, getLocationDetails, getData, getAlerts,
+-        fetchTravelCities, fetchNearbyCities,
+-    };
+-})();
+diff --git a/server.js b/server.js
+index 911ff0f..23a9ca7 100644
+--- a/server.js
++++ b/server.js
+@@ -13,6 +13,144 @@ const rateLimit = require('express-rate-limit');
+ const app = express();
+ app.use(express.json());
+ 
++// ── Trusted-proxy support ──────────────────────────────────────
++// Set TRUST_PROXY=1 (or any truthy string) when running behind a
++// single-hop reverse proxy / Cloudflare Tunnel so that req.ip
++// resolves to the real client address instead of the container IP.
++// Without this, rate-limiting and brute-force protection would key
++// on the proxy address, applying those limits globally.
++if (process.env.TRUST_PROXY) {
++    const hops = parseInt(process.env.TRUST_PROXY);
++    app.set('trust proxy', isNaN(hops) ? 1 : hops);
++}
++
++// ── Security: HTTP security headers ───────────────────────────
++app.use((req, res, next) => {
++    // Prevent clickjacking
++    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
++    // Block MIME-type sniffing
++    res.setHeader('X-Content-Type-Options', 'nosniff');
++    // Prevent cross-site scripting via legacy IE header
++    res.setHeader('X-XSS-Protection', '1; mode=block');
++    // Only send Referrer when same origin
++    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
++    // Disable camera/mic/payment; allow geolocation for self (used by weather location feature)
++    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
++    // HSTS – enforce HTTPS for 1 year (only effective over TLS)
++    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
++    // Content Security Policy
++    // Allow-list covers all third-party origins used by index.html and admin.html:
++    //   fonts.googleapis.com / fonts.gstatic.com – Google Fonts
++    //   unpkg.com – Leaflet CSS + JS
++    //   cdn.jsdelivr.net – marked.js
++    //   tilecache.rainviewer.com / api.rainviewer.com – radar tiles
++    //   *.cartocdn.com – basemap tiles
++    //   openstreetmap.org / nominatim.openstreetmap.org – geocoding
++    //   api.open-meteo.com / air-quality-api.open-meteo.com – forecast/AQI
++    //   api.weather.gov – NWS/NOAA data
++    //   ipapi.co – IP geolocation
++    //   airnowapi.org – air quality
++    //   api.ipify.org – public IP lookup
++    res.setHeader(
++        'Content-Security-Policy',
++        [
++            "default-src 'self'",
++            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
++            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
++            "font-src 'self' https://fonts.gstatic.com",
++            "img-src 'self' data: blob: https://mesonet.agron.iastate.edu https://api.weather.gov https://tilecache.rainviewer.com https://*.cartocdn.com https://unpkg.com",
++            "connect-src 'self' https://api.weather.gov https://airnowapi.org https://api.ipify.org https://api.open-meteo.com https://air-quality-api.open-meteo.com https://nominatim.openstreetmap.org https://ipapi.co https://api.rainviewer.com",
++            "frame-ancestors 'self'",
++            "base-uri 'self'",
++            "form-action 'self'"
++        ].join('; ')
++    );
++    next();
++});
++
++// ── Security: in-memory event log ─────────────────────────────
++const MAX_SECURITY_EVENTS = 500;
++const securityEvents = [];
++let securityEventCounter = 0;
++
++function logSecurityEvent(type, req, detail = '') {
++    // Use req.ip (respects trust proxy setting) rather than trusting
++    // the X-Forwarded-For header directly to prevent IP spoofing.
++    const ip = req.ip || req.socket.remoteAddress || 'unknown';
++    const event = {
++        id: ++securityEventCounter,
++        ts: new Date().toISOString(),
++        type,        // 'auth_failure' | 'auth_success' | 'rate_limited' | 'honeypot' | 'lockout'
++        ip,
++        method: req.method,
++        path: req.path,
++        ua: (req.headers['user-agent'] || '').slice(0, 200),
++        detail
++    };
++    securityEvents.unshift(event); // newest first
++    if (securityEvents.length > MAX_SECURITY_EVENTS) securityEvents.pop();
++    console.log(`[Security] ${type.toUpperCase()} ip=${ip} path=${req.path}${detail ? ' ' + detail : ''}`);
++    return event;
++}
++
++// ── Security: brute-force lockout (per-IP, auth endpoints) ────
++const bruteForceMap = new Map(); // ip → { failures, lockedUntil, lastAttempt }
++const BRUTE_MAX_FAILURES = 5;
++const BRUTE_LOCKOUT_MS = 15 * 60_000; // 15 minutes
++const BRUTE_IDLE_TTL_MS = 60 * 60_000; // evict idle entries after 1 hour
++
++function checkBruteForce(req, res) {
++    const ip = req.ip || req.socket.remoteAddress || 'unknown';
++    const now = Date.now();
++    const entry = bruteForceMap.get(ip) || { failures: 0, lockedUntil: 0, lastAttempt: 0 };
++    if (entry.lockedUntil > now) {
++        const retryAfter = Math.ceil((entry.lockedUntil - now) / 1000);
++        logSecurityEvent('lockout', req, `retry_after=${retryAfter}s`);
++        res.setHeader('Retry-After', retryAfter);
++        res.status(429).json({ error: `Too many failed attempts. Try again in ${retryAfter}s` });
++        return false;
++    }
++    return true;
++}
++
++function recordAuthSuccess(req) {
++    const ip = req.ip || req.socket.remoteAddress || 'unknown';
++    bruteForceMap.delete(ip);
++    // Only log auth_success on the verify (login) endpoint to avoid
++    // filling the ring buffer with routine admin polling events.
++    if (req.path === '/api/verify') {
++        logSecurityEvent('auth_success', req);
++    }
++}
++
++function recordAuthFailure(req) {
++    const ip = req.ip || req.socket.remoteAddress || 'unknown';
++    const now = Date.now();
++    const entry = bruteForceMap.get(ip) || { failures: 0, lockedUntil: 0, lastAttempt: 0 };
++    entry.failures++;
++    entry.lastAttempt = now;
++    if (entry.failures >= BRUTE_MAX_FAILURES) {
++        entry.lockedUntil = now + BRUTE_LOCKOUT_MS;
++        logSecurityEvent('lockout', req, `failures=${entry.failures}`);
++    } else {
++        logSecurityEvent('auth_failure', req, `failures=${entry.failures}/${BRUTE_MAX_FAILURES}`);
++    }
++    bruteForceMap.set(ip, entry);
++}
++
++// Periodically evict idle entries from the brute-force map to prevent
++// unbounded memory growth in long-running deployments.
++// Only entries that haven't been touched for BRUTE_IDLE_TTL_MS and are
++// no longer locked are removed; active failure counters are preserved.
++setInterval(() => {
++    const now = Date.now();
++    for (const [ip, entry] of bruteForceMap) {
++        const idle = now - entry.lastAttempt > BRUTE_IDLE_TTL_MS;
++        const unlocked = entry.lockedUntil < now;
++        if (idle && unlocked) bruteForceMap.delete(ip);
++    }
++}, 5 * 60_000); // run every 5 minutes
++
+ // ── Build hash (automatic cache busting) ───────────────────────
+ // Hash all local JS, CSS, and HTML files so that any code change
+ // produces a new CACHE_VERSION in the service worker, forcing the
+@@ -102,16 +240,7 @@ let pushSubscriptions = []; // { endpoint, keys: { auth, p256dh } }
+ let releaseNotes = [];
+ let releaseNoteId = 1;
+ 
+-let customForecasts = [];  // array of { id, label, periods, targeting, updatedAt }
+-let customForecastId = 1;
+-
+-// Armageddon mode – when set, overrides the entire display with a single message
+-// Shape: { title, text, type, activatedAt, expiresAt } or null when inactive
+-let armageddonState = null;
+-
+-// Acknowledgements: tracks which visitor IDs have acknowledged each message
+-// Map<msgId, Set<visitorId>>
+-const acknowledgements = new Map();
++let customForecast = { periods: [], targeting: { mode: 'all' }, updatedAt: null };
+ 
+ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
+ 
+@@ -131,11 +260,14 @@ app.use('/api/release-notes', adminLimiter);
+ 
+ // ── Auth helper ────────────────────────────────────────────────
+ function checkAuth(req, res) {
++    if (!checkBruteForce(req, res)) return false;
+     const provided = req.headers['x-admin-password'] || req.body?.password;
+     if (provided !== ADMIN_PASSWORD) {
++        recordAuthFailure(req);
+         res.status(401).json({ error: 'Unauthorized' });
+         return false;
+     }
++    recordAuthSuccess(req);
+     return true;
+ }
+ 
+@@ -342,6 +474,33 @@ async function fanOutPush(payload) {
+     return { sent, failed, total: pushSubscriptions.length };
+ }
+ 
++// ── Security: honeypot endpoint ───────────────────────────────
++// Legitimate users never hit this path. Any request here is logged
++// as a suspicious probe (automated scanner, vulnerability tester, etc.).
++// A believable 403 is returned to frustrate automated tools.
++app.all('/api/admin-backdoor', (req, res) => {
++    logSecurityEvent('honeypot', req, `method=${req.method}`);
++    res.status(403).json({ error: 'Forbidden' });
++});
++
++// ── Security: events log (admin only) ─────────────────────────
++app.get('/api/security/events', (req, res) => {
++    if (!checkAuth(req, res)) return;
++    const limit = Math.min(parseInt(req.query.limit) || 100, MAX_SECURITY_EVENTS);
++    res.json({ events: securityEvents.slice(0, limit), total: securityEvents.length });
++});
++
++// ── Security: stats summary (admin only) ──────────────────────
++app.get('/api/security/stats', (req, res) => {
++    if (!checkAuth(req, res)) return;
++    const counts = {};
++    for (const e of securityEvents) counts[e.type] = (counts[e.type] || 0) + 1;
++    const lockedIps = [];
++    const now = Date.now();
++    bruteForceMap.forEach((v, ip) => { if (v.lockedUntil > now) lockedIps.push(ip); });
++    res.json({ counts, lockedIps, totalEvents: securityEvents.length });
++});
++
+ // ── Health check ──────────────────────────────────────────────
+ app.get('/api/health', (_, res) => res.json({
+     ok: true,
+@@ -378,46 +537,21 @@ app.delete('/api/release-notes', adminLimiter, (req, res) => {
+ });
+ 
+ // ── Custom Forecast ───────────────────────────────────────────
+-// Returns array of all custom forecasts
+ app.get('/api/custom-forecast', (_, res) => {
+-    // Short public cache — display clients refresh every 10 min anyway.
+-    // Use stale-while-revalidate so the browser reuses the cached response.
+-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+-    res.json(customForecasts);
++    res.json(customForecast);
+ });
+ 
+-// Add a new forecast (or replace one with same label if label provided)
+ app.post('/api/custom-forecast', adminLimiter, (req, res) => {
+     if (!checkAuth(req, res)) return;
+-    const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = req.body;
+-    const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
+-    if (!periods.length) return res.status(400).json({ error: 'periods required' });
+-    // If a non-empty label is given and a forecast with that label already exists, replace it
+-    const existing = label ? customForecasts.findIndex(c => c.label === label) : -1;
+-    const entry = { id: existing >= 0 ? customForecasts[existing].id : customForecastId++, label, periods, targeting, updatedAt: Date.now() };
+-    if (existing >= 0) {
+-        customForecasts[existing] = entry;
+-    } else {
+-        customForecasts.push(entry);
+-    }
+-    console.log(`[Admin] Custom forecast ${existing >= 0 ? 'updated' : 'added'}: "${label || entry.id}" — ${periods.length} period(s), targeting: ${targeting.mode}`);
+-    res.json(entry);
+-});
+-
+-// Delete a single forecast by id
+-app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
+-    if (!checkAuth(req, res)) return;
+-    const id = parseInt(req.params.id, 10);
+-    const before = customForecasts.length;
+-    customForecasts = customForecasts.filter(c => c.id !== id);
+-    if (customForecasts.length === before) return res.status(404).json({ error: 'not found' });
+-    res.json({ ok: true });
++    const { periods = [], targeting = { mode: 'all' } } = req.body;
++    customForecast = { periods, targeting, updatedAt: Date.now() };
++    console.log(`[Admin] Custom forecast updated: ${periods.length} period(s), targeting: ${targeting.mode}`);
++    res.json(customForecast);
+ });
+ 
+-// Delete all forecasts
+ app.delete('/api/custom-forecast', adminLimiter, (req, res) => {
+     if (!checkAuth(req, res)) return;
+-    customForecasts = [];
++    customForecast = { periods: [], targeting: { mode: 'all' }, updatedAt: null };
+     res.json({ ok: true });
+ });
+ 
+diff --git a/sw.js b/sw.js
+index 1705c99..301391e 100644
+--- a/sw.js
++++ b/sw.js
+@@ -7,154 +7,3 @@
+    ════════════════════════════════════════════════════════════════ */
+ 
+ const CACHE_VERSION = 'shelly-v1.4.2';
+-const APP_SHELL = [
+-    '/',
+-    '/index.html',
+-    '/css/weather.css',
+-    '/js/settings.js',
+-    '/js/music.js',
+-    '/js/weather.js',
+-    '/js/alerts.js',
+-    '/js/radar.js',
+-    '/js/displays.js',
+-    '/js/app.js',
+-    '/js/announcements.js',
+-    '/js/pwa.js',
+-    '/assets/favicon.png',
+-    '/manifest.json',
+-];
+-
+-// External domains whose responses we cache (last-good fallback)
+-const CACHE_EXTERNAL_PATTERNS = [
+-    'api.weather.gov',
+-    'api.open-meteo.com',
+-    'archive-api.open-meteo.com',
+-    'air-quality-api.open-meteo.com',
+-    'nominatim.openstreetmap.org',
+-    'fonts.googleapis.com',
+-    'fonts.gstatic.com',
+-];
+-
+-// ── Install: pre-cache app shell ────────────────────────────────
+-self.addEventListener('install', event => {
+-    event.waitUntil(
+-        caches.open(CACHE_VERSION).then(cache => cache.addAll(APP_SHELL))
+-    );
+-    self.skipWaiting();
+-});
+-
+-// ── Activate: clean up old caches ───────────────────────────────
+-self.addEventListener('activate', event => {
+-    event.waitUntil(
+-        caches.keys().then(keys =>
+-            Promise.all(keys
+-                .filter(k => k !== CACHE_VERSION)
+-                .map(k => caches.delete(k))
+-            )
+-        )
+-    );
+-    self.clients.claim();
+-});
+-
+-// ── Fetch strategy ───────────────────────────────────────────────
+-self.addEventListener('fetch', event => {
+-    const { request } = event;
+-    const url = new URL(request.url);
+-
+-    // Skip non-GET and chrome-extension etc
+-    if (request.method !== 'GET') return;
+-    if (!['http:', 'https:'].includes(url.protocol)) return;
+-
+-    const isLocal = url.origin === self.location.origin;
+-    const isExternalCacheable = CACHE_EXTERNAL_PATTERNS.some(p => url.hostname.includes(p));
+-
+-    if (isLocal) {
+-        // Local API routes: network only (real-time data)
+-        if (url.pathname.startsWith('/api/')) {
+-            event.respondWith(fetch(request));
+-            return;
+-        }
+-        // App shell: cache-first, fall back to network
+-        event.respondWith(cacheFirst(request));
+-    } else if (isExternalCacheable) {
+-        // External weather/geocoding APIs: network-first, cache as fallback
+-        event.respondWith(networkFirstWithCache(request));
+-    }
+-    // All other external requests (Leaflet CDN, etc.): browser default
+-});
+-
+-async function cacheFirst(request) {
+-    const cached = await caches.match(request);
+-    if (cached) return cached;
+-    try {
+-        const response = await fetch(request);
+-        if (response.ok) {
+-            const cache = await caches.open(CACHE_VERSION);
+-            cache.put(request, response.clone());
+-        }
+-        return response;
+-    } catch {
+-        return new Response('Offline – cached version not available', { status: 503 });
+-    }
+-}
+-
+-async function networkFirstWithCache(request) {
+-    const cache = await caches.open(CACHE_VERSION);
+-    try {
+-        const response = await fetch(request);
+-        if (response.ok) {
+-            cache.put(request, response.clone());
+-        }
+-        return response;
+-    } catch {
+-        const cached = await cache.match(request);
+-        if (cached) return cached;
+-        return new Response(JSON.stringify({ error: 'offline', cached: false }), {
+-            status: 503,
+-            headers: { 'Content-Type': 'application/json' }
+-        });
+-    }
+-}
+-
+-// ── Push: show OS notification ──────────────────────────────────
+-self.addEventListener('push', event => {
+-    let data = { title: 'S.H.E.L.L.Y.', body: 'New message from S.H.E.L.L.Y.' };
+-    try {
+-        if (event.data) data = { ...data, ...event.data.json() };
+-    } catch { /* keep defaults */ }
+-
+-    const options = {
+-        body: data.body,
+-        icon: '/assets/favicon.png',
+-        badge: '/assets/favicon.png',
+-        tag: data.tag || 'shelly-notification',
+-        renotify: true,
+-        data: { url: data.url || '/' },
+-        vibrate: [200, 100, 200],
+-    };
+-
+-    // Color the notification based on type
+-    if (data.type === 'emergency') options.urgency = 'high';
+-
+-    event.waitUntil(
+-        self.registration.showNotification(data.title, options)
+-    );
+-});
+-
+-// ── Notification click: focus/open app window ───────────────────
+-self.addEventListener('notificationclick', event => {
+-    event.notification.close();
+-    const targetUrl = event.notification.data?.url || '/';
+-    event.waitUntil(
+-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+-            // Focus existing window if open
+-            for (const client of windowClients) {
+-                if (new URL(client.url).pathname === targetUrl && 'focus' in client) {
+-                    return client.focus();
+-                }
+-            }
+-            // Otherwise open new window
+-            if (clients.openWindow) return clients.openWindow(targetUrl);
+-        })
+-    );
+-});
