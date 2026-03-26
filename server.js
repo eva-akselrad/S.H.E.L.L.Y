@@ -257,6 +257,13 @@ app.use('/api/announce', adminLimiter);
 app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
+app.use('/api/security', adminLimiter);
+app.use('/api/custom-forecast', (req, res, next) => {
+    if (req.method === 'GET') {
+        return next();
+    }
+    return adminLimiter(req, res, next);
+});
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
