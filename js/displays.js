@@ -38,6 +38,24 @@ const Displays = (() => {
             else if (c.windChill !== '--') hiwc.textContent = `Wind Chill: ${c.windChill}`;
             else hiwc.textContent = '';
         }
+
+        // Migraine meter
+        const mr = c.migraineRisk;
+        if (mr) {
+            const badge = el('migraine-level-badge');
+            const detail = el('migraine-detail');
+            const indicator = el('migraine-indicator');
+            if (badge) {
+                badge.textContent = mr.label;
+                badge.className = `migraine-level-badge ${mr.level}`;
+            }
+            if (detail) detail.textContent = mr.detail;
+            if (indicator) {
+                // Positions along the green→yellow→red bar: low=16%, moderate=50%, high=84%
+                const pct = { low: 16, moderate: 50, high: 84 }[mr.level] ?? 50;
+                indicator.style.left = `calc(${pct}% - 2px)`;
+            }
+        }
     }
 
     // ── Detailed Observations (ASOS-style dense grid) ──────────────
