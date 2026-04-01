@@ -459,6 +459,40 @@ node server.js
 
 Or just open `index.html` in a browser for everything except music streaming and the admin panel.
 
+### Run automated tests
+
+```bash
+npm ci
+npm test
+```
+
+`npm test` runs the repository's Node.js test suite (`node --test`).
+
+### Add tests to GitHub Actions
+
+If you want CI to run tests automatically, add `.github/workflows/test.yml` with:
+
+```yaml
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+```
+
 ---
 
 ## 🌐 Environment Variables
