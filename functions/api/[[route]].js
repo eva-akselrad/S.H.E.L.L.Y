@@ -95,8 +95,13 @@ function checkAuth(request, env) {
     return pw === (env.ADMIN_PASSWORD ?? 'weathernow');
 }
 
-function json(data, status = 200) {
-    return new Response(JSON.stringify(data), { status, headers: CORS });
+function json(data, status = 200, extraHeaders = {}) {
+    return new Response(JSON.stringify(data), { status, headers: { ...CORS, ...extraHeaders } });
+}
+
+function noStore(data, status = 200) {
+    // Use for real-time/dynamic endpoints that must never be served from cache.
+    return json(data, status, { 'Cache-Control': 'no-store' });
 }
 
 // ── VAPID / Web Push (Web Crypto — no npm needed) ──────────────────
@@ -191,14 +196,14 @@ export async function onRequest({ request, env }) {
     // ── Health ──────────────────────────────────────────────────
     if (path === '/api/health' && method === 'GET') {
         const subs = await getSubscriptions(env);
-        return json({ ok: true, pushSubscribers: subs.length });
+        return noStore({ ok: true, pushSubscribers: subs.length });
     }
 
     // ── Messages ────────────────────────────────────────────────
     if (path === '/api/messages' && method === 'GET') {
         const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
         const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
-        return json(msgs.filter(m => m.id > since).map(m => ({
+        return noStore(msgs.filter(m => m.id > since).map(m => ({
             ...m,
             ackCount: (acks[m.id] ?? []).length,
         })));
@@ -213,22 +218,7 @@ export async function onRequest({ request, env }) {
             await saveArmageddonState(env, null);
             armState = null;
         }
-        return json({
-            messages: msgs.filter(m => m.id > since),
-            armageddon: armState ? { active: true, ...armState } : { active: false },
-        });
-    }
-
-    // ── Poll (combined messages + armageddon in one request) ────
-    if (path === '/api/poll' && method === 'GET') {
-        const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
-        const [msgs, armageddon] = await Promise.all([getMessages(env), getArmageddonState(env)]);
-        let armState = armageddon;
-        if (armState?.expiresAt && Date.now() > armState.expiresAt) {
-            await saveArmageddonState(env, null);
-            armState = null;
-        }
-        return json({
+        return noStore({
             messages: msgs.filter(m => m.id > since),
             armageddon: armState ? { active: true, ...armState } : { active: false },
         });
@@ -461,7 +451,7 @@ export async function onRequest({ request, env }) {
             await saveArmageddonState(env, null);
             state = null;
         }
-        return json(state ? { active: true, ...state } : { active: false });
+        return noStore(state ? { active: true, ...state } : { active: false });
     }
 
     if (path === '/api/armageddon' && method === 'POST') {
