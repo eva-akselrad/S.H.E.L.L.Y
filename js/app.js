@@ -33,8 +33,66 @@
     const navPause = document.getElementById('nav-pause');
     const navRefresh = document.getElementById('nav-refresh');
     const loadingSlide = document.getElementById('slide-loading');
+    const updatingSlide = document.getElementById('slide-updating');
     const progressFill = document.getElementById('slide-progress');
     const dotsContainer = document.getElementById('slide-dots');
+
+    const VERSION_COOKIE = 'shelly_app_version';
+    const VERSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365 * 2; // 2 years
+
+    function getCookie(name) {
+        const prefix = `${name}=`;
+        return document.cookie.split(';').map(v => v.trim()).find(v => v.startsWith(prefix))?.slice(prefix.length) || '';
+    }
+
+    function setVersionCookie(version) {
+        document.cookie = `${VERSION_COOKIE}=${encodeURIComponent(version)}; path=/; max-age=${VERSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+    }
+
+    function showUpdatingScreen() {
+        clearCycleTimer();
+        document.querySelectorAll('.slide.active').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.slide').forEach(s => s.classList.add('hidden'));
+        if (updatingSlide) {
+            updatingSlide.classList.remove('hidden');
+            updatingSlide.classList.add('active');
+        }
+    }
+
+    async function checkForAppUpdate() {
+        try {
+            const r = await fetch('/api/app-update', { cache: 'no-store' });
+            if (!r.ok) return false;
+            const data = await r.json();
+            const serverVersion = String(data?.version || '').trim();
+            if (!serverVersion) return false;
+
+            const autoUpdateEnabled = data?.autoUpdateEnabled !== false;
+            const localVersion = decodeURIComponent(getCookie(VERSION_COOKIE) || '');
+            const hasMismatch = localVersion && localVersion !== serverVersion;
+
+            // Always persist latest known version on startup.
+            setVersionCookie(serverVersion);
+
+            if (autoUpdateEnabled && hasMismatch) {
+                showUpdatingScreen();
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(regs.map(reg => reg.update()));
+                    } catch (err) {
+                        console.warn('Service worker update check failed:', err);
+                    }
+                }
+                // Brief pause so users can see the updating state before reload.
+                setTimeout(() => window.location.reload(), 1200);
+                return true;
+            }
+        } catch (err) {
+            console.warn('App update check failed:', err);
+        }
+        return false;
+    }
 
     // ── Clock ──────────────────────────────────────────────────────
     function startClock() {
@@ -553,6 +611,9 @@
     }
 
     async function boot() {
+        const isUpdating = await checkForAppUpdate();
+        if (isUpdating) return;
+
         await processPermalink();
 
         startClock();
