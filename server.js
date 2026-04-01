@@ -161,6 +161,7 @@ app.get('/api/poll', (req, res) => {
         armageddonState = null;
         console.log('[Admin] Armageddon mode auto-expired');
     }
+    res.set('Cache-Control', 'no-store');
     res.json({
         messages: messages.filter(m => m.id > since),
         armageddon: armageddonState ? { active: true, ...armageddonState } : { active: false },

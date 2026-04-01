@@ -19,6 +19,7 @@ const CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-admin-password',
+    'Cache-Control': 'no-store',
 };
 
 const KV_MESSAGES_KEY = 'messages';
@@ -203,7 +204,7 @@ export async function onRequest({ request, env }) {
     if (path === '/api/messages' && method === 'GET') {
         const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
         const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
-        return noStore(msgs.filter(m => m.id > since).map(m => ({
+        return json(msgs.filter(m => m.id > since).map(m => ({
             ...m,
             ackCount: (acks[m.id] ?? []).length,
         })));
