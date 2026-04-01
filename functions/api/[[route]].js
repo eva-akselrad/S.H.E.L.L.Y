@@ -17,7 +17,7 @@
 const CORS = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-admin-password',
     'Cache-Control': 'no-store',
 };
@@ -25,10 +25,12 @@ const CORS = {
 const KV_MESSAGES_KEY = 'messages';
 const KV_SUBSCRIPTIONS_KEY = 'push_subscriptions';
 const KV_RELEASE_NOTES_KEY = 'release_notes';
+const KV_APP_UPDATE_SETTINGS_KEY = 'app_update_settings';
 const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
 const KV_ARMAGEDDON_KEY = 'armageddon';
 const KV_MSG_SEQ_KEY = 'msg_next_id'; // persistent counter — never resets on message delete
 const KV_ACKS_KEY = 'msg_acks'; // { [msgId]: [visitorId, ...] }
+const MAX_APP_VERSION_LENGTH = 30;
 
 // ── Helpers ────────────────────────────────────────────────────────
 async function getMessages(env) {
@@ -48,6 +50,16 @@ async function getReleaseNotes(env) {
 }
 async function saveReleaseNotes(env, notes) {
     await env.WEATHERNOW_KV.put(KV_RELEASE_NOTES_KEY, JSON.stringify(notes));
+}
+async function getAppUpdateSettings(env) {
+    return (await env.WEATHERNOW_KV.get(KV_APP_UPDATE_SETTINGS_KEY, 'json')) ?? {
+        version: 'build-cloudflare-pages',
+        autoUpdateEnabled: true,
+        updatedAt: 0,
+    };
+}
+async function saveAppUpdateSettings(env, settings) {
+    await env.WEATHERNOW_KV.put(KV_APP_UPDATE_SETTINGS_KEY, JSON.stringify(settings));
 }
 async function getCustomForecasts(env) {
     const stored = await env.WEATHERNOW_KV.get(KV_CUSTOM_FORECAST_KEY, 'json');
@@ -84,8 +96,13 @@ function checkAuth(request, env) {
     return pw === (env.ADMIN_PASSWORD ?? 'weathernow');
 }
 
-function json(data, status = 200) {
-    return new Response(JSON.stringify(data), { status, headers: CORS });
+function json(data, status = 200, extraHeaders = {}) {
+    return new Response(JSON.stringify(data), { status, headers: { ...CORS, ...extraHeaders } });
+}
+
+function noStore(data, status = 200) {
+    // Use for real-time/dynamic endpoints that must never be served from cache.
+    return json(data, status, { 'Cache-Control': 'no-store' });
 }
 
 // ── VAPID / Web Push (Web Crypto — no npm needed) ──────────────────
@@ -180,7 +197,7 @@ export async function onRequest({ request, env }) {
     // ── Health ──────────────────────────────────────────────────
     if (path === '/api/health' && method === 'GET') {
         const subs = await getSubscriptions(env);
-        return json({ ok: true, pushSubscribers: subs.length });
+        return noStore({ ok: true, pushSubscribers: subs.length });
     }
 
     // ── Messages ────────────────────────────────────────────────
@@ -202,7 +219,7 @@ export async function onRequest({ request, env }) {
             await saveArmageddonState(env, null);
             armState = null;
         }
-        return json({
+        return noStore({
             messages: msgs.filter(m => m.id > since),
             armageddon: armState ? { active: true, ...armState } : { active: false },
         });
@@ -322,6 +339,38 @@ export async function onRequest({ request, env }) {
         return json(results);
     }
 
+    // ── App Update Settings ───────────────────────────────────────
+    if (path === '/api/app-update' && method === 'GET') {
+        const settings = await getAppUpdateSettings(env);
+        return new Response(JSON.stringify(settings), {
+            status: 200,
+            headers: {
+                ...CORS,
+                'Cache-Control': 'no-store',
+            },
+        });
+    }
+
+    if (path === '/api/app-update' && method === 'PUT') {
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        const body = await request.json();
+        const version = String(body?.version ?? '').trim();
+        if (!version || version.length > MAX_APP_VERSION_LENGTH) {
+            return json({ error: 'valid non-whitespace version required (1-30 chars)' }, 400);
+        }
+        const existing = await getAppUpdateSettings(env);
+        const autoUpdateEnabled = typeof body?.autoUpdateEnabled === 'boolean'
+            ? body.autoUpdateEnabled
+            : existing.autoUpdateEnabled;
+        const settings = {
+            version,
+            autoUpdateEnabled,
+            updatedAt: Date.now(),
+        };
+        await saveAppUpdateSettings(env, settings);
+        return json(settings);
+    }
+
     // ── Release Notes ────────────────────────────────────────────
     if (path === '/api/release-notes' && method === 'GET') {
         if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
@@ -403,7 +452,7 @@ export async function onRequest({ request, env }) {
             await saveArmageddonState(env, null);
             state = null;
         }
-        return json(state ? { active: true, ...state } : { active: false });
+        return noStore(state ? { active: true, ...state } : { active: false });
     }
 
     if (path === '/api/armageddon' && method === 'POST') {

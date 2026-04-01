@@ -213,9 +213,15 @@ Nine preset types each provide a unique colour palette, icon, and default title:
 
 Post versioned changelogs that appear in the admin panel's history. Each entry has a version string, date, and free-text notes field with Markdown support.
 
+The Release Notes card also controls app update behavior:
+- **Release Version** — the active app version clients compare against at startup
+- **Enable forced auto-updates** — when enabled, clients with a mismatched saved version show an `UPDATING` screen and force-refresh
+- **Save Update Settings** — saves version + auto-update policy without posting a new note
+
 1. Enter a **version** (e.g. `v2.4.0`), **date**, and **notes**.
 2. Click **📋 Post Release Notes**.
-3. All posted entries appear as a scrollable history below and can be individually deleted.
+3. (Optional) enable **Also announce on display** to broadcast the note as a popup announcement.
+4. All posted entries appear as a scrollable history below and can be individually deleted.
 
 ### Push Notifications (Admin)
 
@@ -313,6 +319,14 @@ S.H.E.L.L.Y. automatically ensures users always load the latest code after a dep
 4. HTML files (`index.html`, `admin.html`) are served with `Cache-Control: no-cache` so the browser always re-fetches them, triggering the SW update check on every page load.
 
 > No action needed from you or your users — this happens automatically on every deploy.
+
+### Client startup version check (admin-controlled)
+
+On startup, display clients also call `/api/app-update` and compare the server version with a persistent cookie (`shelly_app_version`):
+
+- If versions match (or first run), the app continues normally and refreshes the cookie.
+- If versions mismatch **and** auto-updates are enabled, the app shows a temporary **UPDATING** screen, requests SW updates, and forces a full browser refresh.
+- If auto-updates are disabled, the app only updates the cookie and does not force-refresh.
 
 ---
 
@@ -458,6 +472,40 @@ node server.js
 ```
 
 Or just open `index.html` in a browser for everything except music streaming and the admin panel.
+
+### Run automated tests
+
+```bash
+npm ci
+npm test
+```
+
+`npm test` runs the repository's Node.js test suite (`node --test`).
+
+### Add tests to GitHub Actions
+
+If you want CI to run tests automatically, add `.github/workflows/test.yml` with:
+
+```yaml
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+```
 
 ---
 

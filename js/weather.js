@@ -73,7 +73,7 @@ const WeatherAPI = (() => {
                 'temperature_2m', 'weather_code', 'precipitation_probability',
                 'precipitation', 'apparent_temperature', 'wind_speed_10m',
                 'relative_humidity_2m', 'cloud_cover', 'visibility',
-                'snow_depth', 'freezing_level_height', 'cape'
+                'snow_depth', 'freezing_level_height', 'cape', 'surface_pressure'
             ].join(','),
             daily: [
                 'weather_code', 'temperature_2m_max', 'temperature_2m_min',
@@ -257,6 +257,31 @@ const WeatherAPI = (() => {
             return diff > 0 ? `↑ Rising` : `↓ Falling`;
         })();
 
+        // Migraine risk (based on pressure change rate and absolute value)
+        const migraineRisk = (() => {
+            const nowHPa = c.surface_pressure;
+            const prevHPa = h?.surface_pressure?.[0]; // index 0 = 2 hours ago (past_hours=2)
+            const changeHPa = prevHPa != null ? nowHPa - prevHPa : 0;
+            // High: rapid drop (>5 hPa/2h) or very low pressure (<980 hPa)
+            if (changeHPa < -5 || nowHPa < 980) {
+                const detail = changeHPa < -5
+                    ? `Rapid drop (${Math.abs(changeHPa).toFixed(1)} hPa/2h)`
+                    : 'Very low pressure';
+                return { level: 'high', label: 'High', detail };
+            }
+            // Moderate: noticeable drop (2.5–5 hPa), rapid rise (>5 hPa),
+            //           low pressure (980–1000 hPa), or very high pressure (>1025 hPa)
+            if (changeHPa < -2.5 || changeHPa > 5 || nowHPa < 1000 || nowHPa > 1025) {
+                const detail = changeHPa < -2.5
+                    ? `Dropping (${Math.abs(changeHPa).toFixed(1)} hPa/2h)`
+                    : changeHPa > 5
+                        ? `Rapid rise (${changeHPa.toFixed(1)} hPa/2h)`
+                        : nowHPa < 1000 ? 'Low pressure system' : 'High pressure system';
+                return { level: 'moderate', label: 'Moderate', detail };
+            }
+            return { level: 'low', label: 'Low', detail: 'Pressure stable' };
+        })();
+
         // Current conditions
         const conditions = {
             temp: fmtTemp(c.temperature_2m),
@@ -290,6 +315,7 @@ const WeatherAPI = (() => {
             icon: wx.emoji, desc: wx.desc, isDay,
             rawTemp: c.temperature_2m,
             rawCode: c.weather_code,
+            migraineRisk,
         };
 
         // Hourly (next 48h, skip past_hours offset)

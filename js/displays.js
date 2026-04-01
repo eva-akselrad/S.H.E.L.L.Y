@@ -73,6 +73,21 @@ const Displays = (() => {
                 ]
             },
             {
+                label: '🧠 Migraine Risk',
+                cls: 'obs-section-migraine',
+                items: (() => {
+                    const mr = c.migraineRisk;
+                    if (!mr) return [];
+                    const levelColor = { low: '#4ade80', moderate: '#fbbf24', high: '#ef4444' }[mr.level] ?? '#94a3b8';
+                    return [
+                        { icon: '🧠', label: 'Risk Level', value: mr.label, color: levelColor },
+                        { icon: '📉', label: 'Trigger', value: mr.detail },
+                        { icon: '📊', label: 'Pressure', value: c.pressure },
+                        { icon: '📈', label: 'Trend', value: c.pressureTrend || '--' },
+                    ];
+                })()
+            },
+            {
                 label: '🌧 Precipitation & Extremes',
                 cls: 'obs-section-precip',
                 items: [
@@ -107,7 +122,7 @@ const Displays = (() => {
                   <span class="obs-icon">${item.icon}</span>
                   <div class="obs-card-body">
                     <span class="obs-label">${item.label}</span>
-                    <span class="obs-value">${item.value}</span>
+                    <span class="obs-value"${item.color ? ` style="color:${item.color}"` : ''}>${item.value}</span>
                   </div>
                 </div>
               `).join('')}

@@ -101,6 +101,11 @@ let pushSubscriptions = []; // { endpoint, keys: { auth, p256dh } }
 
 let releaseNotes = [];
 let releaseNoteId = 1;
+let appUpdateSettings = {
+    version: `build-${BUILD_HASH}`,
+    autoUpdateEnabled: true,
+    updatedAt: Date.now(),
+};
 
 let customForecasts = [];  // array of { id, label, periods, targeting, updatedAt }
 let customForecastId = 1;
@@ -349,6 +354,32 @@ app.get('/api/health', (_, res) => res.json({
     pushSubscribers: pushSubscriptions.length
 }));
 
+// ── App update settings ───────────────────────────────────────
+// Public read endpoint used by clients at startup.
+app.get('/api/app-update', (_, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(appUpdateSettings);
+});
+
+// Admin write endpoint used by admin panel.
+app.put('/api/app-update', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const version = String(req.body?.version ?? '').trim();
+    if (!version || version.length > 30) {
+        return res.status(400).json({ error: 'valid version required (1-30 chars)' });
+    }
+    const autoUpdateEnabled = typeof req.body?.autoUpdateEnabled === 'boolean'
+        ? req.body.autoUpdateEnabled
+        : appUpdateSettings.autoUpdateEnabled;
+    appUpdateSettings = {
+        version,
+        autoUpdateEnabled,
+        updatedAt: Date.now(),
+    };
+    console.log(`[Admin] Update settings saved: version=${version}, autoUpdateEnabled=${autoUpdateEnabled}`);
+    res.json(appUpdateSettings);
+});
+
 // ── Release Notes ─────────────────────────────────────────────
 app.get('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
@@ -357,10 +388,18 @@ app.get('/api/release-notes', adminLimiter, (req, res) => {
 
 app.post('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    const { version = '', notes = '' } = req.body;
+    const { version = '', notes = '', autoUpdateEnabled } = req.body;
     if (!notes.trim()) return res.status(400).json({ error: 'notes required' });
-    const note = { id: releaseNoteId++, version: version.trim(), notes: notes.trim(), created: Date.now() };
+    const normalizedVersion = version.trim();
+    const note = { id: releaseNoteId++, version: normalizedVersion, notes: notes.trim(), created: Date.now() };
     releaseNotes.unshift(note);
+    if (normalizedVersion) {
+        appUpdateSettings = {
+            version: normalizedVersion,
+            autoUpdateEnabled: typeof autoUpdateEnabled === 'boolean' ? autoUpdateEnabled : appUpdateSettings.autoUpdateEnabled,
+            updatedAt: Date.now(),
+        };
+    }
     console.log(`[Admin] Release note posted: ${version}`);
     res.json(note);
 });
