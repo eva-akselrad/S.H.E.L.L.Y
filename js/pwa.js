@@ -3,6 +3,8 @@
    • Registers service worker
    • Manages install prompt for all browsers
    • Handles push subscription lifecycle
+   • Prompts for push permission on PWA startup
+   • Supports daily weather summary notifications
    ════════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -13,6 +15,11 @@
     let guideShown = false;
     const PUSH_KEY_URL = '/api/push/vapid-key';
     const PUSH_SUB_URL = '/api/push/subscribe';
+    const PUSH_PREFS_URL = '/api/push/prefs';
+
+    // ── LocalStorage keys ────────────────────────────────────────
+    const LS_PUSH_DECLINED = 'shelly-push-declined';
+    const LS_NOTIF_PREFS   = 'shelly-notif-prefs';
 
     // ── Cookie helpers (install prompt throttle) ─────────────────
     const PROMPT_COOKIE = 'pwa-prompt-dismissed';
@@ -36,6 +43,10 @@
                     swRegistration = reg;
                     console.log('[PWA] Service Worker registered:', reg.scope);
                     initPush(reg);
+                    // Show startup push prompt after a short delay (let app settle first)
+                    if (isStandalone) {
+                        setTimeout(() => maybeShowPushStartupPrompt(reg), 2500);
+                    }
                 })
                 .catch(err => console.warn('[PWA] SW registration failed:', err));
         });
@@ -172,10 +183,24 @@
         window.PWA.subscribeToNotifications = () => requestPushPermission(reg);
         window.PWA.unsubscribeFromNotifications = () => unsubscribePush(reg);
         window.PWA.getPushState = () => getPushState(reg);
+        window.PWA.updateNotifPrefs = (prefs) => updateNotifPrefs(reg, prefs);
+        window.PWA.getNotifPrefs = getNotifPrefs;
+        // Called by app.js after each location fetch to keep push prefs in sync
+        window.PWA.onLocationChanged = async (loc) => {
+            const sub = await reg.pushManager.getSubscription().catch(() => null);
+            if (!sub || !loc?.lat) return;
+            const prefs = getNotifPrefs();
+            // Only sync to server if location actually changed
+            if (prefs.lat === loc.lat && prefs.lon === loc.lon) return;
+            updateNotifPrefs(reg, { lat: loc.lat, lon: loc.lon, locationName: loc.label || '' });
+        };
 
         // Restore previous state badge
         const state = await getPushState(reg);
         updatePushUI(state);
+
+        // Sync saved notification preferences to settings UI
+        syncNotifPrefsUI();
     }
 
     async function getPushState(reg) {
@@ -205,6 +230,7 @@
         try {
             // Get server's VAPID public key
             const keyRes = await fetch(PUSH_KEY_URL);
+            if (!keyRes.ok) throw new Error(`VAPID key fetch failed: ${keyRes.status}`);
             const { publicKey } = await keyRes.json();
 
             const sub = await reg.pushManager.subscribe({
@@ -212,12 +238,31 @@
                 applicationServerKey: urlBase64ToUint8Array(publicKey)
             });
 
+            // Serialize explicitly via toJSON so all fields (endpoint, keys) are included
+            const subJSON = sub.toJSON();
+
+            // Include notification preferences and location in subscription
+            const notifPrefs = getNotifPrefs();
+            const loc = typeof WeatherAPI !== 'undefined' ? WeatherAPI.getLocation() : null;
+            if (loc?.lat != null) {
+                notifPrefs.lat = loc.lat;
+                notifPrefs.lon = loc.lon;
+                notifPrefs.locationName = loc.label || '';
+            }
+            notifPrefs.tzOffsetMinutes = -new Date().getTimezoneOffset(); // minutes ahead of UTC (negative for west)
+
+            const payload = { ...subJSON, notifPrefs };
+
             // Send subscription to server
-            await fetch(PUSH_SUB_URL, {
+            const saveRes = await fetch(PUSH_SUB_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sub)
+                body: JSON.stringify(payload)
             });
+            if (!saveRes.ok) {
+                const errData = await saveRes.json().catch(() => ({}));
+                throw new Error(`Server rejected subscription: ${errData.error || saveRes.status}`);
+            }
 
             console.log('[PWA] Push subscribed:', sub.endpoint);
             updatePushUI('subscribed');
@@ -244,6 +289,68 @@
         }
     }
 
+    // ── Notification preferences ─────────────────────────────────
+
+    function getNotifPrefs() {
+        try {
+            return JSON.parse(localStorage.getItem(LS_NOTIF_PREFS) || '{}');
+        } catch { return {}; }
+    }
+
+    function saveNotifPrefs(prefs) {
+        try { localStorage.setItem(LS_NOTIF_PREFS, JSON.stringify(prefs)); } catch { }
+    }
+
+    async function updateNotifPrefs(reg, prefs) {
+        // Merge with existing prefs
+        const current = getNotifPrefs();
+        const merged = { ...current, ...prefs };
+
+        // Always include current location
+        const loc = typeof WeatherAPI !== 'undefined' ? WeatherAPI.getLocation() : null;
+        if (loc?.lat != null) {
+            merged.lat = loc.lat;
+            merged.lon = loc.lon;
+            merged.locationName = loc.label || '';
+        }
+        merged.tzOffsetMinutes = -new Date().getTimezoneOffset();
+
+        saveNotifPrefs(merged);
+
+        // Sync to server if subscribed
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            try {
+                await fetch(PUSH_PREFS_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endpoint: sub.endpoint, notifPrefs: merged })
+                });
+            } catch (err) {
+                console.warn('[PWA] Failed to sync prefs to server:', err.message);
+            }
+        }
+    }
+
+    function syncNotifPrefsUI() {
+        const prefs = getNotifPrefs();
+
+        const alertsToggle = document.getElementById('notif-alerts-toggle');
+        const dailyToggle = document.getElementById('notif-daily-toggle');
+        const dailyTimeInput = document.getElementById('notif-daily-time');
+        const dailyTimeRow = document.getElementById('notif-daily-time-row');
+
+        if (alertsToggle) alertsToggle.checked = prefs.weatherAlerts !== false; // default on
+        if (dailyToggle) {
+            dailyToggle.checked = !!prefs.dailySummary;
+            if (dailyTimeRow) dailyTimeRow.style.display = prefs.dailySummary ? '' : 'none';
+        }
+        if (dailyTimeInput) {
+            const hour = prefs.dailyHour ?? 8;
+            dailyTimeInput.value = String(hour).padStart(2, '0') + ':00';
+        }
+    }
+
     function updatePushUI(state) {
         const btn = document.getElementById('push-subscribe-btn');
         const status = document.getElementById('push-status-text');
@@ -262,23 +369,145 @@
         btn.disabled = s.disabled;
         status.textContent = s.text;
 
+        // Show/hide notification options based on subscription state
+        const optsSection = document.getElementById('notif-options-section');
+        if (optsSection) {
+            optsSection.style.display = state === 'subscribed' ? '' : 'none';
+        }
+
         // Store state for the button's click handler
         btn.dataset.pushState = state;
     }
 
-    // ── 5. Wire push button in settings (called from settings.js init) ──
+    // ── 4b. Startup push prompt (PWA only) ───────────────────────
+
+    async function maybeShowPushStartupPrompt(reg) {
+        // Don't prompt in kiosk mode
+        if (document.body.classList.contains('kiosk-mode')) return;
+        // Only if push is supported
+        if (!('PushManager' in window) || !('Notification' in window)) return;
+        // Only if permission not yet granted or denied
+        if (Notification.permission !== 'default') return;
+        // Don't prompt if user already declined via our UI
+        if (localStorage.getItem(LS_PUSH_DECLINED) === '1') return;
+
+        showPushPermissionModal(reg);
+    }
+
+    function showPushPermissionModal(reg) {
+        if (document.getElementById('push-permission-modal')) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'push-permission-modal';
+        modal.className = 'pwa-guide-modal';
+        modal.innerHTML = `
+            <div class="pwa-guide-inner">
+                <div class="pwa-guide-header">
+                    <span class="pwa-guide-icon">🔔</span>
+                    <span class="pwa-guide-title">Enable Notifications?</span>
+                    <button id="push-modal-close" class="pwa-guide-close">✕</button>
+                </div>
+                <div class="pwa-guide-body">
+                    <p>S.H.E.L.L.Y. can send you push notifications for:</p>
+                    <ul style="margin:8px 0 12px 18px;line-height:1.8">
+                        <li>⚠️ Admin alerts &amp; weather warnings</li>
+                        <li>🌤 Optional daily weather summaries</li>
+                    </ul>
+                    <p style="font-size:0.82rem;color:var(--text-secondary)">You can manage notification preferences in <strong>Settings → Push Notifications</strong>.</p>
+                </div>
+                <div style="display:flex;gap:10px">
+                    <button id="push-modal-allow" class="pwa-guide-ok" style="flex:2">🔔 Enable Notifications</button>
+                    <button id="push-modal-deny" class="pwa-guide-ok" style="flex:1;background:var(--bg-tertiary);color:var(--text-secondary)">No thanks</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const close = () => modal.remove();
+
+        document.getElementById('push-modal-close').addEventListener('click', () => {
+            close();
+            // User dismissed without deciding — don't store, so we ask next time
+        });
+
+        document.getElementById('push-modal-allow').addEventListener('click', async () => {
+            close();
+            await requestPushPermission(reg);
+        });
+
+        document.getElementById('push-modal-deny').addEventListener('click', () => {
+            localStorage.setItem(LS_PUSH_DECLINED, '1');
+            close();
+            showDeclinedTip();
+        });
+    }
+
+    function showDeclinedTip() {
+        const tip = document.createElement('div');
+        tip.className = 'pwa-install-banner';
+        tip.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);max-width:420px;z-index:2100;';
+        tip.innerHTML = `
+            <span class="pwa-banner-icon" style="font-size:1rem">🔕</span>
+            <div class="pwa-banner-text">
+                <strong>Notifications off</strong>
+                <small>Re-enable anytime in <strong>Settings → Push Notifications</strong></small>
+            </div>
+            <button id="push-tip-dismiss" class="pwa-banner-dismiss">✕</button>
+        `;
+        document.body.appendChild(tip);
+
+        const remove = () => tip.remove();
+        document.getElementById('push-tip-dismiss').addEventListener('click', remove);
+        setTimeout(remove, 7000);
+    }
+
+    // ── 5. Wire push button and notif option controls ─────────────
     window.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('push-subscribe-btn');
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-            const state = btn.dataset.pushState;
-            if (!swRegistration) return;
-            if (state === 'subscribed') {
-                await unsubscribePush(swRegistration);
-            } else {
-                await requestPushPermission(swRegistration);
-            }
-        });
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                const state = btn.dataset.pushState;
+                if (!swRegistration) return;
+                if (state === 'subscribed') {
+                    await unsubscribePush(swRegistration);
+                } else {
+                    await requestPushPermission(swRegistration);
+                }
+            });
+        }
+
+        // Weather alerts toggle
+        const alertsToggle = document.getElementById('notif-alerts-toggle');
+        if (alertsToggle) {
+            alertsToggle.addEventListener('change', () => {
+                if (!swRegistration) return;
+                updateNotifPrefs(swRegistration, { weatherAlerts: alertsToggle.checked });
+            });
+        }
+
+        // Daily summary toggle
+        const dailyToggle = document.getElementById('notif-daily-toggle');
+        const dailyTimeRow = document.getElementById('notif-daily-time-row');
+        if (dailyToggle) {
+            dailyToggle.addEventListener('change', () => {
+                if (!swRegistration) return;
+                if (dailyTimeRow) dailyTimeRow.style.display = dailyToggle.checked ? '' : 'none';
+                const prefs = getNotifPrefs();
+                const hour = prefs.dailyHour ?? 8;
+                updateNotifPrefs(swRegistration, { dailySummary: dailyToggle.checked, dailyHour: hour });
+            });
+        }
+
+        // Daily time picker
+        const dailyTimeInput = document.getElementById('notif-daily-time');
+        if (dailyTimeInput) {
+            dailyTimeInput.addEventListener('change', () => {
+                if (!swRegistration) return;
+                const [hourStr] = dailyTimeInput.value.split(':');
+                const hour = parseInt(hourStr, 10);
+                if (!isNaN(hour)) updateNotifPrefs(swRegistration, { dailyHour: hour });
+            });
+        }
     });
 
     // ── Utility ──────────────────────────────────────────────────

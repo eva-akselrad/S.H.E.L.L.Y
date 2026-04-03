@@ -429,6 +429,9 @@
             // Update location display
             if (locationDisplay) locationDisplay.textContent = loc.label;
 
+            // Notify PWA module of location change so push prefs stay in sync
+            if (window.PWA?.onLocationChanged) window.PWA.onLocationChanged(loc);
+
             // Start at first slide if coming from loading
             if (showLoading) {
                 currentSlide = 0;

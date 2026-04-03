@@ -94,10 +94,36 @@ const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:admin@shelly.local';
 
 webPush.setVapidDetails(VAPID_EMAIL, vapidKeys.publicKey, vapidKeys.privateKey);
 
+// ── Push subscription persistence ──────────────────────────────
+const PUSH_SUBS_FILE = path.join(__dirname, '.push-subscriptions.json');
+
+function loadPushSubscriptions() {
+    try {
+        if (fs.existsSync(PUSH_SUBS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, 'utf8'));
+            if (Array.isArray(data)) {
+                console.log(`[Push] Loaded ${data.length} subscription(s) from file`);
+                return data;
+            }
+        }
+    } catch (err) {
+        console.warn('[Push] Failed to load subscriptions from file:', err.message);
+    }
+    return [];
+}
+
+function savePushSubscriptions() {
+    try {
+        fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(pushSubscriptions, null, 2));
+    } catch (err) {
+        console.warn('[Push] Failed to save subscriptions to file:', err.message);
+    }
+}
+
 // ── In-memory stores ────────────────────────────────────────────
 let messages = [];
 let nextId = 1;
-let pushSubscriptions = []; // { endpoint, keys: { auth, p256dh } }
+let pushSubscriptions = loadPushSubscriptions(); // { endpoint, keys: { auth, p256dh }, notifPrefs?, lastDailySummary? }
 
 let releaseNotes = [];
 let releaseNoteId = 1;
@@ -131,8 +157,8 @@ const adminLimiter = rateLimit({
 app.use('/api/verify', adminLimiter);
 app.use('/api/announce', adminLimiter);
 app.use('/api/messages', adminLimiter);
-app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
+// Note: /api/push admin endpoints (send, count, clear) have adminLimiter applied inline
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
@@ -282,7 +308,7 @@ app.delete('/api/armageddon', adminLimiter, (req, res) => {
 app.get('/api/push/vapid-key', (_, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
-app.get('/api/push/count', (req, res) => {
+app.get('/api/push/count', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     res.json({ count: pushSubscriptions.length });
 });
@@ -290,16 +316,33 @@ app.get('/api/push/count', (req, res) => {
 // ── POST /api/push/subscribe ────────────────────────────────────
 app.post('/api/push/subscribe', (req, res) => {
     const sub = req.body;
-    if (!sub?.endpoint) return res.status(400).json({ error: 'invalid subscription' });
+    if (!sub?.endpoint || !sub?.keys?.auth || !sub?.keys?.p256dh) {
+        return res.status(400).json({ error: 'invalid subscription – endpoint and keys required' });
+    }
     // Upsert by endpoint
     const existing = pushSubscriptions.findIndex(s => s.endpoint === sub.endpoint);
     if (existing >= 0) {
-        pushSubscriptions[existing] = sub;
+        // Preserve lastDailySummary timestamp when refreshing a subscription
+        const lastDailySummary = pushSubscriptions[existing].lastDailySummary || null;
+        pushSubscriptions[existing] = { ...sub, lastDailySummary };
     } else {
-        pushSubscriptions.push(sub);
+        pushSubscriptions.push({ ...sub, lastDailySummary: null });
     }
+    savePushSubscriptions();
     console.log(`[Push] Subscribed: ${pushSubscriptions.length} total`);
     res.json({ ok: true, total: pushSubscriptions.length });
+});
+
+// ── PUT /api/push/prefs  (update notification preferences) ─────
+app.put('/api/push/prefs', (req, res) => {
+    const { endpoint, notifPrefs } = req.body;
+    if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+    const idx = pushSubscriptions.findIndex(s => s.endpoint === endpoint);
+    if (idx < 0) return res.status(404).json({ error: 'subscription not found' });
+    pushSubscriptions[idx] = { ...pushSubscriptions[idx], notifPrefs: notifPrefs || {} };
+    savePushSubscriptions();
+    console.log(`[Push] Prefs updated for ${endpoint.slice(-20)}`);
+    res.json({ ok: true });
 });
 
 // ── DELETE /api/push/subscribe ─────────────────────────────────
@@ -307,12 +350,23 @@ app.delete('/api/push/subscribe', (req, res) => {
     const { endpoint } = req.body;
     if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
     pushSubscriptions = pushSubscriptions.filter(s => s.endpoint !== endpoint);
+    savePushSubscriptions();
     console.log(`[Push] Unsubscribed: ${pushSubscriptions.length} remaining`);
     res.json({ ok: true, total: pushSubscriptions.length });
 });
 
+// ── DELETE /api/push/clear (admin: remove all subscriptions) ───
+app.delete('/api/push/clear', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    const count = pushSubscriptions.length;
+    pushSubscriptions = [];
+    savePushSubscriptions();
+    console.log(`[Push] Cleared all ${count} subscription(s)`);
+    res.json({ ok: true, removed: count });
+});
+
 // ── POST /api/push/send (admin test) ──────────────────────────
-app.post('/api/push/send', async (req, res) => {
+app.post('/api/push/send', adminLimiter, async (req, res) => {
     if (!checkAuth(req, res)) return;
     const { title = 'S.H.E.L.L.Y. Test', body = 'Push notifications are working! 🌤', type = 'info' } = req.body;
     const payload = JSON.stringify({ title, body, type, tag: 'test-push', url: '/' });
@@ -321,31 +375,143 @@ app.post('/api/push/send', async (req, res) => {
 });
 
 // ── Fan-out helper ─────────────────────────────────────────────
-async function fanOutPush(payload) {
+async function fanOutPush(payload, filter) {
     let sent = 0, failed = 0;
     const stale = [];
 
-    await Promise.all(pushSubscriptions.map(async sub => {
+    const targets = filter ? pushSubscriptions.filter(filter) : pushSubscriptions;
+
+    await Promise.all(targets.map(async sub => {
         try {
             await webPush.sendNotification(sub, payload);
             sent++;
         } catch (err) {
             failed++;
-            // 410 Gone = subscription is expired/unsubscribed
-            if (err.statusCode === 410 || err.statusCode === 404) stale.push(sub.endpoint);
-            else console.warn('[Push] Send error:', err.message);
+            // 410 Gone = subscription is expired/unsubscribed; 404 = endpoint not found
+            if (err.statusCode === 410 || err.statusCode === 404) {
+                stale.push(sub.endpoint);
+                console.log(`[Push] Stale subscription removed (${err.statusCode}): ${sub.endpoint.slice(-30)}`);
+            } else {
+                console.warn(`[Push] Send error (${err.statusCode || 'no-status'}) for ${sub.endpoint.slice(-30)}: ${err.message}`);
+            }
         }
     }));
 
     // Remove stale subscriptions
     if (stale.length) {
         pushSubscriptions = pushSubscriptions.filter(s => !stale.includes(s.endpoint));
+        savePushSubscriptions();
         console.log(`[Push] Removed ${stale.length} stale subscription(s)`);
     }
 
     console.log(`[Push] Fan-out: ${sent} sent, ${failed} failed / ${pushSubscriptions.length} active`);
     return { sent, failed, total: pushSubscriptions.length };
 }
+
+// ── Daily weather summary helpers ──────────────────────────────
+const WMO_CODES = {
+    0: 'Clear skies ☀️', 1: 'Mostly clear 🌤', 2: 'Partly cloudy ⛅', 3: 'Overcast ☁️',
+    45: 'Foggy 🌫', 48: 'Freezing fog 🌫',
+    51: 'Light drizzle 🌦', 53: 'Drizzle 🌧', 55: 'Heavy drizzle 🌧',
+    61: 'Light rain 🌧', 63: 'Rain 🌧', 65: 'Heavy rain 🌧',
+    71: 'Light snow 🌨', 73: 'Snow 🌨', 75: 'Heavy snow ❄️', 77: 'Snow grains ❄️',
+    80: 'Showers 🌦', 81: 'Heavy showers 🌧', 82: 'Violent showers ⛈',
+    85: 'Snow showers 🌨', 86: 'Heavy snow showers ❄️',
+    95: 'Thunderstorms ⛈', 96: 'Thunderstorms with hail ⛈', 99: 'Severe thunderstorms ⛈',
+};
+
+async function fetchDailySummaryWeather(lat, lon) {
+    try {
+        const params = new URLSearchParams({
+            latitude: lat, longitude: lon,
+            current: 'temperature_2m,weathercode,wind_speed_10m,relative_humidity_2m',
+            daily: 'temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,precipitation_probability_max',
+            temperature_unit: 'fahrenheit', wind_speed_unit: 'mph', precipitation_unit: 'inch',
+            timezone: 'auto', forecast_days: '1',
+        });
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+            signal: AbortSignal.timeout(8000),
+            headers: { 'User-Agent': 'S.H.E.L.L.Y.-WeatherClient/1.0' },
+        });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
+
+// ── Daily summary scheduler (checks every minute) ───────────────
+setInterval(async () => {
+    try {
+        const now = new Date();
+        const currentUtcHour = now.getUTCHours();
+        const currentUtcMinute = now.getUTCMinutes();
+
+        // Only fire in the first 5 minutes of each hour to avoid double-sending
+        if (currentUtcMinute >= 5) return;
+
+        // Collect subscribers who need a summary right now
+        const due = pushSubscriptions.filter(sub => {
+            const prefs = sub.notifPrefs;
+            if (!prefs?.dailySummary || prefs.lat == null || prefs.lon == null) return false;
+
+            // Convert subscriber's local hour to UTC: utc = local - tzOffsetHours
+            // tzOffsetMinutes is minutes ahead of UTC (negative for west, e.g. EST = -300)
+            const tzOffsetHours = Math.round((prefs.tzOffsetMinutes || 0) / 60);
+            const targetUtcHour = ((prefs.dailyHour || 8) - tzOffsetHours + 24) % 24;
+            if (targetUtcHour !== currentUtcHour) return false;
+
+            // Skip if already sent within the last 12 hours
+            if (sub.lastDailySummary) {
+                const hoursSince = (Date.now() - sub.lastDailySummary) / (1000 * 60 * 60);
+                if (hoursSince < 12) return false;
+            }
+            return true;
+        });
+
+        for (const sub of due) {
+            const prefs = sub.notifPrefs;
+            const weather = await fetchDailySummaryWeather(prefs.lat, prefs.lon);
+            if (!weather) {
+                console.warn(`[Push] Daily summary: weather fetch failed for ${sub.endpoint.slice(-20)}`);
+                continue;
+            }
+
+            const condition = WMO_CODES[weather.current.weathercode] || 'Variable conditions';
+            const temp = Math.round(weather.current.temperature_2m);
+            const high = Math.round(weather.daily.temperature_2m_max[0]);
+            const low = Math.round(weather.daily.temperature_2m_min[0]);
+            const precip = weather.daily.precipitation_probability_max?.[0];
+            const location = prefs.locationName || 'your area';
+
+            let body = `${condition} · ${temp}°F now · High ${high}° / Low ${low}°`;
+            if (precip != null && precip >= 20) body += ` · 💧 ${precip}% chance of rain`;
+
+            const payload = JSON.stringify({
+                title: `🌤 Daily Weather – ${location}`,
+                body,
+                type: 'daily-summary',
+                tag: 'daily-weather-summary',
+                url: '/',
+            });
+
+            try {
+                await webPush.sendNotification(sub, payload);
+                sub.lastDailySummary = Date.now();
+                savePushSubscriptions();
+                console.log(`[Push] Daily summary sent to ${sub.endpoint.slice(-20)}`);
+            } catch (err) {
+                console.warn(`[Push] Daily summary failed (${err.statusCode || 'err'}) for ${sub.endpoint.slice(-20)}: ${err.message}`);
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    pushSubscriptions = pushSubscriptions.filter(s => s.endpoint !== sub.endpoint);
+                    savePushSubscriptions();
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Push] Daily summary scheduler error:', err.message);
+    }
+}, 60 * 1000);
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({

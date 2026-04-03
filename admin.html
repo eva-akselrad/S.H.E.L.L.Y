@@ -1618,10 +1618,25 @@
 
             async function clearPushSubs() {
                 if (!confirm('Remove all push subscriptions? Devices will need to re-subscribe.')) return;
-                // We don't have a bulk-clear endpoint, so we fetch count and note it
                 const fb = document.getElementById('push-feedback');
-                fb.style.color = 'var(--muted)';
-                fb.textContent = 'Use the KV dashboard or redeploy to clear subscriptions manually.';
+                try {
+                    const r = await fetch(`${API}/push/clear`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword }
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        fb.style.color = '#22c55e';
+                        fb.textContent = `✓ Cleared ${data.removed} subscription(s)`;
+                        document.getElementById('push-sub-count').textContent = '0';
+                    } else {
+                        fb.style.color = '#ef4444';
+                        fb.textContent = `⚠ Failed: ${data.error || r.status}`;
+                    }
+                } catch {
+                    fb.style.color = '#ef4444';
+                    fb.textContent = '⚠ Failed to clear subscriptions.';
+                }
                 setTimeout(() => fb.textContent = '', 6000);
             }
 

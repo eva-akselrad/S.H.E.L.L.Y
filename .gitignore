@@ -1,5 +1,6 @@
 node_modules/
 .vapid-keys.json
+.push-subscriptions.json
 tasks.mdtmp_screenshots/
 tasks.md
 leaflet*.tgz

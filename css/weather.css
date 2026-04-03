@@ -2627,7 +2627,8 @@ body.kiosk-mode #music-controls {
 
 /* Hide PWA install prompts in kiosk mode */
 body.kiosk-mode #pwa-install-banner,
-body.kiosk-mode #pwa-guide-modal {
+body.kiosk-mode #pwa-guide-modal,
+body.kiosk-mode #push-permission-modal {
     display: none !important;
 }
 

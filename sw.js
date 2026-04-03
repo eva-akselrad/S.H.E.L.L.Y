@@ -123,18 +123,23 @@ self.addEventListener('push', event => {
         if (event.data) data = { ...data, ...event.data.json() };
     } catch { /* keep defaults */ }
 
+    // Choose icon/badge based on notification type
+    const isDailySummary = data.type === 'daily-summary';
+    const isEmergency = data.type === 'emergency';
+
     const options = {
         body: data.body,
         icon: '/assets/favicon.png',
         badge: '/assets/favicon.png',
         tag: data.tag || 'shelly-notification',
-        renotify: true,
+        renotify: !isDailySummary, // don't buzz again for daily summary updates
+        silent: isDailySummary,    // daily summary is low-priority, no sound
         data: { url: data.url || '/' },
-        vibrate: [200, 100, 200],
+        vibrate: isEmergency ? [300, 100, 300, 100, 300] : [200, 100, 200],
     };
 
-    // Color the notification based on type
-    if (data.type === 'emergency') options.urgency = 'high';
+    if (isEmergency) options.urgency = 'high';
+    if (isDailySummary) options.timestamp = Date.now();
 
     event.waitUntil(
         self.registration.showNotification(data.title, options)
