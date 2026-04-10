@@ -213,6 +213,38 @@
             background: #22c55e;
         }
 
+
+        /* ── Tabs ── */
+        .admin-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scrollbar-width: none;
+        }
+        .admin-tabs::-webkit-scrollbar { display: none; }
+        .admin-tab {
+            padding: 10px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: .85rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .2s;
+        }
+        .admin-tab:hover { border-color: var(--accent); color: var(--text); }
+        .admin-tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
         /* ── Composer card ──────────────────────────────────── */
         .card {
             background: var(--surface);
@@ -927,464 +959,465 @@
             <span class="admin-status"><span id="status-dot"></span><span id="status-text">Connecting…</span></span>
         </div>
 
-        <!-- Composer -->
-        <div class="card">
-            <div class="card-title">📣 Send Announcement</div>
+        <div class="admin-tabs">
+            <div class="admin-tab active" data-tab="alerts">📣 Alerts</div>
+            <div class="admin-tab" data-tab="emergency">🛑 Emergency</div>
+            <div class="admin-tab" data-tab="forecast">🌤 Forecast</div>
+            <div class="admin-tab" data-tab="updates">📝 Updates</div>
+            <div class="admin-tab" data-tab="security">🛡 Security</div>
+        </div>
 
-            <div class="field-group">
-                <label>Message Type</label>
-                <div class="type-grid">
-                    <div class="type-btn active" data-val="info">ℹ Info</div>
-                    <div class="type-btn" data-val="warning">⚠ Warning</div>
-                    <div class="type-btn" data-val="emergency">🚨 Emergency</div>
-                </div>
-            </div>
+        <!-- Alerts Tab -->
+        <div class="tab-panel active" id="tab-alerts">
+            <!-- Composer -->
+            <div class="card">
+                <div class="card-title">📣 Send Announcement</div>
 
-            <div class="field-group">
-                <label>Display Style</label>
-                <div class="display-grid">
-                    <div class="display-btn active" data-val="banner">
-                        <span class="disp-icon">📰</span>
-                        <div class="disp-name">Banner</div>
-                        <div class="disp-desc">Slide-in bar at top</div>
-                    </div>
-                    <div class="display-btn" data-val="popup">
-                        <span class="disp-icon">💬</span>
-                        <div class="disp-name">Popup</div>
-                        <div class="disp-desc">Full-screen overlay</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
                 <div class="field-group">
-                    <label>Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                    <input type="text" id="msg-title" placeholder="e.g. Road Closure" maxlength="60" />
+                    <label>Message Type</label>
+                    <div class="type-grid">
+                        <div class="type-btn active" data-val="info">ℹ Info</div>
+                        <div class="type-btn" data-val="warning">⚠ Warning</div>
+                        <div class="type-btn" data-val="emergency">🚨 Emergency</div>
+                    </div>
                 </div>
+
                 <div class="field-group">
-                    <label>Auto-dismiss after</label>
-                    <select id="msg-duration">
-                        <option value="0">Manual dismiss</option>
-                        <option value="15">15 seconds</option>
-                        <option value="30">30 seconds</option>
-                        <option value="60" selected>1 minute</option>
-                        <option value="120">2 minutes</option>
-                        <option value="300">5 minutes</option>
-                        <option value="600">10 minutes</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="field-group">
-                <label>Message</label>
-                <textarea id="msg-text" placeholder="Type your announcement here…"></textarea>
-            </div>
-
-            <div class="field-group"
-                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px">
-                <input type="checkbox" id="msg-tts"
-                    style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
-                <div style="flex:1">
-                    <label for="msg-tts" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔊
-                        Read aloud with TTS on display</label>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Speaks the message on the weather
-                        display. Music will be ducked while speaking.</div>
-                </div>
-            </div>
-
-            <div class="field-group"
-                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                <input type="checkbox" id="msg-push"
-                    style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;cursor:pointer" />
-                <div style="flex:1">
-                    <label for="msg-push" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📲
-                        Send as Push Notification</label>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Pushes to all subscribed devices.
-                        Requires push to be enabled by the viewer.</div>
-                </div>
-            </div>
-
-            <!-- Location Targeting -->
-            <div style="margin-bottom:16px">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">📍 Target Audience</span>
-                    <span id="msg-target-badge" class="fc-target-badge">All Viewers</span>
-                </div>
-                <p style="font-size:.72rem;color:var(--muted);margin-bottom:10px">Restrict who sees this message by location, or leave as All Viewers to show everywhere.</p>
-                <div class="fc-target-tabs">
-                    <div class="msg-target-tab fc-target-tab active" data-msgmode="all">🌍 All Viewers</div>
-                    <div class="msg-target-tab fc-target-tab" data-msgmode="radius">📍 Map Area</div>
-                    <div class="msg-target-tab fc-target-tab" data-msgmode="zips">🏷 ZIP Codes</div>
-                    <div class="msg-target-tab fc-target-tab" data-msgmode="counties">🗺 Counties</div>
-                </div>
-                <!-- All -->
-                <div class="fc-target-panel" id="msg-target-all">
-                    <div style="font-size:.82rem;color:var(--muted)">This message will be visible to <strong style="color:var(--text)">all viewers</strong> regardless of their location.</div>
-                </div>
-                <!-- Radius -->
-                <div class="fc-target-panel" id="msg-target-radius" style="display:none">
-                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center point, then set the radius in miles.</p>
-                    <div id="msg-radius-map" style="height:200px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px"></div>
-                    <div class="fc-target-grid">
-                        <div class="fc-field"><label>Center Lat</label><input type="number" id="msg-radius-lat" step="0.0001" placeholder="e.g. 37.77" /></div>
-                        <div class="fc-field"><label>Center Lon</label><input type="number" id="msg-radius-lon" step="0.0001" placeholder="e.g. -122.42" /></div>
-                        <div class="fc-field"><label>Radius (miles)</label><input type="number" id="msg-radius-mi" min="1" max="1000" placeholder="e.g. 50" /></div>
+                    <label>Display Style</label>
+                    <div class="display-grid">
+                        <div class="display-btn active" data-val="banner">
+                            <span class="disp-icon">📰</span>
+                            <div class="disp-name">Banner</div>
+                            <div class="disp-desc">Slide-in bar at top</div>
+                        </div>
+                        <div class="display-btn" data-val="popup">
+                            <span class="disp-icon">💬</span>
+                            <div class="disp-name">Popup</div>
+                            <div class="disp-desc">Full-screen overlay</div>
+                        </div>
                     </div>
                 </div>
-                <!-- ZIPs -->
-                <div class="fc-target-panel" id="msg-target-zips" style="display:none">
-                    <div class="fc-field">
-                        <label>ZIP Codes — comma-separated</label>
-                        <input type="text" id="msg-zip-input" placeholder="e.g. 90210, 10001, 60601" />
+
+                <div class="row">
+                    <div class="field-group">
+                        <label>Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                        <input type="text" id="msg-title" placeholder="e.g. Road Closure" maxlength="60" />
                     </div>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will only appear for viewers whose location reverse-geocodes to one of these ZIP codes.</div>
-                </div>
-                <!-- Counties -->
-                <div class="fc-target-panel" id="msg-target-counties" style="display:none">
-                    <div class="fc-field">
-                        <label>Counties — comma-separated (include state abbreviation)</label>
-                        <input type="text" id="msg-county-input" placeholder="e.g. Jefferson County AL, Cook County IL" />
-                    </div>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will show for viewers whose county matches any entry in this list.</div>
-                </div>
-            </div>
-
-            <button class="send-btn" id="send-btn">📡 SEND ANNOUNCEMENT</button>
-            <div id="send-feedback"></div>
-        </div>
-
-        <!-- Push Notifications -->
-        <div class="card">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                <span>📲 Push Notifications</span>
-                <span id="push-sub-count" style="font-size:.78rem;color:var(--accent2);font-weight:600">…
-                    subscribers</span>
-            </div>
-            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
-                Send a test push to all subscribed devices. Viewers subscribe via the notification button in Settings.
-            </p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="send-btn" id="push-test-btn"
-                    style="flex:1;background:linear-gradient(135deg,var(--accent2),var(--accent))">
-                    🔔 Send Test Push
-                </button>
-                <button class="clear-all-btn" id="push-clear-btn" style="flex:none">Clear All Subs</button>
-            </div>
-            <div id="push-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-        </div>
-
-        <!-- Active messages -->
-        <div class="card">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                <span>📋 Active Messages</span>
-                <button class="clear-all-btn" id="clear-all-btn">Clear All</button>
-            </div>
-            <div id="active-list">
-                <div class="no-msgs">No active messages</div>
-            </div>
-        </div>
-
-        <!-- E.S.T.O.P. (Exigent Site Take-down Operational Procedure) -->
-        <div class="card" id="armageddon-card" style="border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.05)">
-            <div class="card-title" style="color:#f87171">🛑 E.S.T.O.P. <span style="font-size:.72rem;font-weight:400;letter-spacing:.03em">(Exigent Site Take-down Operational Procedure)</span></div>
-            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
-                Overrides the entire display with a full-screen message that <strong style="color:#f87171">cannot be dismissed by viewers</strong>.
-                Only the admin can deactivate it. Use for critical emergencies only.
-            </p>
-
-            <!-- Active status bar -->
-            <div id="armageddon-status-bar" style="display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:#fca5a5">
-                <span id="armageddon-status-icon" style="font-size:1.3em">🔴</span>
-                <div style="flex:1;min-width:0">
-                    <strong>ACTIVE:</strong>
-                    <span id="armageddon-active-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-                    <div id="armageddon-countdown" style="font-size:.72rem;color:#f59e0b;margin-top:2px"></div>
-                </div>
-            </div>
-
-            <!-- Emergency type presets -->
-            <div class="field-group">
-                <label>Emergency Type</label>
-                <div class="arm-type-grid" id="arm-type-grid">
-                    <button class="arm-type-btn selected" data-type="tornado"      data-icon="🌪️" data-default-title="TORNADO WARNING"       data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                        <span class="arm-type-icon">🌪️</span>Tornado
-                    </button>
-                    <button class="arm-type-btn" data-type="hurricane"   data-icon="🌀" data-default-title="HURRICANE WARNING"     data-color="#a855f7" data-bg="#05000f" data-glow="rgba(168,85,247,0.8)">
-                        <span class="arm-type-icon">🌀</span>Hurricane
-                    </button>
-                    <button class="arm-type-btn" data-type="flood"       data-icon="🌊" data-default-title="FLASH FLOOD WARNING"   data-color="#3b82f6" data-bg="#000514" data-glow="rgba(59,130,246,0.8)">
-                        <span class="arm-type-icon">🌊</span>Flash Flood
-                    </button>
-                    <button class="arm-type-btn" data-type="fire"        data-icon="🔥" data-default-title="WILDFIRE EMERGENCY"    data-color="#f97316" data-bg="#0f0300" data-glow="rgba(249,115,22,0.8)">
-                        <span class="arm-type-icon">🔥</span>Wildfire
-                    </button>
-                    <button class="arm-type-btn" data-type="winter"      data-icon="❄️" data-default-title="WINTER STORM WARNING"  data-color="#bae6fd" data-bg="#00050f" data-glow="rgba(186,230,253,0.8)">
-                        <span class="arm-type-icon">❄️</span>Winter Storm
-                    </button>
-                    <button class="arm-type-btn" data-type="thunderstorm" data-icon="⛈️" data-default-title="SEVERE THUNDERSTORM"  data-color="#fbbf24" data-bg="#050500" data-glow="rgba(251,191,36,0.8)">
-                        <span class="arm-type-icon">⛈️</span>Thunderstorm
-                    </button>
-                    <button class="arm-type-btn" data-type="nuclear"     data-icon="☢️" data-default-title="NUCLEAR ALERT"         data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                        <span class="arm-type-icon">☢️</span>Nuclear
-                    </button>
-                    <button class="arm-type-btn" data-type="civil"       data-icon="📻" data-default-title="CIVIL EMERGENCY"       data-color="#f97316" data-bg="#0a0500" data-glow="rgba(249,115,22,0.8)">
-                        <span class="arm-type-icon">📻</span>Civil Emergency
-                    </button>
-                    <button class="arm-type-btn" data-type="custom"      data-icon="🚨" data-default-title=""                      data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                        <span class="arm-type-icon">🚨</span>Custom
-                    </button>
-                </div>
-            </div>
-
-            <!-- Title -->
-            <div class="field-group">
-                <label>Title <span style="color:var(--muted);font-weight:400">(optional — pre-filled by type)</span></label>
-                <input type="text" id="arm-title" placeholder="e.g. TORNADO WARNING" maxlength="80" />
-            </div>
-
-            <!-- Message -->
-            <div class="field-group">
-                <label>Message</label>
-                <textarea id="arm-text" rows="3" placeholder="Enter the override message to display on all screens…"></textarea>
-            </div>
-
-            <!-- Options row -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-                <div class="field-group" style="margin-bottom:0">
-                    <label>Auto-deactivate</label>
-                    <select id="arm-duration" style="width:100%;padding:9px 12px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem">
-                        <option value="0">Manual only</option>
-                        <option value="5">5 minutes</option>
-                        <option value="15">15 minutes</option>
-                        <option value="30">30 minutes</option>
-                        <option value="60">1 hour</option>
-                        <option value="120">2 hours</option>
-                    </select>
-                </div>
-                <div class="field-group" style="margin-bottom:0;justify-content:flex-end">
-                    <label style="visibility:hidden;height:18px">.</label>
-                    <div style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px">
-                        <input type="checkbox" id="arm-push" style="width:16px;height:16px;accent-color:#ef4444;flex-shrink:0;cursor:pointer" />
-                        <label for="arm-push" style="cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);line-height:1.3">
-                            📲 Push notify subscribers
-                        </label>
+                    <div class="field-group">
+                        <label>Auto-dismiss after</label>
+                        <select id="msg-duration">
+                            <option value="0">Manual dismiss</option>
+                            <option value="15">15 seconds</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>1 minute</option>
+                            <option value="120">2 minutes</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                        </select>
                     </div>
                 </div>
-            </div>
 
-            <!-- Buttons -->
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-                <button class="send-btn" id="arm-activate-btn"
-                    style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b)">
-                    🛑 ACTIVATE E.S.T.O.P.
-                </button>
-                <button class="clear-all-btn" id="arm-deactivate-btn" style="flex:none;display:none">
-                    ✕ Deactivate
-                </button>
-            </div>
-            <div id="arm-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-        </div>
-
-        <!-- E.S.T.O.P. confirmation modal -->
-        <div id="arm-confirm-modal">
-            <div class="arm-confirm-box">
-                <div class="arm-confirm-icon" id="arm-confirm-icon">🛑</div>
-                <div class="arm-confirm-title">ACTIVATE E.S.T.O.P.?</div>
-                <div class="arm-confirm-body">
-                    This will immediately override <strong style="color:#fff">all connected displays</strong>
-                    with a full-screen emergency message. Viewers <strong style="color:#f87171">cannot dismiss it</strong>.
-                    <div class="arm-confirm-preview" id="arm-confirm-preview">
-                        <div class="arm-confirm-preview-type" id="arm-confirm-preview-type"></div>
-                        <div class="arm-confirm-preview-title" id="arm-confirm-preview-title"></div>
-                        <div class="arm-confirm-preview-text" id="arm-confirm-preview-text"></div>
-                        <div class="arm-confirm-preview-timer" id="arm-confirm-preview-timer"></div>
-                    </div>
-                </div>
-                <div class="arm-confirm-btns">
-                    <button id="arm-confirm-cancel">Cancel</button>
-                    <button id="arm-confirm-ok">🛑 ACTIVATE NOW</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Release Notes -->
-        <div class="card">
-            <div class="card-title">📝 Release Notes</div>
-            <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Post a release note to document updates.
-                It will be saved here and can optionally be announced on the display.</p>
-
-            <div class="row">
                 <div class="field-group">
-                    <label>Release Version</label>
-                    <input type="text" id="rn-version" placeholder="e.g. v2.1.0" maxlength="30" />
+                    <label>Message</label>
+                    <textarea id="msg-text" placeholder="Type your announcement here…"></textarea>
                 </div>
-                <div class="field-group">
-                    <label>Date</label>
-                    <input type="text" id="rn-date" placeholder="Auto-filled on post" readonly
-                        style="opacity:.5;cursor:default" />
+
+                <div class="field-group"
+                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px">
+                    <input type="checkbox" id="msg-tts"
+                        style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
+                    <div style="flex:1">
+                        <label for="msg-tts" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔊
+                            Read aloud with TTS on display</label>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Speaks the message on the weather
+                            display. Music will be ducked while speaking.</div>
+                    </div>
                 </div>
+
+                <div class="field-group"
+                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                    <input type="checkbox" id="msg-push"
+                        style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;cursor:pointer" />
+                    <div style="flex:1">
+                        <label for="msg-push" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📲
+                            Send as Push Notification</label>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Pushes to all subscribed devices.
+                            Requires push to be enabled by the viewer.</div>
+                    </div>
+                </div>
+
+                <!-- Location Targeting -->
+                <div style="margin-bottom:16px">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                        <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">📍 Target Audience</span>
+                        <span id="msg-target-badge" class="fc-target-badge">All Viewers</span>
+                    </div>
+                    <p style="font-size:.72rem;color:var(--muted);margin-bottom:10px">Restrict who sees this message by location, or leave as All Viewers to show everywhere.</p>
+                    <div class="fc-target-tabs">
+                        <div class="msg-target-tab fc-target-tab active" data-msgmode="all">🌍 All Viewers</div>
+                        <div class="msg-target-tab fc-target-tab" data-msgmode="radius">📍 Map Area</div>
+                        <div class="msg-target-tab fc-target-tab" data-msgmode="zips">🏷 ZIP Codes</div>
+                        <div class="msg-target-tab fc-target-tab" data-msgmode="counties">🗺 Counties</div>
+                    </div>
+                    <!-- All -->
+                    <div class="fc-target-panel" id="msg-target-all">
+                        <div style="font-size:.82rem;color:var(--muted)">This message will be visible to <strong style="color:var(--text)">all viewers</strong> regardless of their location.</div>
+                    </div>
+                    <!-- Radius -->
+                    <div class="fc-target-panel" id="msg-target-radius" style="display:none">
+                        <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center point, then set the radius in miles.</p>
+                        <div id="msg-radius-map" style="height:200px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px"></div>
+                        <div class="fc-target-grid">
+                            <div class="fc-field"><label>Center Lat</label><input type="number" id="msg-radius-lat" step="0.0001" placeholder="e.g. 37.77" /></div>
+                            <div class="fc-field"><label>Center Lon</label><input type="number" id="msg-radius-lon" step="0.0001" placeholder="e.g. -122.42" /></div>
+                            <div class="fc-field"><label>Radius (miles)</label><input type="number" id="msg-radius-mi" min="1" max="1000" placeholder="e.g. 50" /></div>
+                        </div>
+                    </div>
+                    <!-- ZIPs -->
+                    <div class="fc-target-panel" id="msg-target-zips" style="display:none">
+                        <div class="fc-field">
+                            <label>ZIP Codes — comma-separated</label>
+                            <input type="text" id="msg-zip-input" placeholder="e.g. 90210, 10001, 60601" />
+                        </div>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will only appear for viewers whose location reverse-geocodes to one of these ZIP codes.</div>
+                    </div>
+                    <!-- Counties -->
+                    <div class="fc-target-panel" id="msg-target-counties" style="display:none">
+                        <div class="fc-field">
+                            <label>Counties — comma-separated (include state abbreviation)</label>
+                            <input type="text" id="msg-county-input" placeholder="e.g. Jefferson County AL, Cook County IL" />
+                        </div>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will show for viewers whose county matches any entry in this list.</div>
+                    </div>
+                </div>
+
+                <button class="send-btn" id="send-btn">📡 SEND ANNOUNCEMENT</button>
+                <div id="send-feedback"></div>
             </div>
 
-            <div class="field-group">
-                <label>Release Notes</label>
-                <textarea id="rn-notes" placeholder="What changed in this update?&#10;• New feature: …&#10;• Fixed: …&#10;• Improved: …"
-                    style="min-height:110px"></textarea>
-            </div>
-
-            <div class="field-group"
-                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                <input type="checkbox" id="rn-announce"
-                    style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
-                <div style="flex:1">
-                    <label for="rn-announce"
-                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📣 Also announce on
-                        display</label>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Sends a popup announcement to the
-                        weather display so viewers can see what's new.</div>
-                </div>
-            </div>
-
-            <div class="field-group"
-                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                <input type="checkbox" id="rn-autoupdate"
-                    style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
-                <div style="flex:1">
-                    <label for="rn-autoupdate"
-                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Force client updates on version mismatch</label>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
-                </div>
-            </div>
-
-            <button class="clear-all-btn" id="rn-save-settings-btn" style="margin-bottom:10px">💾 Save Update Settings</button>
-
-            <button class="send-btn" id="rn-post-btn"
-                style="background:linear-gradient(135deg,var(--accent2),#0ea5e9)">📝 POST RELEASE NOTES</button>
-            <div id="rn-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-
-            <div style="margin-top:24px">
+            <!-- Active messages -->
+            <div class="card">
                 <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>🗒 History</span>
-                    <button class="clear-all-btn" id="rn-clear-all-btn">Clear All</button>
+                    <span>📋 Active Messages</span>
+                    <button class="clear-all-btn" id="clear-all-btn">Clear All</button>
                 </div>
-                <div id="rn-list">
-                    <div class="no-msgs">No release notes posted yet</div>
+                <div id="active-list">
+                    <div class="no-msgs">No active messages</div>
                 </div>
             </div>
         </div>
 
-        <!-- Custom Forecast -->
-        <div class="card">
-            <div class="card-title">🌤 Custom Forecast</div>
-            <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Build your own forecast periods. Only fill
-                in the fields you want — everything is optional except the period name. You can publish multiple
-                forecasts at once (e.g. for different areas). Each forecast needs a unique label.</p>
+        <!-- Emergency Tab -->
+        <div class="tab-panel" id="tab-emergency">
+            <!-- E.S.T.O.P. (Exigent Site Take-down Operational Procedure) -->
+            <div class="card" id="armageddon-card" style="border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.05)">
+                <div class="card-title" style="color:#f87171">🛑 E.S.T.O.P. <span style="font-size:.72rem;font-weight:400;letter-spacing:.03em">(Exigent Site Take-down Operational Procedure)</span></div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                    Overrides the entire display with a full-screen message that <strong style="color:#f87171">cannot be dismissed by viewers</strong>.
+                    Only the admin can deactivate it. Use for critical emergencies only.
+                </p>
 
-            <!-- Forecast label (used to identify this forecast among multiple) -->
-            <div class="fc-field" style="margin-bottom:14px">
-                <label>Forecast Label <span style="font-size:.72rem;color:var(--muted)">(optional — used to distinguish multiple forecasts)</span></label>
-                <input type="text" id="fc-label" placeholder="e.g. Downtown, North Suburbs, Airport…" style="width:100%" />
-            </div>
-
-            <div id="fc-periods"></div>
-
-            <button class="fc-add-btn" id="fc-add-btn">＋ Add Forecast Period</button>
-
-            <!-- Target Area -->
-            <div style="margin-bottom:16px">
-                <div class="card-title" style="margin-bottom:12px">📍 Target Area <span id="fc-target-badge" class="fc-target-badge">All Viewers</span></div>
-                <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Restrict who sees this forecast by
-                    location. Select a map area, ZIP codes, or counties — or leave as All Viewers to show everywhere.</p>
-
-                <div class="fc-target-tabs">
-                    <div class="fc-target-tab active" data-tmode="all">🌍 All Viewers</div>
-                    <div class="fc-target-tab" data-tmode="radius">📍 Map Area</div>
-                    <div class="fc-target-tab" data-tmode="zips">🏷 ZIP Codes</div>
-                    <div class="fc-target-tab" data-tmode="counties">🗺 Counties</div>
+                <!-- Active status bar -->
+                <div id="armageddon-status-bar" style="display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:#fca5a5">
+                    <span id="armageddon-status-icon" style="font-size:1.3em">🔴</span>
+                    <div style="flex:1;min-width:0">
+                        <strong>ACTIVE:</strong>
+                        <span id="armageddon-active-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                        <div id="armageddon-countdown" style="font-size:.72rem;color:#f59e0b;margin-top:2px"></div>
+                    </div>
                 </div>
 
-                <!-- All -->
-                <div class="fc-target-panel" id="fc-target-all">
-                    <div style="font-size:.82rem;color:var(--muted)">This forecast will be visible to <strong
-                            style="color:var(--text)">all viewers</strong> regardless of their location.</div>
+                <!-- Emergency type presets -->
+                <div class="field-group">
+                    <label>Emergency Type</label>
+                    <div class="arm-type-grid" id="arm-type-grid">
+                        <button class="arm-type-btn selected" data-type="tornado"      data-icon="🌪️" data-default-title="TORNADO WARNING"       data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                            <span class="arm-type-icon">🌪️</span>Tornado
+                        </button>
+                        <button class="arm-type-btn" data-type="hurricane"   data-icon="🌀" data-default-title="HURRICANE WARNING"     data-color="#a855f7" data-bg="#05000f" data-glow="rgba(168,85,247,0.8)">
+                            <span class="arm-type-icon">🌀</span>Hurricane
+                        </button>
+                        <button class="arm-type-btn" data-type="flood"       data-icon="🌊" data-default-title="FLASH FLOOD WARNING"   data-color="#3b82f6" data-bg="#000514" data-glow="rgba(59,130,246,0.8)">
+                            <span class="arm-type-icon">🌊</span>Flash Flood
+                        </button>
+                        <button class="arm-type-btn" data-type="fire"        data-icon="🔥" data-default-title="WILDFIRE EMERGENCY"    data-color="#f97316" data-bg="#0f0300" data-glow="rgba(249,115,22,0.8)">
+                            <span class="arm-type-icon">🔥</span>Wildfire
+                        </button>
+                        <button class="arm-type-btn" data-type="winter"      data-icon="❄️" data-default-title="WINTER STORM WARNING"  data-color="#bae6fd" data-bg="#00050f" data-glow="rgba(186,230,253,0.8)">
+                            <span class="arm-type-icon">❄️</span>Winter Storm
+                        </button>
+                        <button class="arm-type-btn" data-type="thunderstorm" data-icon="⛈️" data-default-title="SEVERE THUNDERSTORM"  data-color="#fbbf24" data-bg="#050500" data-glow="rgba(251,191,36,0.8)">
+                            <span class="arm-type-icon">⛈️</span>Thunderstorm
+                        </button>
+                        <button class="arm-type-btn" data-type="nuclear"     data-icon="☢️" data-default-title="NUCLEAR ALERT"         data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                            <span class="arm-type-icon">☢️</span>Nuclear
+                        </button>
+                        <button class="arm-type-btn" data-type="civil"       data-icon="📻" data-default-title="CIVIL EMERGENCY"       data-color="#f97316" data-bg="#0a0500" data-glow="rgba(249,115,22,0.8)">
+                            <span class="arm-type-icon">📻</span>Civil Emergency
+                        </button>
+                        <button class="arm-type-btn" data-type="custom"      data-icon="🚨" data-default-title=""                      data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                            <span class="arm-type-icon">🚨</span>Custom
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Radius / Map Area -->
-                <div class="fc-target-panel" id="fc-target-radius" style="display:none">
-                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center
-                        point, then set the radius in miles. The forecast will show for viewers inside that circle.</p>
-                    <div id="fc-radius-map"></div>
-                    <div class="fc-target-grid">
-                        <div class="fc-field">
-                            <label>Center Lat</label>
-                            <input type="number" id="fc-radius-lat" step="0.0001" placeholder="e.g. 37.77" />
-                        </div>
-                        <div class="fc-field">
-                            <label>Center Lon</label>
-                            <input type="number" id="fc-radius-lon" step="0.0001" placeholder="e.g. -122.42" />
-                        </div>
-                        <div class="fc-field">
-                            <label>Radius (miles)</label>
-                            <input type="number" id="fc-radius-mi" min="1" max="1000" placeholder="e.g. 50" />
+                <!-- Title -->
+                <div class="field-group">
+                    <label>Title <span style="color:var(--muted);font-weight:400">(optional — pre-filled by type)</span></label>
+                    <input type="text" id="arm-title" placeholder="e.g. TORNADO WARNING" maxlength="80" />
+                </div>
+
+                <!-- Message -->
+                <div class="field-group">
+                    <label>Message</label>
+                    <textarea id="arm-text" rows="3" placeholder="Enter the override message to display on all screens…"></textarea>
+                </div>
+
+                <!-- Options row -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                    <div class="field-group" style="margin-bottom:0">
+                        <label>Auto-deactivate</label>
+                        <select id="arm-duration" style="width:100%;padding:9px 12px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem">
+                            <option value="0">Manual only</option>
+                            <option value="5">5 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="120">2 hours</option>
+                        </select>
+                    </div>
+                    <div class="field-group" style="margin-bottom:0;justify-content:flex-end">
+                        <label style="visibility:hidden;height:18px">.</label>
+                        <div style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px">
+                            <input type="checkbox" id="arm-push" style="width:16px;height:16px;accent-color:#ef4444;flex-shrink:0;cursor:pointer" />
+                            <label for="arm-push" style="cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);line-height:1.3">
+                                📲 Push notify subscribers
+                            </label>
                         </div>
                     </div>
                 </div>
 
-                <!-- ZIP Codes -->
-                <div class="fc-target-panel" id="fc-target-zips" style="display:none">
-                    <div class="fc-field">
-                        <label>ZIP Codes — comma-separated</label>
-                        <input type="text" id="fc-zip-input"
-                            placeholder="e.g. 90210, 10001, 60601" />
-                    </div>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will only appear for
-                        viewers whose location reverse-geocodes to one of these ZIP codes.</div>
+                <!-- Buttons -->
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+                    <button class="send-btn" id="arm-activate-btn"
+                        style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b)">
+                        🛑 ACTIVATE E.S.T.O.P.
+                    </button>
+                    <button class="clear-all-btn" id="arm-deactivate-btn" style="flex:none;display:none">
+                        ✕ Deactivate
+                    </button>
                 </div>
-
-                <!-- Counties -->
-                <div class="fc-target-panel" id="fc-target-counties" style="display:none">
-                    <div class="fc-field">
-                        <label>Counties — comma-separated (include state abbreviation)</label>
-                        <input type="text" id="fc-county-input"
-                            placeholder="e.g. Jefferson County AL, Cook County IL, Los Angeles County CA" />
-                    </div>
-                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will show for viewers
-                        whose county matches any entry in this list.</div>
-                </div>
-            </div>
-
-            <div class="fc-btn-row">
-                <button class="send-btn" id="fc-publish-btn" style="flex:1">📡 PUBLISH FORECAST</button>
-                <button class="fc-clear-btn" id="fc-clear-btn">Clear All Forecasts</button>
-            </div>
-            <div id="fc-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-
-            <div id="fc-active-preview" style="display:none;margin-top:20px">
-                <div class="card-title">📺 Currently Published</div>
-                <div id="fc-active-list" style="font-size:.82rem;color:var(--muted)"></div>
+                <div id="arm-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
             </div>
         </div>
 
-        <!-- Security & Audit -->
-        <div class="card">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                <span>🛡 Security & Audit</span>
-                <button class="amsg-del" id="refresh-security-btn" style="padding:4px 8px;font-size:.7rem">↻ Refresh</button>
-            </div>
-            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
-                Review recent security events and administrative actions. Logs are kept in-memory (max 50/100).
-            </p>
+        <!-- Forecast Tab -->
+        <div class="tab-panel" id="tab-forecast">
+            <!-- Custom Forecast -->
+            <div class="card">
+                <div class="card-title">🌤 Custom Forecast</div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Build your own forecast periods. Only fill
+                    in the fields you want — everything is optional except the period name. You can publish multiple
+                    forecasts at once (e.g. for different areas). Each forecast needs a unique label.</p>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-                <div>
-                    <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:10px">Security Events</div>
-                    <div id="security-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
-                        <div style="color:var(--muted)">No events logged.</div>
+                <!-- Forecast label (used to identify this forecast among multiple) -->
+                <div class="fc-field" style="margin-bottom:14px">
+                    <label>Forecast Label <span style="font-size:.72rem;color:var(--muted)">(optional — used to distinguish multiple forecasts)</span></label>
+                    <input type="text" id="fc-label" placeholder="e.g. Downtown, North Suburbs, Airport…" style="width:100%" />
+                </div>
+
+                <div id="fc-periods"></div>
+
+                <button class="fc-add-btn" id="fc-add-btn">＋ Add Forecast Period</button>
+
+                <!-- Target Area -->
+                <div style="margin-bottom:16px">
+                    <div class="card-title" style="margin-bottom:12px">📍 Target Area <span id="fc-target-badge" class="fc-target-badge">All Viewers</span></div>
+                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Restrict who sees this forecast by
+                        location. Select a map area, ZIP codes, or counties — or leave as All Viewers to show everywhere.</p>
+
+                    <div class="fc-target-tabs">
+                        <div class="fc-target-tab active" data-tmode="all">🌍 All Viewers</div>
+                        <div class="fc-target-tab" data-tmode="radius">📍 Map Area</div>
+                        <div class="fc-target-tab" data-tmode="zips">🏷 ZIP Codes</div>
+                        <div class="fc-target-tab" data-tmode="counties">🗺 Counties</div>
+                    </div>
+
+                    <!-- All -->
+                    <div class="fc-target-panel" id="fc-target-all">
+                        <div style="font-size:.82rem;color:var(--muted)">This forecast will be visible to <strong
+                                style="color:var(--text)">all viewers</strong> regardless of their location.</div>
+                    </div>
+
+                    <!-- Radius / Map Area -->
+                    <div class="fc-target-panel" id="fc-target-radius" style="display:none">
+                        <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center
+                            point, then set the radius in miles. The forecast will show for viewers inside that circle.</p>
+                        <div id="fc-radius-map"></div>
+                        <div class="fc-target-grid">
+                            <div class="fc-field">
+                                <label>Center Lat</label>
+                                <input type="number" id="fc-radius-lat" step="0.0001" placeholder="e.g. 37.77" />
+                            </div>
+                            <div class="fc-field">
+                                <label>Center Lon</label>
+                                <input type="number" id="fc-radius-lon" step="0.0001" placeholder="e.g. -122.42" />
+                            </div>
+                            <div class="fc-field">
+                                <label>Radius (miles)</label>
+                                <input type="number" id="fc-radius-mi" min="1" max="1000" placeholder="e.g. 50" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ZIP Codes -->
+                    <div class="fc-target-panel" id="fc-target-zips" style="display:none">
+                        <div class="fc-field">
+                            <label>ZIP Codes — comma-separated</label>
+                            <input type="text" id="fc-zip-input"
+                                placeholder="e.g. 90210, 10001, 60601" />
+                        </div>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will only appear for
+                            viewers whose location reverse-geocodes to one of these ZIP codes.</div>
+                    </div>
+
+                    <!-- Counties -->
+                    <div class="fc-target-panel" id="fc-target-counties" style="display:none">
+                        <div class="fc-field">
+                            <label>Counties — comma-separated (include state abbreviation)</label>
+                            <input type="text" id="fc-county-input"
+                                placeholder="e.g. Jefferson County AL, Cook County IL, Los Angeles County CA" />
+                        </div>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will show for viewers
+                            whose county matches any entry in this list.</div>
                     </div>
                 </div>
-                <div>
-                    <div style="font-size:.7rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:10px">Admin Audit</div>
-                    <div id="audit-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
-                        <div style="color:var(--muted)">No actions logged.</div>
+
+                <div class="fc-btn-row">
+                    <button class="send-btn" id="fc-publish-btn" style="flex:1">📡 PUBLISH FORECAST</button>
+                    <button class="fc-clear-btn" id="fc-clear-btn">Clear All Forecasts</button>
+                </div>
+                <div id="fc-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+
+                <div id="fc-active-preview" style="display:none;margin-top:20px">
+                    <div class="card-title">📺 Currently Published</div>
+                    <div id="fc-active-list" style="font-size:.82rem;color:var(--muted)"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Updates Tab -->
+        <div class="tab-panel" id="tab-updates">
+            <!-- Push Notifications -->
+            <div class="card">
+                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>📲 Push Notifications</span>
+                    <span id="push-sub-count" style="font-size:.78rem;color:var(--accent2);font-weight:600">…
+                        subscribers</span>
+                </div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                    Send a test push to all subscribed devices. Viewers subscribe via the notification button in Settings.
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="send-btn" id="push-test-btn"
+                        style="flex:1;background:linear-gradient(135deg,var(--accent2),var(--accent))">
+                        🔔 Send Test Push
+                    </button>
+                    <button class="clear-all-btn" id="push-clear-btn" style="flex:none">Clear All Subs</button>
+                </div>
+                <div id="push-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+            </div>
+
+            <!-- Release Notes -->
+            <div class="card">
+                <div class="card-title">📝 Release Notes</div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Post a release note to document updates.
+                    It will be saved here and can optionally be announced on the display.</p>
+
+                <div class="row">
+                    <div class="field-group">
+                        <label>Release Version</label>
+                        <input type="text" id="rn-version" placeholder="e.g. v2.1.0" maxlength="30" />
+                    </div>
+                    <div class="field-group">
+                        <label>Date</label>
+                        <input type="text" id="rn-date" placeholder="Auto-filled on post" readonly
+                            style="opacity:.5;cursor:default" />
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <label>Release Notes</label>
+                    <textarea id="rn-notes" placeholder="What changed in this update?&#10;• New feature: …&#10;• Fixed: …&#10;• Improved: …"
+                        style="min-height:110px"></textarea>
+                </div>
+
+                <div class="field-group"
+                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                    <input type="checkbox" id="rn-announce"
+                        style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
+                    <div style="flex:1">
+                        <label for="rn-announce"
+                            style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📣 Also announce on
+                            display</label>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Sends a popup announcement to the
+                            weather display so viewers can see what's new.</div>
+                    </div>
+                </div>
+
+                <div class="field-group"
+                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                    <input type="checkbox" id="rn-autoupdate"
+                        style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
+                    <div style="flex:1">
+                        <label for="rn-autoupdate"
+                            style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Force client updates on version mismatch</label>
+                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
+                    </div>
+                </div>
+
+                <button class="clear-all-btn" id="rn-save-settings-btn" style="margin-bottom:10px">💾 Save Update Settings</button>
+
+                <button class="send-btn" id="rn-post-btn"
+                    style="background:linear-gradient(135deg,var(--accent2),#0ea5e9)">📝 POST RELEASE NOTES</button>
+                <div id="rn-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+
+                <div style="margin-top:24px">
+                    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                        <span>🗒 History</span>
+                        <button class="clear-all-btn" id="rn-clear-all-btn">Clear All</button>
+                    </div>
+                    <div id="rn-list">
+                        <div class="no-msgs">No release notes posted yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Tab -->
+        <div class="tab-panel" id="tab-security">
+            <!-- Security & Audit -->
+            <div class="card">
+                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>🛡 Security & Audit</span>
+                    <button class="amsg-del" id="refresh-security-btn" style="padding:4px 8px;font-size:.7rem">↻ Refresh</button>
+                </div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                    Review recent security events and administrative actions. Logs are kept in-memory (max 50/100).
+                </p>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+                    <div>
+                        <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:10px">Security Events</div>
+                        <div id="security-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
+                            <div style="color:var(--muted)">No events logged.</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:.7rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:10px">Admin Audit</div>
+                        <div id="audit-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
+                            <div style="color:var(--muted)">No actions logged.</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1574,6 +1607,7 @@
 
                 initTargetingUI();
                 initMsgTargetingUI();
+                initTabs();
 
                 checkHealth();
                 loadMessages();
@@ -1590,6 +1624,18 @@
                 setInterval(loadPushCount, 60000);
                 setInterval(checkHealth, 30000);
                 setInterval(loadSecurityLogs, 30000);
+            }
+
+            function initTabs() {
+                const tabs = document.querySelectorAll('.admin-tab');
+                const panels = document.querySelectorAll('.tab-panel');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const target = tab.dataset.tab;
+                        tabs.forEach(t => t.classList.toggle('active', t === tab));
+                        panels.forEach(p => p.classList.toggle('active', p.id === `tab-${target}`));
+                    });
+                });
             }
 
             async function sendAnnouncement() {
