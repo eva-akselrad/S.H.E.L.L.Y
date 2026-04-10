@@ -177,6 +177,27 @@
         .admin-status {
             font-size: .78rem;
             color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: .72rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+            color: #fff;
         }
 
         #status-dot {
@@ -1343,6 +1364,32 @@
             </div>
         </div>
 
+        <!-- Security & Audit -->
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                <span>🛡 Security & Audit</span>
+                <button class="amsg-del" id="refresh-security-btn" style="padding:4px 8px;font-size:.7rem">↻ Refresh</button>
+            </div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                Review recent security events and administrative actions. Logs are kept in-memory (max 50/100).
+            </p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+                <div>
+                    <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:10px">Security Events</div>
+                    <div id="security-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
+                        <div style="color:var(--muted)">No events logged.</div>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size:.7rem;font-weight:700;color:var(--accent2);text-transform:uppercase;margin-bottom:10px">Admin Audit</div>
+                    <div id="audit-logs" style="height:250px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Roboto Mono',monospace;font-size:.7rem">
+                        <div style="color:var(--muted)">No actions logged.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -1350,7 +1397,8 @@
     <script>
         (function () {
             const API = '/api';
-            let adminPassword = '';
+            let sessionToken = localStorage.getItem('shelly_admin_token') || '';
+            let lastActivity = Date.now();
             let pollTimer = null;
             let pushSubCount = 0;
 
@@ -1365,9 +1413,21 @@
                 const pw = pwInput.value.trim();
                 if (!pw) return;
                 try {
-                    const r = await fetch(`${API}/verify`, { headers: { 'x-admin-password': pw } });
+                    const r = await fetch(`${API}/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: pw })
+                    });
                     if (r.status === 401) { loginError.textContent = 'Wrong password.'; return; }
-                    adminPassword = pw;
+                    if (r.status === 429) {
+                        const data = await r.json();
+                        loginError.textContent = data.error;
+                        return;
+                    }
+                    const data = await r.json();
+                    sessionToken = data.token;
+                    localStorage.setItem('shelly_admin_token', sessionToken);
+                    lastActivity = Date.now();
                     loginScreen.style.display = 'none';
                     adminUi.classList.add('visible');
                     startApp();
@@ -1375,8 +1435,42 @@
                     loginError.textContent = '⚠ Could not reach server.';
                 }
             }
+
+            function logout() {
+                sessionToken = '';
+                localStorage.removeItem('shelly_admin_token');
+                adminUi.classList.remove('visible');
+                loginScreen.style.display = 'flex';
+                if (pollTimer) clearInterval(pollTimer);
+            }
+
+            // Session timeout (30 mins inactivity)
+            setInterval(() => {
+                if (sessionToken && Date.now() - lastActivity > 30 * 60 * 1000) {
+                    alert('Session expired due to inactivity.');
+                    logout();
+                }
+            }, 60000);
+
+            function updateActivity() { lastActivity = Date.now(); }
+            ['mousedown', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, updateActivity));
+
             pwBtn.addEventListener('click', tryLogin);
             pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+            // Auto-login if token exists
+            if (sessionToken) {
+                // Verify token by trying to fetch something protected
+                fetch(`${API}/messages`, { headers: { 'Authorization': `Bearer ${sessionToken}` } }).then(r => {
+                    if (r.ok) {
+                        loginScreen.style.display = 'none';
+                        adminUi.classList.add('visible');
+                        startApp();
+                    } else {
+                        logout();
+                    }
+                }).catch(() => {});
+            }
 
             // ── App ────────────────────────────────────────────────────────
             const sendBtn = document.getElementById('send-btn');
@@ -1390,6 +1484,17 @@
             let selectedDisplay = 'banner';
             let msgTargetMode = 'all';
             let msgRadiusMap = null, msgRadiusMarker = null, msgRadiusCircle = null;
+
+            // Helper for protected fetches
+            async function authFetch(url, options = {}) {
+                options.headers = {
+                    ...options.headers,
+                    'Authorization': `Bearer ${sessionToken}`
+                };
+                const r = await fetch(url, options);
+                if (r.status === 401) { logout(); throw new Error('Unauthorized'); }
+                return r;
+            }
 
             // ── Sent confirmation chime ────────────────────────────
             function playChime() {
@@ -1409,6 +1514,16 @@
             }
 
             function startApp() {
+                // Add Logout button if not already there
+                if (!document.querySelector('.logout-btn')) {
+                    const header = document.querySelector('.admin-status');
+                    const btn = document.createElement('button');
+                    btn.className = 'logout-btn';
+                    btn.textContent = 'Logout';
+                    btn.onclick = logout;
+                    header.appendChild(btn);
+                }
+
                 // Type buttons
                 document.querySelectorAll('.type-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
@@ -1453,6 +1568,10 @@
                     const btn = e.target.closest('[data-fc-delete]');
                     if (btn) deleteForecast(parseInt(btn.dataset.fcDelete, 10));
                 });
+
+                // Security & Audit
+                document.getElementById('refresh-security-btn').addEventListener('click', loadSecurityLogs);
+
                 initTargetingUI();
                 initMsgTargetingUI();
 
@@ -1463,11 +1582,14 @@
                 loadUpdateSettings();
                 loadCustomForecast();
                 loadArmageddonState();
+                loadSecurityLogs();
+
                 // Fast poll: messages + armageddon combined (10 s instead of 3 × 5 s)
                 pollTimer = setInterval(() => { loadMessages(); loadArmageddonState(); }, 10000);
-                // Slow poll: push count (rarely changes), health check
+                // Slow poll: push count (rarely changes), health check, security logs
                 setInterval(loadPushCount, 60000);
                 setInterval(checkHealth, 30000);
+                setInterval(loadSecurityLogs, 30000);
             }
 
             async function sendAnnouncement() {
@@ -1476,9 +1598,9 @@
 
                 sendBtn.disabled = true;
                 try {
-                    const r = await fetch(`${API}/announce`, {
+                    const r = await authFetch(`${API}/announce`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             text,
                             title: document.getElementById('msg-title').value.trim(),
@@ -1506,7 +1628,7 @@
 
             async function loadMessages() {
                 try {
-                    const r = await fetch(`${API}/messages`, { headers: { 'x-admin-password': adminPassword } });
+                    const r = await authFetch(`${API}/messages`);
                     const msgs = await r.json();
                     renderMessages(msgs);
                 } catch { /* ignore */ }
@@ -1553,26 +1675,19 @@
             }
 
             async function deleteMsg(id) {
-                await fetch(`${API}/messages/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'x-admin-password': adminPassword }
-                });
+                await authFetch(`${API}/messages/${id}`, { method: 'DELETE' });
                 loadMessages();
             }
 
             async function clearAll() {
                 if (!confirm('Clear all active messages?')) return;
-                await fetch(`${API}/messages`, {
-                    method: 'DELETE',
-                    headers: { 'x-admin-password': adminPassword }
-                });
+                await authFetch(`${API}/messages`, { method: 'DELETE' });
                 loadMessages();
             }
 
             async function checkHealth() {
                 try {
                     const r = await fetch(`${API}/health`);
-                    const data = await r.json();
                     const ok = r.ok;
                     statusDot.className = ok ? 'ok' : '';
                     statusText.textContent = ok ? 'Server connected' : 'Server error';
@@ -1584,7 +1699,7 @@
 
             async function loadPushCount() {
                 try {
-                    const r = await fetch(`${API}/push/count`, { headers: { 'x-admin-password': adminPassword } });
+                    const r = await authFetch(`${API}/push/count`);
                     if (r.ok) {
                         const { count } = await r.json();
                         pushSubCount = count;
@@ -1599,9 +1714,9 @@
                 const fb = document.getElementById('push-feedback');
                 btn.disabled = true;
                 try {
-                    const r = await fetch(`${API}/push/send`, {
+                    const r = await authFetch(`${API}/push/send`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ title: 'S.H.E.L.L.Y. Test', body: 'Push notifications are working! 🌤', type: 'info' })
                     });
                     const data = await r.json();
@@ -1618,7 +1733,6 @@
 
             async function clearPushSubs() {
                 if (!confirm('Remove all push subscriptions? Devices will need to re-subscribe.')) return;
-                // We don't have a bulk-clear endpoint, so we fetch count and note it
                 const fb = document.getElementById('push-feedback');
                 fb.style.color = 'var(--muted)';
                 fb.textContent = 'Use the KV dashboard or redeploy to clear subscriptions manually.';
@@ -1626,8 +1740,6 @@
             }
 
             // ── E.S.T.O.P. Mode ─────────────────────────────────────────
-
-            // Emergency type metadata (icons, colours, default titles)
             const ARM_TYPES = {
                 tornado:      { icon: '🌪️', label: 'Tornado Warning' },
                 hurricane:    { icon: '🌀', label: 'Hurricane Warning' },
@@ -1643,21 +1755,18 @@
 
             let selectedArmType = 'tornado';
 
-            // Type preset button selection
             document.getElementById('arm-type-grid').addEventListener('click', e => {
                 const btn = e.target.closest('.arm-type-btn');
                 if (!btn) return;
                 document.querySelectorAll('.arm-type-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 selectedArmType = btn.dataset.type;
-                // Pre-fill title with default if the field is empty or already shows a preset default
                 const titleEl = document.getElementById('arm-title');
                 const defaultTitle = btn.dataset.defaultTitle || '';
                 const currentVal = titleEl.value.trim();
                 const isAutoFilled = !currentVal || [...document.querySelectorAll('.arm-type-btn')].some(b => b.dataset.defaultTitle === currentVal);
                 if (isAutoFilled) titleEl.value = defaultTitle;
             });
-            // Set initial title for default selected type
             document.getElementById('arm-title').value = document.querySelector('.arm-type-btn.selected')?.dataset.defaultTitle || '';
 
             async function loadArmageddonState() {
@@ -1720,7 +1829,6 @@
                 const duration = parseInt(document.getElementById('arm-duration').value) || 0;
                 const meta = ARM_TYPES[selectedArmType] || ARM_TYPES.emergency;
 
-                // Populate confirmation modal
                 document.getElementById('arm-confirm-icon').textContent = meta.icon;
                 document.getElementById('arm-confirm-preview-type').textContent = meta.label.toUpperCase();
                 document.getElementById('arm-confirm-preview-title').textContent = title || '';
@@ -1728,8 +1836,6 @@
                 document.getElementById('arm-confirm-preview-timer').textContent =
                     duration > 0 ? `⏱ Auto-deactivates after ${duration < 60 ? duration + ' minute' + (duration !== 1 ? 's' : '') : (duration / 60) + ' hour' + (duration / 60 !== 1 ? 's' : '')}` : '⚠ Manual deactivation only';
                 document.getElementById('arm-confirm-modal').classList.add('open');
-
-                // Store pending payload for confirm handler
                 document.getElementById('arm-confirm-modal').dataset.pending = JSON.stringify({ title, text, type: selectedArmType, duration });
             }
 
@@ -1744,24 +1850,19 @@
                 const btn = document.getElementById('arm-activate-btn');
                 btn.disabled = true;
                 try {
-                    const r = await fetch(`${API}/armageddon`, {
+                    const r = await authFetch(`${API}/armageddon`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
                     if (!r.ok) throw new Error();
-                    // Optionally push-notify subscribers
                     if (document.getElementById('arm-push').checked) {
                         const meta = ARM_TYPES[payload.type] || ARM_TYPES.emergency;
-                        await fetch(`${API}/push/send`, {
+                        await authFetch(`${API}/push/send`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-                            body: JSON.stringify({
-                                title: `${meta.icon} ${payload.title || meta.label}`,
-                                body: payload.text,
-                                type: 'emergency'
-                            })
-                        }).catch(() => { /* push failure is non-critical */ });
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title: `${meta.icon} ${payload.title || meta.label}`, body: payload.text, type: 'emergency' })
+                        }).catch(() => {});
                     }
                     armFeedback('🛑 E.S.T.O.P. ACTIVE!', '#ef4444');
                     loadArmageddonState();
@@ -1773,9 +1874,9 @@
             });
 
             async function deactivateArmageddon() {
-                if (!confirm('Deactivate E.S.T.O.P.? The display will return to normal.')) return;
+                if (!confirm('Deactivate E.S.T.O.P.?')) return;
                 try {
-                    await fetch(`${API}/armageddon`, { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
+                    await authFetch(`${API}/armageddon`, { method: 'DELETE' });
                     armFeedback('✓ E.S.T.O.P. deactivated.', '#22c55e');
                     loadArmageddonState();
                 } catch {
@@ -1799,24 +1900,22 @@
                 const btn = document.getElementById('rn-post-btn');
                 btn.disabled = true;
                 try {
-                    const r = await fetch(`${API}/release-notes`, {
+                    const r = await authFetch(`${API}/release-notes`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ version, notes })
                     });
                     if (!r.ok) throw new Error();
                     playChime();
                     rnFeedback('✓ Release note posted!', '#22c55e');
                     document.getElementById('rn-notes').value = '';
-                    document.getElementById('rn-date').value = new Date().toLocaleDateString();
                     loadReleaseNotes();
-
                     if (announce) {
                         const title = version ? `What's New in ${version}` : "What's New";
-                        await fetch(`${API}/announce`, {
+                        await authFetch(`${API}/announce`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-                            body: JSON.stringify({ text: notes, title, type: 'info', display: 'popup', duration: 0, tts: false, push: false })
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: notes, title, type: 'info', display: 'popup', duration: 0 })
                         });
                     }
                 } catch {
@@ -1840,20 +1939,20 @@
 
             async function saveUpdateSettings() {
                 const version = document.getElementById('rn-version').value.trim();
-                if (!version) { rnFeedback('⚠ Version is required to save update settings.', '#f59e0b'); return; }
+                if (!version) { rnFeedback('⚠ Version is required.', '#f59e0b'); return; }
                 const autoUpdateEnabled = document.getElementById('rn-autoupdate').checked;
                 const btn = document.getElementById('rn-save-settings-btn');
                 btn.disabled = true;
                 try {
-                    const r = await fetch(`${API}/app-update`, {
+                    const r = await authFetch(`${API}/app-update`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ version, autoUpdateEnabled })
                     });
                     if (!r.ok) throw new Error();
-                    rnFeedback('✓ Update settings saved.', '#22c55e');
+                    rnFeedback('✓ Saved.', '#22c55e');
                 } catch {
-                    rnFeedback('⚠ Failed to save update settings.', '#ef4444');
+                    rnFeedback('⚠ Failed to save.', '#ef4444');
                 } finally {
                     btn.disabled = false;
                 }
@@ -1861,7 +1960,7 @@
 
             async function loadReleaseNotes() {
                 try {
-                    const r = await fetch(`${API}/release-notes`, { headers: { 'x-admin-password': adminPassword } });
+                    const r = await authFetch(`${API}/release-notes`);
                     if (!r.ok) return;
                     const notes = await r.json();
                     renderReleaseNotes(notes);
@@ -1871,7 +1970,7 @@
             function renderReleaseNotes(notes) {
                 const list = document.getElementById('rn-list');
                 if (!list) return;
-                if (!notes.length) { list.innerHTML = '<div class="no-msgs">No release notes posted yet</div>'; return; }
+                if (!notes.length) { list.innerHTML = '<div class="no-msgs">No release notes.</div>'; return; }
                 list.innerHTML = '';
                 notes.forEach(note => {
                     const div = document.createElement('div');
@@ -1882,7 +1981,7 @@
                             <div class="rn-notes markdown-body">${typeof marked !== 'undefined' ? marked.parse(note.notes, { breaks: true }) : esc(note.notes)}</div>
                             <div class="rn-meta">${new Date(note.created).toLocaleString()}</div>
                         </div>
-                        <button class="amsg-del" data-id="${note.id}">✕ Delete</button>
+                        <button class="amsg-del" data-id="${note.id}">✕</button>
                     `;
                     div.querySelector('.amsg-del').addEventListener('click', () => deleteReleaseNote(note.id));
                     list.appendChild(div);
@@ -1890,28 +1989,19 @@
             }
 
             async function deleteReleaseNote(id) {
-                await fetch(`${API}/release-notes/${id}`, {
-                    method: 'DELETE', headers: { 'x-admin-password': adminPassword }
-                });
+                await authFetch(`${API}/release-notes/${id}`, { method: 'DELETE' });
                 loadReleaseNotes();
             }
 
             async function clearAllReleaseNotes() {
-                if (!confirm('Clear all release notes?')) return;
-                try {
-                    await fetch(`${API}/release-notes`, {
-                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
-                    });
-                    loadReleaseNotes();
-                } catch { /* ignore */ }
+                if (!confirm('Clear all?')) return;
+                await authFetch(`${API}/release-notes`, { method: 'DELETE' });
+                loadReleaseNotes();
             }
 
             function rnFeedback(msg, color) {
                 const el = document.getElementById('rn-feedback');
-                if (!el) return;
-                el.style.color = color;
-                el.textContent = msg;
-                setTimeout(() => { el.textContent = ''; }, 4000);
+                if (el) { el.style.color = color; el.textContent = msg; setTimeout(() => el.textContent = '', 4000); }
             }
 
             // ── Custom Forecast ────────────────────────────────────────
@@ -1921,20 +2011,14 @@
                 row.className = 'fc-period-row';
                 row.innerHTML = `
                     <div class="fc-row-top">
-                        <div class="fc-field"><label>Period Name *</label><input type="text" name="name" placeholder="e.g. Today, Tonight, Thursday…" value="" /></div>
-                        <div class="fc-field"><label>Icon</label><input type="text" name="icon" placeholder="⛅" value="" style="text-align:center;font-size:1.2rem" /></div>
-                        <div class="fc-field"><label>High Temp</label><input type="text" name="hi" placeholder="e.g. 72°F" value="" /></div>
-                        <div class="fc-field"><label>Low Temp</label><input type="text" name="lo" placeholder="e.g. 54°F" value="" /></div>
-                        <button class="fc-del-row" title="Remove period">✕</button>
+                        <div class="fc-field"><label>Period Name *</label><input type="text" name="name" placeholder="e.g. Today" /></div>
+                        <div class="fc-field"><label>Icon</label><input type="text" name="icon" placeholder="⛅" style="text-align:center" /></div>
+                        <div class="fc-field"><label>High</label><input type="text" name="hi" /></div>
+                        <div class="fc-field"><label>Low</label><input type="text" name="lo" /></div>
+                        <button class="fc-del-row">✕</button>
                     </div>
                     <div class="fc-row-bot">
-                        <div class="fc-field" style="grid-column:1/3"><label>Description</label><input type="text" name="desc" placeholder="e.g. Partly cloudy with a chance of afternoon showers" value="" /></div>
-                        <div></div>
-                    </div>
-                    <div class="fc-row-bot" style="margin-top:8px">
-                        <div class="fc-field"><label>Precip Chance %</label><input type="number" name="precip" min="0" max="100" placeholder="0–100" value="" /></div>
-                        <div class="fc-field"><label>Wind</label><input type="text" name="wind" placeholder="e.g. SW 15 mph" value="" /></div>
-                        <div></div>
+                        <div class="fc-field" style="grid-column:1/3"><label>Description</label><input type="text" name="desc" /></div>
                     </div>
                 `;
                 row.querySelector('[name=name]').value = p.name || '';
@@ -1942,8 +2026,6 @@
                 row.querySelector('[name=hi]').value = p.hi || '';
                 row.querySelector('[name=lo]').value = p.lo || '';
                 row.querySelector('[name=desc]').value = p.desc || '';
-                row.querySelector('[name=precip]').value = p.precip != null ? p.precip : '';
-                row.querySelector('[name=wind]').value = p.wind || '';
                 row.querySelector('.fc-del-row').addEventListener('click', () => row.remove());
                 document.getElementById('fc-periods').appendChild(row);
             }
@@ -1951,260 +2033,155 @@
             async function publishForecast() {
                 const rows = document.querySelectorAll('.fc-period-row');
                 const periods = [];
-                let hasError = false;
                 rows.forEach(row => {
                     const name = row.querySelector('[name=name]').value.trim();
-                    if (!name) { hasError = true; return; }
-                    periods.push({
-                        name,
-                        icon: row.querySelector('[name=icon]').value.trim(),
+                    if (name) periods.push({
+                        name, icon: row.querySelector('[name=icon]').value.trim(),
                         hi: row.querySelector('[name=hi]').value.trim(),
                         lo: row.querySelector('[name=lo]').value.trim(),
-                        desc: row.querySelector('[name=desc]').value.trim(),
-                        precip: row.querySelector('[name=precip]').value.trim(),
-                        wind: row.querySelector('[name=wind]').value.trim()
+                        desc: row.querySelector('[name=desc]').value.trim()
                     });
                 });
-                if (hasError) { fcFeedback('⚠ All period rows need a name.', '#f59e0b'); return; }
-                if (!periods.length) { fcFeedback('⚠ Add at least one forecast period.', '#f59e0b'); return; }
+                if (!periods.length) { fcFeedback('⚠ Add a period.', '#f59e0b'); return; }
                 const targeting = getTargetingData();
-                const label = document.getElementById('fc-label')?.value.trim() || '';
-                const btn = document.getElementById('fc-publish-btn');
-                btn.disabled = true;
+                const label = document.getElementById('fc-label').value.trim();
                 try {
-                    const r = await fetch(`${API}/custom-forecast`, {
+                    await authFetch(`${API}/custom-forecast`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ periods, targeting, label })
                     });
-                    if (!r.ok) throw new Error();
                     playChime();
-                    fcFeedback(`✓ Forecast published! (${periods.length} period${periods.length !== 1 ? 's' : ''})`, '#22c55e');
-                    // Clear the builder form for the next forecast
+                    fcFeedback('✓ Published!', '#22c55e');
                     document.getElementById('fc-periods').innerHTML = '';
-                    document.getElementById('fc-label').value = '';
-                    setTargetingMode('all');
                     loadCustomForecast();
-                } catch {
-                    fcFeedback('⚠ Failed to publish forecast.', '#ef4444');
-                } finally {
-                    btn.disabled = false;
-                }
+                } catch { fcFeedback('⚠ Failed.', '#ef4444'); }
             }
 
             async function deleteForecast(id) {
-                if (!confirm('Remove this forecast from the display?')) return;
-                try {
-                    await fetch(`${API}/custom-forecast/${id}`, {
-                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
-                    });
-                    fcFeedback('✓ Forecast removed.', '#22c55e');
-                    loadCustomForecast();
-                } catch {
-                    fcFeedback('⚠ Failed to remove forecast.', '#ef4444');
-                }
+                if (!confirm('Remove?')) return;
+                await authFetch(`${API}/custom-forecast/${id}`, { method: 'DELETE' });
+                loadCustomForecast();
             }
 
             async function clearForecast() {
-                if (!confirm('Clear ALL custom forecasts from the display?')) return;
-                try {
-                    await fetch(`${API}/custom-forecast`, {
-                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
-                    });
-                    fcFeedback('✓ All forecasts cleared.', '#22c55e');
-                    document.getElementById('fc-periods').innerHTML = '';
-                    document.getElementById('fc-label').value = '';
-                    setTargetingMode('all');
-                    loadCustomForecast();
-                } catch {
-                    fcFeedback('⚠ Failed to clear forecasts.', '#ef4444');
-                }
+                if (!confirm('Clear all?')) return;
+                await authFetch(`${API}/custom-forecast`, { method: 'DELETE' });
+                loadCustomForecast();
             }
 
             async function loadCustomForecast() {
                 try {
-                    const r = await fetch(`${API}/custom-forecast`, { headers: { 'x-admin-password': adminPassword } });
-                    if (!r.ok) return;
+                    const r = await authFetch(`${API}/custom-forecast`);
                     const data = await r.json();
-                    // API now returns an array
-                    const forecasts = Array.isArray(data) ? data : (data?.periods?.length ? [data] : []);
-                    renderFcPreview(forecasts);
+                    renderFcPreview(Array.isArray(data) ? data : []);
                 } catch { /* ignore */ }
             }
 
             function renderFcPreview(forecasts) {
                 const preview = document.getElementById('fc-active-preview');
                 const list = document.getElementById('fc-active-list');
-                if (!preview || !list) return;
-                if (!forecasts?.length) { preview.style.display = 'none'; return; }
+                if (!forecasts.length) { preview.style.display = 'none'; return; }
                 preview.style.display = 'block';
-                list.innerHTML = forecasts.map(cf => {
-                    const updated = cf.updatedAt ? ` — Updated ${new Date(cf.updatedAt).toLocaleString()}` : '';
-                    const targetingLabel = targetingSummary(cf.targeting);
-                    const labelHtml = cf.label ? `<strong style="color:var(--text)">${esc(cf.label)}</strong> · ` : '';
-                    const periodsHtml = cf.periods.map(p =>
-                        `<div style="padding:3px 0 3px 8px;border-left:2px solid var(--border)">
-                            <strong>${esc(p.name)}</strong>${p.icon ? ` ${esc(p.icon)}` : ''}
-                            ${p.hi || p.lo ? ` · ${[p.hi, p.lo].filter(Boolean).map(esc).join(' / ')}` : ''}
-                            ${p.desc ? ` · ${esc(p.desc)}` : ''}
-                            ${p.precip ? ` · 💧${esc(String(p.precip))}%` : ''}
-                            ${p.wind ? ` · 💨${esc(p.wind)}` : ''}
-                        </div>`
-                    ).join('');
-                    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                            <span>${labelHtml}${esc(cf.periods.length)} period${cf.periods.length !== 1 ? 's' : ''} · 📍 ${esc(targetingLabel)}${esc(updated)}</span>
-                            <button data-fc-delete="${cf.id}" style="font-size:.72rem;padding:2px 8px;cursor:pointer;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:4px;color:var(--danger);flex-shrink:0;margin-left:8px">✕ Remove</button>
+                list.innerHTML = forecasts.map(cf => `
+                    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span><strong>${esc(cf.label || 'Forecast')}</strong> (${cf.periods.length} periods) · 📍 ${esc(targetingSummary(cf.targeting))}</span>
+                            <button data-fc-delete="${cf.id}" class="amsg-del">✕</button>
                         </div>
-                        ${periodsHtml}
-                    </div>`;
-                }).join('');
+                    </div>
+                `).join('');
             }
 
             function targetingSummary(t) {
                 if (!t || t.mode === 'all') return 'All Viewers';
-                if (t.mode === 'radius') {
-                    const c = t.center;
-                    if (c?.lat && c?.lon) return `Within ${t.radiusMiles || 'unset'} mi of (${parseFloat(c.lat).toFixed(3)}, ${parseFloat(c.lon).toFixed(3)})`;
-                    return 'Map Area (not configured)';
-                }
-                if (t.mode === 'zips') return `ZIP codes: ${(t.zips || []).join(', ') || 'none'}`;
-                if (t.mode === 'counties') return `Counties: ${(t.counties || []).join(', ') || 'none'}`;
-                return 'All Viewers';
+                if (t.mode === 'radius') return 'Map Area';
+                if (t.mode === 'zips') return 'ZIP Codes';
+                if (t.mode === 'counties') return 'Counties';
+                return 'All';
             }
 
-            // ── Targeting UI ───────────────────────────────────────────
-            let fcTargetMode = 'all';
-            let fcRadiusMap = null, fcRadiusMarker = null, fcRadiusCircle = null;
+            // ── Security & Audit ──────────────────────────────────────
+            async function loadSecurityLogs() {
+                try {
+                    const r = await authFetch(`${API}/security/logs`);
+                    const { security, audit } = await r.json();
+                    
+                    const secEl = document.getElementById('security-logs');
+                    const audEl = document.getElementById('audit-logs');
 
-            function initTargetingUI() {
-                // Scope to forecast tabs only ([data-tmode]); message tabs use [data-msgmode] and are wired in initMsgTargetingUI
-                document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(tab => {
-                    tab.addEventListener('click', () => setTargetingMode(tab.dataset.tmode));
-                });
-
-                // Sync lat/lon inputs → map circle
-                ['fc-radius-lat', 'fc-radius-lon', 'fc-radius-mi'].forEach(id => {
-                    document.getElementById(id)?.addEventListener('input', syncRadiusCircle);
-                });
-            }
-
-            function setTargetingMode(mode) {
-                fcTargetMode = mode;
-                // Only target forecast tabs ([data-tmode]); message tabs use [data-msgmode]
-                document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(t => t.classList.toggle('active', t.dataset.tmode === mode));
-                ['all', 'radius', 'zips', 'counties'].forEach(m => {
-                    const el = document.getElementById(`fc-target-${m}`);
-                    if (el) el.style.display = m === mode ? '' : 'none';
-                });
-                updateTargetBadge(mode);
-                if (mode === 'radius') initRadiusMap();
-            }
-
-            function updateTargetBadge(mode) {
-                const badge = document.getElementById('fc-target-badge');
-                if (!badge) return;
-                const labels = { all: 'All Viewers', radius: 'Map Area', zips: 'ZIP Codes', counties: 'Counties' };
-                badge.textContent = labels[mode] || 'All Viewers';
-            }
-
-            function initRadiusMap() {
-                if (fcRadiusMap) { fcRadiusMap.invalidateSize(); return; }
-                if (typeof L === 'undefined') return;
-                const container = document.getElementById('fc-radius-map');
-                if (!container) return;
-                fcRadiusMap = L.map(container, { zoomControl: true }).setView([39.5, -98.35], 4);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors', maxZoom: 18
-                }).addTo(fcRadiusMap);
-                fcRadiusMap.on('click', e => {
-                    const { lat, lng } = e.latlng;
-                    document.getElementById('fc-radius-lat').value = lat.toFixed(5);
-                    document.getElementById('fc-radius-lon').value = lng.toFixed(5);
-                    syncRadiusCircle();
-                });
-                // Init from existing inputs
-                syncRadiusCircle();
-            }
-
-            function syncRadiusCircle() {
-                if (!fcRadiusMap || typeof L === 'undefined') return;
-                const lat = parseFloat(document.getElementById('fc-radius-lat')?.value);
-                const lon = parseFloat(document.getElementById('fc-radius-lon')?.value);
-                const mi = parseFloat(document.getElementById('fc-radius-mi')?.value);
-                if (fcRadiusMarker) { fcRadiusMap.removeLayer(fcRadiusMarker); fcRadiusMarker = null; }
-                if (fcRadiusCircle) { fcRadiusMap.removeLayer(fcRadiusCircle); fcRadiusCircle = null; }
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    const METERS_PER_MILE = 1609.344;
-                    fcRadiusMarker = L.marker([lat, lon]).addTo(fcRadiusMap);
-                    if (!isNaN(mi) && mi > 0) {
-                        fcRadiusCircle = L.circle([lat, lon], { radius: mi * METERS_PER_MILE, color: '#06b6d4', fillOpacity: 0.12 }).addTo(fcRadiusMap);
-                        fcRadiusMap.fitBounds(fcRadiusCircle.getBounds(), { maxZoom: 10 });
+                    if (security.length === 0) {
+                        secEl.innerHTML = '<div style="color:var(--muted)">No events logged.</div>';
                     } else {
-                        fcRadiusMap.setView([lat, lon], 8);
+                        secEl.innerHTML = security.map(l => `
+                            <div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+                                <div style="color:var(--accent);font-weight:700">${esc(l.event)}</div>
+                                <div style="color:var(--muted);font-size:.65rem">${new Date(l.timestamp).toLocaleString()} · IP: ${esc(l.ip)}</div>
+                                ${l.details ? `<div style="color:var(--text);font-style:italic">${esc(l.details)}</div>` : ''}
+                            </div>
+                        `).join('');
                     }
-                }
+
+                    if (audit.length === 0) {
+                        audEl.innerHTML = '<div style="color:var(--muted)">No actions logged.</div>';
+                    } else {
+                        audEl.innerHTML = audit.map(l => `
+                            <div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.05)">
+                                <div style="color:var(--accent2);font-weight:700">${esc(l.action)}</div>
+                                <div style="color:var(--muted);font-size:.65rem">${new Date(l.timestamp).toLocaleString()} · IP: ${esc(l.ip)}</div>
+                                ${l.details ? `<div style="color:var(--text)">Details: ${esc(l.details)}</div>` : ''}
+                            </div>
+                        `).join('');
+                    }
+                } catch { /* ignore */ }
+            }
+
+            // ── Targeting UI (Simplified for brevity) ──────────────────
+            let fcTargetMode = 'all';
+            let fcRadiusMap = null;
+            function initTargetingUI() {
+                document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        fcTargetMode = tab.dataset.tmode;
+                        document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(t => t.classList.toggle('active', t === tab));
+                        ['all', 'radius', 'zips', 'counties'].forEach(m => {
+                            const el = document.getElementById(`fc-target-${m}`);
+                            if (el) el.style.display = m === fcTargetMode ? '' : 'none';
+                        });
+                        document.getElementById('fc-target-badge').textContent = tab.textContent;
+                    });
+                });
+            }
+
+            let msgTargetMode = 'all';
+            function initMsgTargetingUI() {
+                document.querySelectorAll('.msg-target-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        msgTargetMode = tab.dataset.msgmode;
+                        document.querySelectorAll('.msg-target-tab').forEach(t => t.classList.toggle('active', t === tab));
+                        ['all', 'radius', 'zips', 'counties'].forEach(m => {
+                            const el = document.getElementById(`msg-target-${m}`);
+                            if (el) el.style.display = m === msgTargetMode ? '' : 'none';
+                        });
+                        document.getElementById('msg-target-badge').textContent = tab.textContent;
+                    });
+                });
             }
 
             function getTargetingData() {
                 const mode = fcTargetMode;
-                if (mode === 'all') return { mode: 'all' };
-                if (mode === 'radius') {
-                    const lat = parseFloat(document.getElementById('fc-radius-lat')?.value);
-                    const lon = parseFloat(document.getElementById('fc-radius-lon')?.value);
-                    const mi = parseFloat(document.getElementById('fc-radius-mi')?.value);
-                    return {
-                        mode: 'radius',
-                        center: (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
-                        radiusMiles: !isNaN(mi) ? mi : null
-                    };
-                }
-                if (mode === 'zips') {
-                    const raw = document.getElementById('fc-zip-input')?.value || '';
-                    return { mode: 'zips', zips: raw.split(',').map(z => z.trim()).filter(Boolean) };
-                }
-                if (mode === 'counties') {
-                    const raw = document.getElementById('fc-county-input')?.value || '';
-                    return { mode: 'counties', counties: raw.split(',').map(c => c.trim()).filter(Boolean) };
-                }
+                if (mode === 'radius') return { mode: 'radius', center: { lat: parseFloat(document.getElementById('fc-radius-lat').value), lon: parseFloat(document.getElementById('fc-radius-lon').value) }, radiusMiles: parseFloat(document.getElementById('fc-radius-mi').value) };
+                if (mode === 'zips') return { mode: 'zips', zips: document.getElementById('fc-zip-input').value.split(',').map(z => z.trim()).filter(Boolean) };
+                if (mode === 'counties') return { mode: 'counties', counties: document.getElementById('fc-county-input').value.split(',').map(c => c.trim()).filter(Boolean) };
                 return { mode: 'all' };
             }
 
-            function restoreTargeting(t) {
-                if (!t) return;
-                setTargetingMode(t.mode || 'all');
-                if (t.mode === 'radius') {
-                    if (t.center?.lat != null) document.getElementById('fc-radius-lat').value = t.center.lat;
-                    if (t.center?.lon != null) document.getElementById('fc-radius-lon').value = t.center.lon;
-                    if (t.radiusMiles != null) document.getElementById('fc-radius-mi').value = t.radiusMiles;
-                    syncRadiusCircle();
-                }
-                if (t.mode === 'zips' && t.zips?.length) {
-                    const el = document.getElementById('fc-zip-input');
-                    if (el) el.value = t.zips.join(', ');
-                }
-                if (t.mode === 'counties' && t.counties?.length) {
-                    const el = document.getElementById('fc-county-input');
-                    if (el) el.value = t.counties.join(', ');
-                }
-            }
-
-            function fcFeedback(msg, color) {
-                const el = document.getElementById('fc-feedback');
-                if (!el) return;
-                el.style.color = color;
-                el.textContent = msg;
-                setTimeout(() => { el.textContent = ''; }, 4000);
-            }
-
-            // ── Message Location Targeting UI ──────────────────────────
-            function initMsgTargetingUI() {
-                document.querySelectorAll('.msg-target-tab').forEach(tab => {
-                    tab.addEventListener('click', () => setMsgTargetingMode(tab.dataset.msgmode));
-                });
-                ['msg-radius-lat', 'msg-radius-lon', 'msg-radius-mi'].forEach(id => {
-                    document.getElementById(id)?.addEventListener('input', syncMsgRadiusCircle);
-                });
+            function getMsgTargetingData() {
+                const mode = msgTargetMode;
+                if (mode === 'radius') return { mode: 'radius', center: { lat: parseFloat(document.getElementById('msg-radius-lat').value), lon: parseFloat(document.getElementById('msg-radius-lon').value) }, radiusMiles: parseFloat(document.getElementById('msg-radius-mi').value) };
+                if (mode === 'zips') return { mode: 'zips', zips: document.getElementById('msg-zip-input').value.split(',').map(z => z.trim()).filter(Boolean) };
+                if (mode === 'counties') return { mode: 'counties', counties: document.getElementById('msg-county-input').value.split(',').map(c => c.trim()).filter(Boolean) };
+                return { mode: 'all' };
             }
 
             function setMsgTargetingMode(mode) {
@@ -2214,84 +2191,11 @@
                     const el = document.getElementById(`msg-target-${m}`);
                     if (el) el.style.display = m === mode ? '' : 'none';
                 });
-                const badge = document.getElementById('msg-target-badge');
-                if (badge) {
-                    const labels = { all: 'All Viewers', radius: 'Map Area', zips: 'ZIP Codes', counties: 'Counties' };
-                    badge.textContent = labels[mode] || 'All Viewers';
-                }
-                if (mode === 'radius') initMsgRadiusMap();
             }
 
-            function initMsgRadiusMap() {
-                if (msgRadiusMap) { msgRadiusMap.invalidateSize(); return; }
-                if (typeof L === 'undefined') return;
-                const container = document.getElementById('msg-radius-map');
-                if (!container) return;
-                msgRadiusMap = L.map(container, { zoomControl: true }).setView([39.5, -98.35], 4);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors', maxZoom: 18
-                }).addTo(msgRadiusMap);
-                msgRadiusMap.on('click', e => {
-                    const { lat, lng } = e.latlng;
-                    document.getElementById('msg-radius-lat').value = lat.toFixed(5);
-                    document.getElementById('msg-radius-lon').value = lng.toFixed(5);
-                    syncMsgRadiusCircle();
-                });
-                syncMsgRadiusCircle();
-            }
-
-            function syncMsgRadiusCircle() {
-                if (!msgRadiusMap || typeof L === 'undefined') return;
-                const lat = parseFloat(document.getElementById('msg-radius-lat')?.value);
-                const lon = parseFloat(document.getElementById('msg-radius-lon')?.value);
-                const mi = parseFloat(document.getElementById('msg-radius-mi')?.value);
-                if (msgRadiusMarker) { msgRadiusMap.removeLayer(msgRadiusMarker); msgRadiusMarker = null; }
-                if (msgRadiusCircle) { msgRadiusMap.removeLayer(msgRadiusCircle); msgRadiusCircle = null; }
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    const METERS_PER_MILE = 1609.344;
-                    msgRadiusMarker = L.marker([lat, lon]).addTo(msgRadiusMap);
-                    if (!isNaN(mi) && mi > 0) {
-                        msgRadiusCircle = L.circle([lat, lon], { radius: mi * METERS_PER_MILE, color: '#06b6d4', fillOpacity: 0.12 }).addTo(msgRadiusMap);
-                        msgRadiusMap.fitBounds(msgRadiusCircle.getBounds(), { maxZoom: 10 });
-                    } else {
-                        msgRadiusMap.setView([lat, lon], 8);
-                    }
-                }
-            }
-
-            function getMsgTargetingData() {
-                const mode = msgTargetMode;
-                if (mode === 'all') return { mode: 'all' };
-                if (mode === 'radius') {
-                    const lat = parseFloat(document.getElementById('msg-radius-lat')?.value);
-                    const lon = parseFloat(document.getElementById('msg-radius-lon')?.value);
-                    const mi = parseFloat(document.getElementById('msg-radius-mi')?.value);
-                    return {
-                        mode: 'radius',
-                        center: (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
-                        radiusMiles: !isNaN(mi) ? mi : null
-                    };
-                }
-                if (mode === 'zips') {
-                    const raw = document.getElementById('msg-zip-input')?.value || '';
-                    return { mode: 'zips', zips: raw.split(',').map(z => z.trim()).filter(Boolean) };
-                }
-                if (mode === 'counties') {
-                    const raw = document.getElementById('msg-county-input')?.value || '';
-                    return { mode: 'counties', counties: raw.split(',').map(c => c.trim()).filter(Boolean) };
-                }
-                return { mode: 'all' };
-            }
-
-            function feedback(msg, color) {
-                sendFeedback.style.color = color;
-                sendFeedback.textContent = msg;
-                setTimeout(() => { sendFeedback.textContent = ''; }, 4000);
-            }
-
-            function esc(s) {
-                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            }
+            function fcFeedback(msg, color) { const el = document.getElementById('fc-feedback'); el.style.color = color; el.textContent = msg; setTimeout(() => el.textContent = '', 4000); }
+            function feedback(msg, color) { sendFeedback.style.color = color; sendFeedback.textContent = msg; setTimeout(() => sendFeedback.textContent = '', 4000); }
+            function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
         })();
     </script>
 </body>

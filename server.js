@@ -9,8 +9,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 const webPush = require('web-push');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // ── Build hash (automatic cache busting) ───────────────────────
@@ -119,6 +121,36 @@ let armageddonState = null;
 const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+
+// ── Security & Audit (Task 1.2 & 2.1) ──────────────────────────
+const failedLogins = new Map();
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
+let securityLogs = [];
+function logSecurityEvent(event, ip, details = '') {
+    securityLogs.unshift({
+        timestamp: new Date().toISOString(),
+        event,
+        ip,
+        details
+    });
+    if (securityLogs.length > 50) securityLogs.pop();
+    console.log(`[Security] ${event} from ${ip} ${details ? '(' + details + ')' : ''}`);
+}
+
+let auditLogs = [];
+function logAuditAction(action, ip, details = '') {
+    auditLogs.unshift({
+        timestamp: new Date().toISOString(),
+        action,
+        ip,
+        details
+    });
+    if (auditLogs.length > 100) auditLogs.pop();
+    console.log(`[Audit] ${action} by ${ip} ${details ? '(' + details + ')' : ''}`);
+}
 
 // ── Rate limiter (admin routes) ────────────────────────────────
 const adminLimiter = rateLimit({
@@ -136,13 +168,69 @@ app.use('/api/release-notes', adminLimiter);
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
-    const provided = req.headers['x-admin-password'] || req.body?.password;
-    if (provided !== ADMIN_PASSWORD) {
-        res.status(401).json({ error: 'Unauthorized' });
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+        // Fallback for legacy /api/poll and others that might still use headers/body
+        const provided = req.headers['x-admin-password'] || req.body?.password;
+        if (provided === ADMIN_PASSWORD) return true;
+        
+        res.status(401).json({ error: 'Authentication required' });
         return false;
     }
-    return true;
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.admin = decoded;
+        return true;
+    } catch (err) {
+        res.status(401).json({ error: 'Invalid or expired session' });
+        return false;
+    }
 }
+
+// ── GET /api/security/logs ─────────────────────────────────────
+app.get('/api/security/logs', adminLimiter, (req, res) => {
+    if (!checkAuth(req, res)) return;
+    res.json({ security: securityLogs, audit: auditLogs });
+});
+
+// ── POST /api/login ────────────────────────────────────────────
+app.post('/api/login', adminLimiter, (req, res) => {
+    const ip = req.ip;
+    const { password } = req.body;
+
+    const status = failedLogins.get(ip);
+    if (status && status.lockedUntil > Date.now()) {
+        const remaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
+        return res.status(429).json({ error: `Locked out. Try again in ${remaining} min.` });
+    }
+
+    if (password === ADMIN_PASSWORD) {
+        failedLogins.delete(ip);
+        const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '1h' });
+        logSecurityEvent('Login Success', ip);
+        res.json({ token });
+    } else {
+        const count = (status?.count || 0) + 1;
+        const lockedUntil = count >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0;
+        failedLogins.set(ip, { count, lockedUntil });
+        
+        logSecurityEvent('Login Failed', ip, `Attempt ${count}/${MAX_FAILED_ATTEMPTS}`);
+        if (lockedUntil > 0) logSecurityEvent('IP Locked', ip, '15-minute lockout');
+        
+        res.status(401).json({ error: 'Invalid password' });
+    }
+});
+
+// ── Honeypot (Task 2.3) ────────────────────────────────────────
+app.get('/api/admin-backdoor', (req, res) => {
+    const ip = req.ip;
+    logSecurityEvent('Honeypot Triggered', ip, 'Accessed /api/admin-backdoor');
+    failedLogins.set(ip, { count: MAX_FAILED_ATTEMPTS, lockedUntil: Date.now() + LOCKOUT_MS * 4 });
+    res.status(403).json({ error: 'Access denied' });
+});
 
 // ── GET /api/messages?since=ID ─────────────────────────────────
 app.get('/api/messages', (req, res) => {
@@ -194,6 +282,7 @@ app.post('/api/announce', async (req, res) => {
         created: Date.now()
     };
     messages.push(msg);
+    logAuditAction('Created Announcement', req.ip, text.slice(0, 50));
     console.log(`[Admin] New ${type} ${display}: ${text.slice(0, 80)}`);
 
     // Fan-out push notification if requested
@@ -233,6 +322,7 @@ app.delete('/api/messages/:id', (req, res) => {
     const id = parseInt(req.params.id);
     messages = messages.filter(m => m.id !== id);
     acknowledgements.delete(id);
+    logAuditAction('Deleted Message', req.ip, `ID: ${id}`);
     res.json({ ok: true });
 });
 
@@ -241,6 +331,7 @@ app.delete('/api/messages', (req, res) => {
     if (!checkAuth(req, res)) return;
     messages = [];
     acknowledgements.clear();
+    logAuditAction('Cleared All Messages', req.ip);
     res.json({ ok: true });
 });
 
@@ -266,6 +357,7 @@ app.post('/api/armageddon', adminLimiter, (req, res) => {
         activatedAt: Date.now(),
         expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
     };
+    logAuditAction('Activated Armageddon', req.ip, text.slice(0, 50));
     console.log('[Admin] Armageddon mode ACTIVATED');
     res.json({ ok: true, ...armageddonState });
 });
@@ -274,6 +366,7 @@ app.post('/api/armageddon', adminLimiter, (req, res) => {
 app.delete('/api/armageddon', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     armageddonState = null;
+    logAuditAction('Deactivated Armageddon', req.ip);
     console.log('[Admin] Armageddon mode deactivated');
     res.json({ ok: true });
 });
@@ -376,6 +469,7 @@ app.put('/api/app-update', adminLimiter, (req, res) => {
         autoUpdateEnabled,
         updatedAt: Date.now(),
     };
+    logAuditAction('Updated App Settings', req.ip, `v:${version}, auto:${autoUpdateEnabled}`);
     console.log(`[Admin] Update settings saved: version=${version}, autoUpdateEnabled=${autoUpdateEnabled}`);
     res.json(appUpdateSettings);
 });
@@ -400,19 +494,23 @@ app.post('/api/release-notes', adminLimiter, (req, res) => {
             updatedAt: Date.now(),
         };
     }
+    logAuditAction('Posted Release Note', req.ip, normalizedVersion);
     console.log(`[Admin] Release note posted: ${version}`);
     res.json(note);
 });
 
 app.delete('/api/release-notes/:id', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    releaseNotes = releaseNotes.filter(n => n.id !== parseInt(req.params.id));
+    const id = parseInt(req.params.id);
+    releaseNotes = releaseNotes.filter(n => n.id !== id);
+    logAuditAction('Deleted Release Note', req.ip, `ID: ${id}`);
     res.json({ ok: true });
 });
 
 app.delete('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = [];
+    logAuditAction('Cleared All Release Notes', req.ip);
     res.json({ ok: true });
 });
 
@@ -439,6 +537,7 @@ app.post('/api/custom-forecast', adminLimiter, (req, res) => {
     } else {
         customForecasts.push(entry);
     }
+    logAuditAction(existing >= 0 ? 'Updated Custom Forecast' : 'Added Custom Forecast', req.ip, label || entry.id);
     console.log(`[Admin] Custom forecast ${existing >= 0 ? 'updated' : 'added'}: "${label || entry.id}" — ${periods.length} period(s), targeting: ${targeting.mode}`);
     res.json(entry);
 });
@@ -450,6 +549,7 @@ app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
     const before = customForecasts.length;
     customForecasts = customForecasts.filter(c => c.id !== id);
     if (customForecasts.length === before) return res.status(404).json({ error: 'not found' });
+    logAuditAction('Deleted Custom Forecast', req.ip, `ID: ${id}`);
     res.json({ ok: true });
 });
 
@@ -457,6 +557,7 @@ app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
 app.delete('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     customForecasts = [];
+    logAuditAction('Cleared All Custom Forecasts', req.ip);
     res.json({ ok: true });
 });
 
