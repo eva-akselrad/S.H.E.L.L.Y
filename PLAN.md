@@ -47,12 +47,18 @@ Here is the implementation plan :3 in no particular order
 - [ ] **HTTPS Redirection**:
     - Enforce HTTPS via middleware to ensure all traffic is encrypted.
 
-## 5. A Demo mode /cs242
-
-- [ ] **Security Demo**:
-    - Add a full suite of testing buttons that trigger each security thing added. Make this accessable with password and the endpoint able to be d  isabled with a env variable.
-    - Make it have a cool hackery time ui
-    TODO: add more subtasks
+## 5. Security Demo Mode (/cs242)
+- [ ] **Create Demo Dashboard**: `demo.html` with a specialized "Command Center" UI.
+    - Matrix-style aesthetics (monochrome green, terminal fonts).
+    - Real-time visualization of the ring buffers (Security & Audit).
+- [ ] **Interactive Attack Simulators**:
+    - "Simulate Brute Force": Button to trigger 5 failed logins and show the resulting lockout.
+    - "Trigger Honeypot": Button to hit the `/api/admin-backdoor` and show the 403 response + log.
+    - "JWT Decoder": Tool to inspect the current session token's payload/expiry.
+- [ ] **Backend Demo Controls**:
+    - `POST /api/security/demo/reset`: Endpoint to clear `failedLogins` and logs for easy re-testing.
+    - `SECURITY_DEMO_ENABLED` env variable to disable these endpoints in production.
+- [ ] **Live Audit Trail**: A dedicated websocket or fast-polling terminal view of admin actions as they happen.
 
 
 ## 6. Bonus Tasks (Advanced)
