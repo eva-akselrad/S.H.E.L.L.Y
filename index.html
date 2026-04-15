@@ -718,12 +718,13 @@
                         hideLockoutScreen();
                         location.reload();
                     } else {
-                        const data = await response.json();
+                        const data = await response.json().catch(() => ({ error: 'Server error' }));
                         showLockoutError(data.error || 'Invalid password');
                     }
                     
                 } catch (err) {
-                    showLockoutError('Error: ' + err.message);
+                    console.error('Unlock error:', err);
+                    showLockoutError('Network error: ' + err.message);
                 } finally {
                     lockoutSubmit.disabled = false;
                     lockoutSubmit.textContent = 'UNLOCK';
