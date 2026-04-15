@@ -1,17 +1,24 @@
 {
-    "name": "shelly",
-    "version": "1.0.0",
-    "description": "S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook",
-    "main": "server.js",
-    "scripts": {
-        "start": "node server.js",
-        "dev": "node server.js",
-        "test": "node --test"
-    },
-    "dependencies": {
-        "express": "^4.21.2",
-        "express-rate-limit": "^7.5.0",
-        "jsonwebtoken": "^9.0.3",
-        "web-push": "^3.6.7"
-    }
+  "name": "shelly",
+  "version": "1.0.0",
+  "description": "S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "web-push": "^3.6.7",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "wrangler": "^4.83.0"
+  }
 }

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.E.L.L.Y. // SECURITY COMMAND CENTER</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --matrix-green: #00ff41;
+            --matrix-dark: #000800;
+            --matrix-fade: rgba(0, 255, 65, 0.2);
+            --matrix-border: #003b00;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--matrix-dark);
+            color: var(--matrix-green);
+            font-family: 'Roboto Mono', monospace;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+
+        canvas#matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.15;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        header {
+            border: 2px solid var(--matrix-green);
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            background: rgba(0, 8, 0, 0.8);
+            box-shadow: 0 0 15px var(--matrix-fade);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            border: 1px solid var(--matrix-green);
+            background: rgba(0, 8, 0, 0.9);
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.1);
+        }
+
+        .panel-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--matrix-green);
+            padding-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .log-container {
+            height: 300px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--matrix-green) transparent;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--matrix-border);
+            opacity: 0.9;
+        }
+
+        .timestamp { color: #aaa; margin-right: 8px; }
+        .event-type { font-weight: 700; margin-right: 8px; }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            background: transparent;
+            color: var(--matrix-green);
+            border: 1px solid var(--matrix-green);
+            padding: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: var(--matrix-green);
+            color: var(--matrix-dark);
+            box-shadow: 0 0 15px var(--matrix-green);
+        }
+
+        .btn-danger {
+            color: #ff3e3e;
+            border-color: #ff3e3e;
+        }
+
+        .btn-danger:hover {
+            background: #ff3e3e;
+            color: white;
+            box-shadow: 0 0 15px #ff3e3e;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--matrix-green);
+            color: var(--matrix-green);
+            padding: 8px;
+            font-family: inherit;
+            margin-top: 5px;
+            outline: none;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .badge-locked { background: #600; color: #ff3e3e; border: 1px solid #ff3e3e; }
+        .badge-ok { background: #030; color: #0f4; border: 1px solid #0f4; }
+
+        .active-lockouts {
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+
+        .lockout-item {
+            color: #ff3e3e;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+
+    <div class="container">
+        <header>
+            <h1>S.H.E.L.L.Y. // Security Command Center</h1>
+            <div style="font-size: 0.7rem; margin-top: 10px; opacity: 0.7;">CS242 Final Project // Security Hardening Demo</div>
+        </header>
+
+        <div class="grid">
+            <!-- Attack Simulation -->
+            <div class="panel">
+                <div class="panel-title">Attack Simulator</div>
+                <div class="controls">
+                    <button id="sim-brute">Brute Force IP</button>
+                    <button id="sim-honeypot">Trigger Honeypot</button>
+                    <button id="sim-expire" class="btn-danger">Force Expire Session</button>
+                    <button id="sim-reset">Clear All Logs/Lockouts</button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div class="panel-title">XSS Sandbox</div>
+                    <div class="input-group">
+                        <label>Payload:</label>
+                        <input type="text" id="xss-input" value='<img src=x onerror="alert(\'HACKED\')">'>
+                    </div>
+                    <button id="sim-xss" style="width: 100%;">Test Sanitization</button>
+                    <div id="xss-result" style="margin-top: 10px; padding: 10px; border: 1px dashed var(--matrix-border); font-size: 0.8rem; overflow-wrap: break-word;"></div>
+                </div>
+            </div>
+
+            <!-- Active Lockouts -->
+            <div class="panel">
+                <div class="panel-title">Active IP Lockouts</div>
+                <div id="lockout-list" class="active-lockouts">
+                    <div style="opacity: 0.5;">No active lockouts.</div>
+                </div>
+            </div>
+
+            <!-- Security Logs -->
+            <div class="panel">
+                <div class="panel-title">Security Event Log</div>
+                <div id="security-log" class="log-container"></div>
+            </div>
+
+            <!-- Audit Logs -->
+            <div class="panel">
+                <div class="panel-title">Admin Audit Trail</div>
+                <div id="audit-log" class="log-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Matrix Rain Effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズヅブプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
+        const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const nums = '0123456789';
+        const alphabet = katakana + latin + nums;
+
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+
+        const rainDrops = [];
+        for( let x = 0; x < columns; x++ ) {
+            rainDrops[x] = 1;
+        }
+
+        const draw = () => {
+            ctx.fillStyle = 'rgba(0, 8, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+
+            for(let i = 0; i < rainDrops.length; i++) {
+                const text = alphabet.charAt(Math.floor(Math.random() * alphabet.alphabet));
+                ctx.fillText(text, i*fontSize, rainDrops[i]*fontSize);
+
+                if(rainDrops[i]*fontSize > canvas.height && Math.random() > 0.975){
+                    rainDrops[i] = 0;
+                }
+                rainDrops[i]++;
+            }
+        };
+
+        setInterval(draw, 30);
+
+        // API Interaction
+        const API = '/api';
+
+        async function fetchLogs() {
+            try {
+                // We need auth for security logs, but this is a demo
+                // For the demo, we'll try to use the stored token if available
+                const token = localStorage.getItem('shelly_admin_token');
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                
+                const r = await fetch(`${API}/security/logs`, { headers });
+                if (!r.ok) return;
+                const { security, audit } = await r.json();
+                
+                const secEl = document.getElementById('security-log');
+                secEl.innerHTML = security.map(l => `
+                    <div class="log-entry">
+                        <span class="timestamp">${new Date(l.timestamp).toLocaleTimeString()}</span>
+                        <span class="event-type">[${l.event}]</span>
+                        <span class="details">IP: ${l.ip} ${l.details ? '- ' + l.details : ''}</span>
+                    </div>
+                `).join('');
+
+                const audEl = document.getElementById('audit-log');
+                audEl.innerHTML = audit.map(l => `
+                    <div class="log-entry">
+                        <span class="timestamp">${new Date(l.timestamp).toLocaleTimeString()}</span>
+                        <span class="event-type">[${l.action}]</span>
+                        <span class="details">IP: ${l.ip} ${l.details ? '- ' + l.details : ''}</span>
+                    </div>
+                `).join('');
+            } catch(e) {}
+        }
+
+        async function fetchLockouts() {
+            try {
+                const r = await fetch(`${API}/security/demo/lockouts`);
+                if (!r.ok) return;
+                const lockouts = await r.json();
+                const el = document.getElementById('lockout-list');
+                
+                if (lockouts.length === 0) {
+                    el.innerHTML = '<div style="opacity: 0.5;">No active lockouts.</div>';
+                } else {
+                    el.innerHTML = lockouts.map(l => `
+                        <div class="lockout-item">
+                            🔴 LOCKED: ${l.ip} (${l.remaining}s remaining) - Attempts: ${l.count}
+                        </div>
+                    `).join('');
+                }
+            } catch(e) {}
+        }
+
+        // Simulators
+        document.getElementById('sim-brute').onclick = async () => {
+            for(let i=0; i<5; i++) {
+                await fetch(`${API}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: 'wrong-password-' + Math.random() })
+                });
+            }
+            alert('Brute force simulation complete. Check logs.');
+        };
+
+        document.getElementById('sim-honeypot').onclick = async () => {
+            await fetch(`${API}/admin-backdoor`);
+            alert('Honeypot triggered. You should be locked out for 1 hour.');
+        };
+
+        document.getElementById('sim-reset').onclick = async () => {
+            await fetch(`${API}/security/demo/reset`, { method: 'POST' });
+            alert('System reset.');
+        };
+
+        document.getElementById('sim-expire').onclick = async () => {
+            const r = await fetch(`${API}/security/demo/expire-token`, { method: 'POST' });
+            const data = await r.json();
+            if (data.action === 'logout') {
+                localStorage.removeItem('shelly_admin_token');
+                alert('Session expired. You would be logged out of the admin panel now.');
+            }
+        };
+
+        document.getElementById('sim-xss').onclick = async () => {
+            const input = document.getElementById('xss-input').value;
+            try {
+                const r = await fetch(`${API}/security/demo/sanitize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input })
+                });
+                const data = await r.json();
+                
+                const resultEl = document.getElementById('xss-result');
+                resultEl.innerHTML = `
+                    <div style="margin-bottom: 5px; color: #aaa;">Raw Input: <span style="color: var(--matrix-green)">${input.replace(/</g, '&lt;')}</span></div>
+                    <div style="margin-bottom: 5px; color: #aaa;">Sanitized: <span style="color: #0f4">${data.sanitized.replace(/</g, '&lt;')}</span></div>
+                    <div style="padding: 10px; border: 1px solid var(--matrix-border); margin-top: 10px;">
+                        Render Test: ${data.sanitized}
+                    </div>
+                `;
+            } catch(e) {
+                alert('Sanitization failed');
+            }
+        };
+
+        setInterval(() => {
+            fetchLogs();
+            fetchLockouts();
+        }, 2000);
+        
+        fetchLogs();
+        fetchLockouts();
+    </script>
+</body>
+</html>

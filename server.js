@@ -10,10 +10,44 @@ const crypto = require('crypto');
 const webPush = require('web-push');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
+const xss = require('xss');
 
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json());
+
+// ── Security Headers & HTTPS Redirection (Task 3.1 & 4.3) ──────
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://*.tile.weather.gov", "https://api.weather.gov"],
+            connectSrc: ["'self'", "https://api.weather.gov", "https://nominatim.openstreetmap.org"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+    referrerPolicy: { policy: 'same-origin' },
+}));
+
+// Enforce HTTPS in production
+app.use((req, res, next) => {
+    if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] !== 'https') {
+        return res.redirect(`https://${req.headers.host}${req.url}`);
+    }
+    // Task 3.1: HSTS
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+});
+
+app.use(express.json({ limit: '10kb' })); // Payload size limit
 
 // ── Build hash (automatic cache busting) ───────────────────────
 // Hash all local JS, CSS, and HTML files so that any code change
@@ -64,6 +98,8 @@ app.use(express.static(__dirname, {
         // gets the latest markup (and triggers a SW update check).
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('X-Frame-Options', 'DENY');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
         }
         res.setHeader('Accept-Ranges', 'bytes');
     }
@@ -267,15 +303,21 @@ app.get('/api/verify', (req, res) => {
 app.post('/api/announce', async (req, res) => {
     if (!checkAuth(req, res)) return;
     const { text, type = 'info', display = 'banner', duration = 0, title = '', tts = false, push = false, targeting = { mode: 'all' } } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+    
+    // Task 3.3: API Payload Validation
+    if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
+    if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
+    if (!['info', 'warning', 'emergency', 'success'].includes(type)) return res.status(400).json({ error: 'invalid type' });
+    if (!['banner', 'kiosk', 'modal'].includes(display)) return res.status(400).json({ error: 'invalid display' });
 
     const msg = {
         id: nextId++,
-        text: text.trim(),
-        title: title.trim(),
+        // Task 3.2: Input Sanitization
+        text: xss(text.trim()),
+        title: xss(title.trim()),
         type,
         display,
-        duration,
+        duration: Math.max(0, parseInt(duration) || 0),
         tts: !!tts,
         push: !!push,
         targeting,
@@ -284,6 +326,7 @@ app.post('/api/announce', async (req, res) => {
     messages.push(msg);
     logAuditAction('Created Announcement', req.ip, text.slice(0, 50));
     console.log(`[Admin] New ${type} ${display}: ${text.slice(0, 80)}`);
+
 
     // Fan-out push notification if requested
     if (push && pushSubscriptions.length > 0) {
@@ -350,10 +393,17 @@ app.get('/api/armageddon', (req, res) => {
 app.post('/api/armageddon', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { title = '', text, type = 'emergency', duration = 0 } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+    
+    // Task 3.3: API Payload Validation
+    if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
+    if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
+    
     const durationMs = Math.max(0, parseInt(duration) || 0) * 60 * 1000;
     armageddonState = {
-        title: title.trim(), text: text.trim(), type,
+        // Task 3.2: Input Sanitization
+        title: xss(title.trim()), 
+        text: xss(text.trim()), 
+        type: xss(type),
         activatedAt: Date.now(),
         expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
     };
@@ -465,7 +515,7 @@ app.put('/api/app-update', adminLimiter, (req, res) => {
         ? req.body.autoUpdateEnabled
         : appUpdateSettings.autoUpdateEnabled;
     appUpdateSettings = {
-        version,
+        version: xss(version),
         autoUpdateEnabled,
         updatedAt: Date.now(),
     };
@@ -483,9 +533,15 @@ app.get('/api/release-notes', adminLimiter, (req, res) => {
 app.post('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { version = '', notes = '', autoUpdateEnabled } = req.body;
-    if (!notes.trim()) return res.status(400).json({ error: 'notes required' });
-    const normalizedVersion = version.trim();
-    const note = { id: releaseNoteId++, version: normalizedVersion, notes: notes.trim(), created: Date.now() };
+    if (!notes || typeof notes !== 'string' || !notes.trim()) return res.status(400).json({ error: 'notes required' });
+    
+    const normalizedVersion = xss(version.trim());
+    const note = { 
+        id: releaseNoteId++, 
+        version: normalizedVersion, 
+        notes: xss(notes.trim()), 
+        created: Date.now() 
+    };
     releaseNotes.unshift(note);
     if (normalizedVersion) {
         appUpdateSettings = {
@@ -528,10 +584,17 @@ app.post('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = req.body;
     const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
-    if (!periods.length) return res.status(400).json({ error: 'periods required' });
+    if (!periods || !Array.isArray(periods) || !periods.length) return res.status(400).json({ error: 'periods required' });
+    
     // If a non-empty label is given and a forecast with that label already exists, replace it
     const existing = label ? customForecasts.findIndex(c => c.label === label) : -1;
-    const entry = { id: existing >= 0 ? customForecasts[existing].id : customForecastId++, label, periods, targeting, updatedAt: Date.now() };
+    const entry = { 
+        id: existing >= 0 ? customForecasts[existing].id : customForecastId++, 
+        label: xss(label), 
+        periods, 
+        targeting, 
+        updatedAt: Date.now() 
+    };
     if (existing >= 0) {
         customForecasts[existing] = entry;
     } else {
@@ -612,6 +675,54 @@ app.get('/api/spc-outlook', async (req, res) => {
         }
         res.status(502).json({ error: 'Failed to fetch SPC outlook data' });
     }
+});
+
+// ── GET /cs242 ────────────────────────────────────────────────
+app.get('/cs242', (req, res) => {
+    res.sendFile(path.join(__dirname, 'demo.html'));
+});
+
+// ── Security Demo Endpoints (Task 5) ──────────────────────────
+const DEMO_ENABLED = process.env.SECURITY_DEMO_ENABLED === 'true' || true; // Default true for this project
+
+app.post('/api/security/demo/reset', (req, res) => {
+    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
+    failedLogins.clear();
+    securityLogs = [];
+    auditLogs = [];
+    logSecurityEvent('Demo Reset', req.ip, 'Logs and lockouts cleared via demo control');
+    res.json({ ok: true });
+});
+
+app.post('/api/security/demo/expire-token', (req, res) => {
+    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
+    // We can't easily "expire" a JWT from the server side without a blacklist,
+    // but we can signal the client to clear its token.
+    logSecurityEvent('Demo Token Expire', req.ip, 'Triggered token expiration demo');
+    res.json({ ok: true, action: 'logout' });
+});
+
+app.post('/api/security/demo/sanitize', (req, res) => {
+    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
+    const { input } = req.body;
+    const sanitized = xss(input || '');
+    res.json({ input, sanitized });
+});
+
+// ── GET /api/security/demo/lockouts ───────────────────────────
+app.get('/api/security/demo/lockouts', (req, res) => {
+    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
+    const lockouts = [];
+    failedLogins.forEach((status, ip) => {
+        if (status.lockedUntil > Date.now()) {
+            lockouts.push({
+                ip,
+                remaining: Math.ceil((status.lockedUntil - Date.now()) / 1000),
+                count: status.count
+            });
+        }
+    });
+    res.json(lockouts);
 });
 
 // ── Start ─────────────────────────────────────────────────────
