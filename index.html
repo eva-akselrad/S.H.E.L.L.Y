@@ -29,6 +29,30 @@
     <!-- ═══════════════════════════════════════════════
        SETTINGS PANEL (slides in from left)
   ═══════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════
+       LOCKOUT SCREEN (full-page overlay when IP is locked out)
+   ═══════════════════════════════════════════════ -->
+    <div id="lockout-screen" class="lockout-screen hidden">
+        <div class="lockout-container">
+            <div class="lockout-header">
+                <span class="lockout-title">⛔ SYSTEM LOCKOUT</span>
+            </div>
+            <div class="lockout-content">
+                <div class="lockout-message">
+                    <p class="lockout-warning">This IP address has been temporarily locked out.</p>
+                    <p class="lockout-reason" id="lockout-reason">Reason: Too many failed login attempts</p>
+                    <p class="lockout-timer">⏱ <span id="lockout-minutes">30</span> minutes remaining until auto-unlock</p>
+                </div>
+                <div class="lockout-form">
+                    <label for="lockout-password" class="lockout-label">Enter Lockout Password to Bypass:</label>
+                    <input type="password" id="lockout-password" class="lockout-input" placeholder="••••••••" autocomplete="off" />
+                    <button id="lockout-submit" class="lockout-btn">UNLOCK</button>
+                    <div id="lockout-error" class="lockout-error"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="settings-overlay" class="settings-overlay hidden"></div>
     <aside id="settings-panel" class="settings-panel">
         <div class="settings-header">
@@ -588,6 +612,170 @@
     <script src="js/alerts.js"></script>
     <script src="js/radar.js"></script>
     <script src="js/displays.js"></script>
+    <script>
+        /* ════════════════════════════════════════════════════════════════
+           LOCKOUT SCREEN HANDLER – Runs before app.js initialization
+           ════════════════════════════════════════════════════════════════ */
+        (() => {
+            'use strict';
+
+            const LOCKOUT_SESSION_KEY = 'weathernow_lockout_state';
+            const CHECK_LOCKOUT_ENDPOINT = '/api/security/check-lockout';
+            const UNLOCK_ENDPOINT = '/api/security/unlock';
+
+            const lockoutScreen = document.getElementById('lockout-screen');
+            const lockoutMinutes = document.getElementById('lockout-minutes');
+            const lockoutReason = document.getElementById('lockout-reason');
+            const lockoutPassword = document.getElementById('lockout-password');
+            const lockoutSubmit = document.getElementById('lockout-submit');
+            const lockoutError = document.getElementById('lockout-error');
+
+            let lockoutTimerInterval = null;
+            let lockoutExpiresAt = null;
+
+            async function checkLockout() {
+                try {
+                    const response = await fetch(CHECK_LOCKOUT_ENDPOINT, { cache: 'no-store' });
+                    if (!response.ok) throw new Error('Failed to check lockout status');
+                    
+                    const data = await response.json();
+                    return data;
+                } catch (err) {
+                    console.error('Lockout check failed:', err);
+                    return { locked: false };
+                }
+            }
+
+            function showLockoutScreen(minutesRemaining, reason) {
+                if (!lockoutScreen) return;
+                
+                lockoutScreen.classList.remove('hidden');
+                lockoutExpiresAt = Date.now() + (minutesRemaining * 60 * 1000);
+                
+                if (lockoutReason) {
+                    lockoutReason.textContent = `Reason: ${reason || 'Too many failed login attempts'}`;
+                }
+                
+                updateLockoutTimer();
+                if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
+                lockoutTimerInterval = setInterval(updateLockoutTimer, 1000);
+                
+                // Disable main app
+                document.querySelectorAll('.slide, .settings-overlay, #settings-panel, .slide-nav, #music-controls').forEach(el => {
+                    el.style.pointerEvents = 'none';
+                    el.style.opacity = '0.3';
+                });
+            }
+
+            function hideLockoutScreen() {
+                if (!lockoutScreen) return;
+                
+                lockoutScreen.classList.add('hidden');
+                if (lockoutTimerInterval) clearInterval(lockoutTimerInterval);
+                
+                // Re-enable main app
+                document.querySelectorAll('.slide, .settings-overlay, #settings-panel, .slide-nav, #music-controls').forEach(el => {
+                    el.style.pointerEvents = '';
+                    el.style.opacity = '';
+                });
+                
+                // Clear session storage
+                try { sessionStorage.removeItem(LOCKOUT_SESSION_KEY); } catch { }
+            }
+
+            function updateLockoutTimer() {
+                if (!lockoutExpiresAt || !lockoutMinutes) return;
+                
+                const remaining = Math.max(0, lockoutExpiresAt - Date.now());
+                const mins = Math.ceil(remaining / 60000);
+                lockoutMinutes.textContent = Math.max(0, mins);
+                
+                if (remaining <= 0 && lockoutTimerInterval) {
+                    clearInterval(lockoutTimerInterval);
+                    hideLockoutScreen();
+                    window.location.reload();
+                }
+            }
+
+            async function handleUnlock() {
+                if (!lockoutPassword || !lockoutPassword.value) {
+                    showLockoutError('Please enter the password');
+                    return;
+                }
+
+                try {
+                    lockoutSubmit.disabled = true;
+                    lockoutSubmit.textContent = 'Verifying...';
+                    
+                    // For now, client-side only - the backend endpoint will be created separately
+                    // This is a placeholder that will be replaced when /api/security/unlock is implemented
+                    showLockoutError('Unlock endpoint not yet implemented');
+                    
+                } catch (err) {
+                    showLockoutError('Error: ' + err.message);
+                } finally {
+                    lockoutSubmit.disabled = false;
+                    lockoutSubmit.textContent = 'UNLOCK';
+                }
+            }
+
+            function showLockoutError(msg) {
+                if (lockoutError) {
+                    lockoutError.textContent = msg;
+                }
+            }
+
+            async function initLockoutHandler() {
+                // Check if already locked out in this session
+                let sessionLockoutState = null;
+                try {
+                    const stored = sessionStorage.getItem(LOCKOUT_SESSION_KEY);
+                    if (stored) sessionLockoutState = JSON.parse(stored);
+                } catch { }
+
+                if (sessionLockoutState && sessionLockoutState.expiresAt > Date.now()) {
+                    showLockoutScreen(
+                        Math.ceil((sessionLockoutState.expiresAt - Date.now()) / 60000),
+                        sessionLockoutState.reason
+                    );
+                    return;
+                }
+
+                // Check with server
+                const lockoutStatus = await checkLockout();
+                
+                if (lockoutStatus.locked) {
+                    const lockoutState = {
+                        expiresAt: Date.now() + (lockoutStatus.minutesRemaining * 60 * 1000),
+                        reason: lockoutStatus.reason
+                    };
+                    try {
+                        sessionStorage.setItem(LOCKOUT_SESSION_KEY, JSON.stringify(lockoutState));
+                    } catch { }
+                    
+                    showLockoutScreen(lockoutStatus.minutesRemaining, lockoutStatus.reason);
+                }
+            }
+
+            // Bind unlock button
+            if (lockoutSubmit) {
+                lockoutSubmit.addEventListener('click', handleUnlock);
+            }
+
+            if (lockoutPassword) {
+                lockoutPassword.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') handleUnlock();
+                });
+            }
+
+            // Run lockout check on page load
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initLockoutHandler);
+            } else {
+                initLockoutHandler();
+            }
+        })();
+    </script>
     <script src="js/app.js"></script>
     <script src="js/announcements.js"></script>
     <script src="js/pwa.js"></script>

@@ -88,12 +88,13 @@ app.get('/sw.js', (req, res) => {
 });
 
 // ── GET /cs242 (Security Demo) ────────────────────────────────
+// Password-protected route: requires CS242_PASSWORD query param
 app.get('/cs242', (req, res) => {
-    res.sendFile(path.join(__dirname, 'demo.html'));
-});
-
-// ── GET /cs242 (Security Demo) ────────────────────────────────
-app.get('/cs242', (req, res) => {
+    const providedPassword = req.query.password || '';
+    if (providedPassword !== CS242_PASSWORD) {
+        return res.status(403).json({ error: 'Access denied. Invalid or missing password.' });
+    }
+    logSecurityEvent('CS242 Demo Accessed', req.ip, 'Correct password provided');
     res.sendFile(path.join(__dirname, 'demo.html'));
 });
 
@@ -167,6 +168,7 @@ let armageddonState = null;
 const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
+const CS242_PASSWORD = process.env.CS242_PASSWORD || 'cs242-security';
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 // ── Security & Audit (Task 1.2 & 2.1) ──────────────────────────
@@ -212,6 +214,15 @@ app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
 
+// ── Rate limiter (unlock attempts) ────────────────────────────
+const unlockLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 2,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many unlock attempts. Try again later.' }
+});
+
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
     const authHeader = req.headers['authorization'];
@@ -242,6 +253,25 @@ app.get('/api/security/logs', adminLimiter, (req, res) => {
     res.json({ security: securityLogs, audit: auditLogs });
 });
 
+// ── GET /api/security/check-lockout ────────────────────────────
+// Returns lockout status for the client to show/hide the main app
+app.get('/api/security/check-lockout', (req, res) => {
+    const ip = req.ip;
+    const status = failedLogins.get(ip);
+    
+    // Check if IP is locked out
+    if (status && status.lockedUntil > Date.now()) {
+        const minutesRemaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
+        res.json({
+            locked: true,
+            minutesRemaining,
+            reason: 'Too many failed login attempts'
+        });
+    } else {
+        res.json({ locked: false });
+    }
+});
+
 // ── POST /api/login ────────────────────────────────────────────
 app.post('/api/login', adminLimiter, (req, res) => {
     const ip = req.ip;
@@ -267,6 +297,22 @@ app.post('/api/login', adminLimiter, (req, res) => {
         if (lockedUntil > 0) logSecurityEvent('IP Locked', ip, '15-minute lockout');
         
         res.status(401).json({ error: 'Invalid password' });
+    }
+});
+
+// ── POST /api/security/unlock ───────────────────────────────────
+// Allows locked-out users to enter CS242 password to bypass lockout
+app.post('/api/security/unlock', unlockLimiter, (req, res) => {
+    const ip = req.ip;
+    const { password } = req.body;
+
+    if (password === CS242_PASSWORD) {
+        failedLogins.delete(ip);
+        logSecurityEvent('Lockout Bypassed', ip, 'User entered CS242 password to unlock');
+        res.json({ ok: true, message: 'Lockout cleared' });
+    } else {
+        logSecurityEvent('Unlock Failed', ip, 'Invalid unlock password attempt');
+        res.status(401).json({ error: 'Invalid lockout password' });
     }
 });
 
@@ -685,11 +731,6 @@ app.get('/api/spc-outlook', async (req, res) => {
         }
         res.status(502).json({ error: 'Failed to fetch SPC outlook data' });
     }
-});
-
-// ── GET /cs242 ────────────────────────────────────────────────
-app.get('/cs242', (req, res) => {
-    res.sendFile(path.join(__dirname, 'demo.html'));
 });
 
 // ── Security Demo Endpoints (Task 5) ──────────────────────────

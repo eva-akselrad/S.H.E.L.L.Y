@@ -943,8 +943,10 @@
             </div>
             <div class="login-title">Admin Panel</div>
             <div class="login-sub">Enter your admin password to continue.</div>
-            <input type="password" id="pw-input" placeholder="Admin password" autocomplete="current-password" />
-            <button id="pw-btn">Sign In</button>
+            <form id="login-form">
+                <input type="password" id="pw-input" placeholder="Admin password" autocomplete="current-password" />
+                <button id="pw-btn" type="submit">Sign In</button>
+            </form>
             <div id="login-error"></div>
         </div>
     </div>
@@ -1425,6 +1427,28 @@
 
     </div>
 
+    <!-- Armageddon confirmation modal -->
+    <div id="arm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="arm-confirm-title">
+        <div class="arm-confirm-box">
+            <div id="arm-confirm-icon" class="arm-confirm-icon">🚨</div>
+            <div id="arm-confirm-title" class="arm-confirm-title">CONFIRM E.S.T.O.P.</div>
+            <div class="arm-confirm-body">
+                You are about to override all viewer displays with an emergency message.
+                Please confirm the details below.
+            </div>
+            <div class="arm-confirm-preview">
+                <div id="arm-confirm-preview-type" class="arm-confirm-preview-type"></div>
+                <div id="arm-confirm-preview-title" class="arm-confirm-preview-title"></div>
+                <div id="arm-confirm-preview-text" class="arm-confirm-preview-text"></div>
+                <div id="arm-confirm-preview-timer" class="arm-confirm-preview-timer"></div>
+            </div>
+            <div class="arm-confirm-btns" style="margin-top:18px">
+                <button id="arm-confirm-cancel" type="button">Cancel</button>
+                <button id="arm-confirm-ok" type="button">Activate E.S.T.O.P.</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
@@ -1438,8 +1462,8 @@
             // ── Login ──────────────────────────────────────────────────────
             const loginScreen = document.getElementById('login-screen');
             const adminUi = document.getElementById('admin-ui');
+            const loginForm = document.getElementById('login-form');
             const pwInput = document.getElementById('pw-input');
-            const pwBtn = document.getElementById('pw-btn');
             const loginError = document.getElementById('login-error');
 
             async function tryLogin() {
@@ -1488,8 +1512,10 @@
             function updateActivity() { lastActivity = Date.now(); }
             ['mousedown', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, updateActivity));
 
-            pwBtn.addEventListener('click', tryLogin);
-            pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+            loginForm.addEventListener('submit', e => {
+                e.preventDefault();
+                tryLogin();
+            });
 
             // Auto-login if token exists
             if (sessionToken) {
@@ -1874,50 +1900,68 @@
                 const title = document.getElementById('arm-title').value.trim();
                 const duration = parseInt(document.getElementById('arm-duration').value) || 0;
                 const meta = ARM_TYPES[selectedArmType] || ARM_TYPES.emergency;
+                const modal = document.getElementById('arm-confirm-modal');
+                const iconEl = document.getElementById('arm-confirm-icon');
+                const typeEl = document.getElementById('arm-confirm-preview-type');
+                const titleEl = document.getElementById('arm-confirm-preview-title');
+                const textEl = document.getElementById('arm-confirm-preview-text');
+                const timerEl = document.getElementById('arm-confirm-preview-timer');
 
-                document.getElementById('arm-confirm-icon').textContent = meta.icon;
-                document.getElementById('arm-confirm-preview-type').textContent = meta.label.toUpperCase();
-                document.getElementById('arm-confirm-preview-title').textContent = title || '';
-                document.getElementById('arm-confirm-preview-text').textContent = text;
-                document.getElementById('arm-confirm-preview-timer').textContent =
+                if (!modal || !iconEl || !typeEl || !titleEl || !textEl || !timerEl) {
+                    armFeedback('⚠ Confirmation dialog unavailable.', '#ef4444');
+                    return;
+                }
+
+                iconEl.textContent = meta.icon;
+                typeEl.textContent = meta.label.toUpperCase();
+                titleEl.textContent = title || '';
+                textEl.textContent = text;
+                timerEl.textContent =
                     duration > 0 ? `⏱ Auto-deactivates after ${duration < 60 ? duration + ' minute' + (duration !== 1 ? 's' : '') : (duration / 60) + ' hour' + (duration / 60 !== 1 ? 's' : '')}` : '⚠ Manual deactivation only';
-                document.getElementById('arm-confirm-modal').classList.add('open');
-                document.getElementById('arm-confirm-modal').dataset.pending = JSON.stringify({ title, text, type: selectedArmType, duration });
+                modal.classList.add('open');
+                modal.dataset.pending = JSON.stringify({ title, text, type: selectedArmType, duration });
             }
 
-            document.getElementById('arm-confirm-cancel').addEventListener('click', () => {
-                document.getElementById('arm-confirm-modal').classList.remove('open');
-            });
+            const armConfirmCancel = document.getElementById('arm-confirm-cancel');
+            const armConfirmOk = document.getElementById('arm-confirm-ok');
+            const armConfirmModal = document.getElementById('arm-confirm-modal');
 
-            document.getElementById('arm-confirm-ok').addEventListener('click', async () => {
-                const modal = document.getElementById('arm-confirm-modal');
-                modal.classList.remove('open');
-                const payload = JSON.parse(modal.dataset.pending || '{}');
-                const btn = document.getElementById('arm-activate-btn');
-                btn.disabled = true;
-                try {
-                    const r = await authFetch(`${API}/armageddon`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!r.ok) throw new Error();
-                    if (document.getElementById('arm-push').checked) {
-                        const meta = ARM_TYPES[payload.type] || ARM_TYPES.emergency;
-                        await authFetch(`${API}/push/send`, {
+            if (armConfirmCancel && armConfirmModal) {
+                armConfirmCancel.addEventListener('click', () => {
+                    armConfirmModal.classList.remove('open');
+                });
+            }
+
+            if (armConfirmOk && armConfirmModal) {
+                armConfirmOk.addEventListener('click', async () => {
+                    armConfirmModal.classList.remove('open');
+                    const payload = JSON.parse(armConfirmModal.dataset.pending || '{}');
+                    const btn = document.getElementById('arm-activate-btn');
+                    btn.disabled = true;
+                    try {
+                        const r = await authFetch(`${API}/armageddon`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ title: `${meta.icon} ${payload.title || meta.label}`, body: payload.text, type: 'emergency' })
-                        }).catch(() => {});
+                            body: JSON.stringify(payload)
+                        });
+                        if (!r.ok) throw new Error();
+                        if (document.getElementById('arm-push').checked) {
+                            const meta = ARM_TYPES[payload.type] || ARM_TYPES.emergency;
+                            await authFetch(`${API}/push/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ title: `${meta.icon} ${payload.title || meta.label}`, body: payload.text, type: 'emergency' })
+                            }).catch(() => {});
+                        }
+                        armFeedback('🛑 E.S.T.O.P. ACTIVE!', '#ef4444');
+                        loadArmageddonState();
+                    } catch {
+                        armFeedback('⚠ Failed to activate.', '#ef4444');
+                    } finally {
+                        btn.disabled = false;
                     }
-                    armFeedback('🛑 E.S.T.O.P. ACTIVE!', '#ef4444');
-                    loadArmageddonState();
-                } catch {
-                    armFeedback('⚠ Failed to activate.', '#ef4444');
-                } finally {
-                    btn.disabled = false;
-                }
-            });
+                });
+            }
 
             async function deactivateArmageddon() {
                 if (!confirm('Deactivate E.S.T.O.P.?')) return;
