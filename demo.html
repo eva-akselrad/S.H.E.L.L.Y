@@ -33,102 +33,10 @@
             opacity: 0.15;
         }
 
-        .password-gate {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 8, 0, 0.98);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            backdrop-filter: blur(2px);
-        }
-
-        .password-gate.hidden {
-            display: none;
-        }
-
-        .password-prompt {
-            border: 2px solid var(--matrix-green);
-            padding: 40px;
-            text-align: center;
-            background: rgba(0, 8, 0, 0.95);
-            box-shadow: 0 0 30px var(--matrix-fade);
-            max-width: 400px;
-        }
-
-        .password-prompt h1 {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-            letter-spacing: 0.2em;
-            color: #ff3e3e;
-        }
-
-        .password-prompt p {
-            margin-bottom: 20px;
-            opacity: 0.8;
-            font-size: 0.9rem;
-        }
-
-        .password-prompt input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            background: rgba(0, 255, 65, 0.05);
-            border: 1px solid var(--matrix-green);
-            color: var(--matrix-green);
-            font-family: 'Roboto Mono', monospace;
-            font-size: 1rem;
-        }
-
-        .password-prompt input:focus {
-            outline: none;
-            box-shadow: 0 0 10px var(--matrix-fade);
-        }
-
-        .password-prompt button {
-            width: 100%;
-            padding: 12px;
-            background: transparent;
-            border: 1px solid var(--matrix-green);
-            color: var(--matrix-green);
-            font-family: 'Roboto Mono', monospace;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 700;
-            transition: all 0.2s;
-        }
-
-        .password-prompt button:hover {
-            background: rgba(0, 255, 65, 0.1);
-            box-shadow: 0 0 10px var(--matrix-fade);
-        }
-
-        .password-prompt .error {
-            color: #ff3e3e;
-            margin-bottom: 10px;
-            font-size: 0.8rem;
-        }
-
-        .password-gate .status {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            font-size: 0.7rem;
-            opacity: 0.5;
-        }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
             position: relative;
-        }
-
-        .container.hidden {
-            display: none;
         }
 
         header {
@@ -586,20 +494,7 @@
 <body>
     <canvas id="matrix-bg"></canvas>
     
-    <!-- Password Gate -->
-    <div id="password-gate" class="password-gate">
-        <div class="password-prompt">
-            <h1>🔒 ACCESS RESTRICTED</h1>
-            <p>CS242 Security Demo Panel</p>
-            <p style="font-size: 0.8rem;">Enter the CS242 password to proceed:</p>
-            <div id="password-error" class="error"></div>
-            <input type="password" id="demo-password-input" placeholder="••••••••" autocomplete="off" />
-            <button onclick="verifyDemoPassword()">VERIFY ACCESS</button>
-            <div class="status">Checking verification...</div>
-        </div>
-    </div>
-
-    <div class="container hidden" id="demo-container">
+    <div class="container">
         <header>
             <h1>S.H.E.L.L.Y. // Security Command Center</h1>
             <div style="font-size: 0.7rem; margin-top: 10px; opacity: 0.7;">CS242 Final Project // Security Hardening Demo</div>
@@ -919,129 +814,6 @@ const sanitizedInput = xss(userInput);<br>
     </div>
 
     <script>
-        // ── Password Verification System ──────────────────────────────
-        const DEMO_PASSWORD_KEY = 'demo_password_verified';
-        const DEMO_CONTAINER = document.getElementById('demo-container');
-        const PASSWORD_GATE = document.getElementById('password-gate');
-        let verificationCheckInterval = null;
-
-        async function verifyDemoPassword() {
-            const password = document.getElementById('demo-password-input').value;
-            const errorEl = document.getElementById('password-error');
-            const button = event.target;
-            
-            if (!password) {
-                errorEl.textContent = 'Please enter a password';
-                return;
-            }
-
-            try {
-                button.disabled = true;
-                button.textContent = 'Verifying...';
-                
-                // Check if CS242_DEMO_ENABLED is true and verify password matches
-                const response = await fetch(`/api/security/cs242-status`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                
-                // For /cs242, we verify via the URL query param approach
-                // Check if the password is correct by attempting to access with it
-                const testResponse = await fetch(`/cs242?password=${encodeURIComponent(password)}`);
-                
-                if (testResponse.status === 200) {
-                    // Password correct - store verification
-                    sessionStorage.setItem(DEMO_PASSWORD_KEY, 'true');
-                    errorEl.textContent = '';
-                    PASSWORD_GATE.classList.add('hidden');
-                    DEMO_CONTAINER.classList.remove('hidden');
-                    startVerificationCheck();
-                } else if (testResponse.status === 403) {
-                    errorEl.textContent = 'Invalid password';
-                    button.disabled = false;
-                    button.textContent = 'VERIFY ACCESS';
-                } else if (testResponse.status === 404) {
-                    errorEl.textContent = 'Feature disabled';
-                    button.disabled = false;
-                    button.textContent = 'VERIFY ACCESS';
-                } else {
-                    errorEl.textContent = 'Verification failed';
-                    button.disabled = false;
-                    button.textContent = 'VERIFY ACCESS';
-                }
-            } catch (err) {
-                console.error('Verification error:', err);
-                errorEl.textContent = 'Network error: ' + err.message;
-                button.disabled = false;
-                button.textContent = 'VERIFY ACCESS';
-            }
-        }
-
-        function startVerificationCheck() {
-            // Clear any existing interval
-            if (verificationCheckInterval) clearInterval(verificationCheckInterval);
-            
-            // Check verification every 10 seconds
-            verificationCheckInterval = setInterval(async () => {
-                const isVerified = sessionStorage.getItem(DEMO_PASSWORD_KEY);
-                
-                if (!isVerified) {
-                    // Session storage cleared - show password gate
-                    PASSWORD_GATE.classList.remove('hidden');
-                    DEMO_CONTAINER.classList.add('hidden');
-                    document.getElementById('demo-password-input').value = '';
-                    document.getElementById('password-error').textContent = 'Session expired. Please verify again.';
-                    clearInterval(verificationCheckInterval);
-                    return;
-                }
-
-                // Verify CS242 is still available (in case feature toggle changed)
-                try {
-                    const response = await fetch(`/api/security/cs242-status`);
-                    const data = await response.json();
-                    
-                    if (!data.available) {
-                        // Feature has been disabled
-                        sessionStorage.removeItem(DEMO_PASSWORD_KEY);
-                        PASSWORD_GATE.classList.remove('hidden');
-                        DEMO_CONTAINER.classList.add('hidden');
-                        document.getElementById('password-error').textContent = 'Feature has been disabled by administrator.';
-                        clearInterval(verificationCheckInterval);
-                    }
-                } catch (err) {
-                    console.error('Verification check failed:', err);
-                }
-            }, 10000); // Check every 10 seconds
-        }
-
-        // Check if already verified on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            const isVerified = sessionStorage.getItem(DEMO_PASSWORD_KEY);
-            
-            if (isVerified) {
-                PASSWORD_GATE.classList.add('hidden');
-                DEMO_CONTAINER.classList.remove('hidden');
-                startVerificationCheck();
-            } else {
-                PASSWORD_GATE.classList.remove('hidden');
-                DEMO_CONTAINER.classList.add('hidden');
-            }
-        });
-
-        // Add Enter key support for password input
-        document.addEventListener('DOMContentLoaded', () => {
-            const passwordInput = document.getElementById('demo-password-input');
-            if (passwordInput) {
-                passwordInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        verifyDemoPassword();
-                    }
-                });
-            }
-        });
-
         // ── Matrix Rain Effect ────────────────────────────────────────
         const canvas = document.getElementById('matrix-bg');
         const ctx = canvas.getContext('2d');

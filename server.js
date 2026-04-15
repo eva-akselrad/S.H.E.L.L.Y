@@ -87,19 +87,7 @@ app.get('/sw.js', (req, res) => {
     res.send(SW_CONTENT);
 });
 
-// ── GET /cs242 (Security Demo) ────────────────────────────────
-// Password-protected route: requires CS242_PASSWORD query param (only if enabled)
-app.get('/cs242', (req, res) => {
-    if (!CS242_DEMO_ENABLED) {
-        return res.status(404).send('Not found');
-    }
-    const providedPassword = req.query.password || '';
-    if (providedPassword !== CS242_PASSWORD) {
-        return res.status(403).json({ error: 'Access denied. Invalid or missing password.' });
-    }
-    logSecurityEvent('CS242 Demo Accessed', req.ip, 'Correct password provided');
-    res.sendFile(path.join(__dirname, 'demo.html'));
-});
+
 
 // ── Static files ───────────────────────────────────────────────
 app.use(express.static(__dirname, {
@@ -166,24 +154,15 @@ let customForecastId = 1;
 // Shape: { title, text, type, activatedAt, expiresAt } or null when inactive
 let armageddonState = null;
 
-// CS242 Demo temporary access control
-// Shape: { enabledAt, expiresAt } or null when inactive
-let cs242DemoState = null;
-
 // Acknowledgements: tracks which visitor IDs have acknowledged each message
 // Map<msgId, Set<visitorId>>
 const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
-const CS242_PASSWORD = process.env.CS242_PASSWORD || 'cs242-security';
-const CS242_DEMO_ENABLED = process.env.CS242_DEMO_ENABLED !== 'false'; // Disable with CS242_DEMO_ENABLED=false
+
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 // ── Security & Audit (Task 1.2 & 2.1) ──────────────────────────
-const failedLogins = new Map();
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
-
 let securityLogs = [];
 function logSecurityEvent(event, ip, details = '') {
     securityLogs.unshift({
@@ -222,15 +201,6 @@ app.use('/api/messages', adminLimiter);
 app.use('/api/push', adminLimiter);
 app.use('/api/release-notes', adminLimiter);
 
-// ── Rate limiter (unlock attempts) ────────────────────────────
-const unlockLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 2,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many unlock attempts. Try again later.' }
-});
-
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
     const authHeader = req.headers['authorization'];
@@ -261,138 +231,43 @@ app.get('/api/security/logs', adminLimiter, (req, res) => {
     res.json({ security: securityLogs, audit: auditLogs });
 });
 
-// ── GET /api/security/check-lockout ────────────────────────────
-// Returns lockout status for the client to show/hide the main app
-app.get('/api/security/check-lockout', (req, res) => {
-    const ip = req.ip;
-    const status = failedLogins.get(ip);
-    
-    // Check if IP is locked out
-    if (status && status.lockedUntil > Date.now()) {
-        const minutesRemaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
-        res.json({
-            locked: true,
-            minutesRemaining,
-            reason: 'Too many failed login attempts'
-        });
-    } else {
-        res.json({ locked: false });
-    }
-});
+
 
 // ── POST /api/login ────────────────────────────────────────────
 app.post('/api/login', adminLimiter, (req, res) => {
     const ip = req.ip;
     const { password } = req.body;
 
-    const status = failedLogins.get(ip);
-    if (status && status.lockedUntil > Date.now()) {
-        const remaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
-        return res.status(429).json({ error: `Locked out. Try again in ${remaining} min.` });
-    }
-
     if (password === ADMIN_PASSWORD) {
-        failedLogins.delete(ip);
         const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '1h' });
         logSecurityEvent('Login Success', ip);
         res.json({ token });
     } else {
-        const count = (status?.count || 0) + 1;
-        const lockedUntil = count >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0;
-        failedLogins.set(ip, { count, lockedUntil });
-        
-        logSecurityEvent('Login Failed', ip, `Attempt ${count}/${MAX_FAILED_ATTEMPTS}`);
-        if (lockedUntil > 0) logSecurityEvent('IP Locked', ip, '15-minute lockout');
-        
+        logSecurityEvent('Login Failed', ip);
         res.status(401).json({ error: 'Invalid password' });
     }
 });
 
-// ── POST /api/security/unlock ───────────────────────────────────
-// Allows locked-out users to enter CS242 password to bypass lockout (if enabled)
-app.post('/api/security/unlock', unlockLimiter, (req, res) => {
-    const ip = req.ip;
-    const { password } = req.body;
 
-    if (CS242_DEMO_ENABLED && password === CS242_PASSWORD) {
-        failedLogins.delete(ip);
-        logSecurityEvent('Lockout Bypassed', ip, 'User entered CS242 password to unlock');
-        res.json({ ok: true, message: 'Lockout cleared' });
-    } else {
-        logSecurityEvent('Unlock Failed', ip, 'Invalid unlock password attempt');
-        res.status(401).json({ error: 'Invalid lockout password' });
-    }
-});
 
-// ── POST /api/security/enable-cs242-demo ───────────────────────
-// Admin-only: Enable temporary CS242 demo access for presentations
-app.post('/api/security/enable-cs242-demo', (req, res) => {
-    if (!CS242_DEMO_ENABLED) {
-        return res.status(403).json({ error: 'CS242 demo is disabled' });
-    }
-    if (!checkAuth(req, res)) return;
-    
-    const { durationMinutes } = req.body;
-    const duration = parseInt(durationMinutes) || 30;
-    
-    if (duration < 1 || duration > 1440) {
-        return res.status(400).json({ error: 'Duration must be 1-1440 minutes' });
-    }
-    
-    const expiresAt = Date.now() + (duration * 60 * 1000);
-    cs242DemoState = { enabledAt: Date.now(), expiresAt };
-    
-    logAuditAction('CS242 Demo Enabled', req.ip, `Duration: ${duration} minutes`);
-    res.json({ ok: true, expiresAt, message: `CS242 demo enabled for ${duration} minutes` });
-});
 
-// ── POST /api/security/disable-cs242-demo ──────────────────────
-// Admin-only: Disable CS242 demo access
-app.post('/api/security/disable-cs242-demo', (req, res) => {
-    if (!CS242_DEMO_ENABLED) {
-        return res.status(403).json({ error: 'CS242 demo is disabled' });
-    }
-    if (!checkAuth(req, res)) return;
-    
-    cs242DemoState = null;
-    logAuditAction('CS242 Demo Disabled', req.ip, 'Demo access revoked');
-    res.json({ ok: true, message: 'CS242 demo disabled' });
-});
 
-// ── GET /api/security/cs242-status ────────────────────────────
-// Public: Check if CS242 demo access is currently enabled
-app.get('/api/security/cs242-status', (req, res) => {
-    if (!CS242_DEMO_ENABLED) {
-        return res.json({ enabled: false, available: false });
-    }
-    
-    // Check if demo access is expired
-    if (cs242DemoState?.expiresAt && Date.now() > cs242DemoState.expiresAt) {
-        cs242DemoState = null;
-    }
-    
-    const enabled = cs242DemoState !== null && cs242DemoState.expiresAt > Date.now();
-    res.json({ 
-        enabled,
-        expiresAt: enabled ? cs242DemoState.expiresAt : null,
-        available: CS242_DEMO_ENABLED
-    });
-});
 
-// ── GET /api/security/cs242-config ─────────────────────────────
-// Admin-only: Check if CS242 demo feature is available for admin panel
-app.get('/api/security/cs242-config', (req, res) => {
-    if (!checkAuth(req, res)) return;
-    res.json({ available: CS242_DEMO_ENABLED });
-});
 
+
+
 // ── Honeypot (Task 2.3) ────────────────────────────────────────
 app.get('/api/admin-backdoor', (req, res) => {
     const ip = req.ip;
     logSecurityEvent('Honeypot Triggered', ip, 'Accessed /api/admin-backdoor');
-    failedLogins.set(ip, { count: MAX_FAILED_ATTEMPTS, lockedUntil: Date.now() + LOCKOUT_MS * 4 });
     res.status(403).json({ error: 'Access denied' });
 });
+
+
+
+
+
+
 
 // ── GET /api/messages?since=ID ─────────────────────────────────
 app.get('/api/messages', (req, res) => {
@@ -803,48 +678,7 @@ app.get('/api/spc-outlook', async (req, res) => {
     }
 });
 
-// ── Security Demo Endpoints (Task 5) ──────────────────────────
-const DEMO_ENABLED = process.env.SECURITY_DEMO_ENABLED === 'true' || true; // Default true for this project
 
-app.post('/api/security/demo/reset', (req, res) => {
-    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
-    failedLogins.clear();
-    securityLogs = [];
-    auditLogs = [];
-    logSecurityEvent('Demo Reset', req.ip, 'Logs and lockouts cleared via demo control');
-    res.json({ ok: true });
-});
-
-app.post('/api/security/demo/expire-token', (req, res) => {
-    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
-    // We can't easily "expire" a JWT from the server side without a blacklist,
-    // but we can signal the client to clear its token.
-    logSecurityEvent('Demo Token Expire', req.ip, 'Triggered token expiration demo');
-    res.json({ ok: true, action: 'logout' });
-});
-
-app.post('/api/security/demo/sanitize', (req, res) => {
-    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
-    const { input } = req.body;
-    const sanitized = xss(input || '');
-    res.json({ input, sanitized });
-});
-
-// ── GET /api/security/demo/lockouts ───────────────────────────
-app.get('/api/security/demo/lockouts', (req, res) => {
-    if (!DEMO_ENABLED) return res.status(403).json({ error: 'Demo mode disabled' });
-    const lockouts = [];
-    failedLogins.forEach((status, ip) => {
-        if (status.lockedUntil > Date.now()) {
-            lockouts.push({
-                ip,
-                remaining: Math.ceil((status.lockedUntil - Date.now()) / 1000),
-                count: status.count
-            });
-        }
-    });
-    res.json(lockouts);
-});
 
 // ── Start ─────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

@@ -79,9 +79,13 @@ https://your-domain.com/cs242?password=cs242-security
 
 **Password Protection:**
 - The `/cs242` endpoint is password-protected via query parameter
+- Password verification happens SERVER-SIDE before the page is served
 - Default password: `cs242-security` (configure via `CS242_PASSWORD` env var)
-- Incorrect or missing password returns 403 Forbidden
+- Missing password: returns 404 if `CS242_DEMO_ENABLED=false`
+- Incorrect password: returns 403 Forbidden (page NOT served)
+- Correct password: returns 200 with demo.html served
 - Successful access is logged to security audit
+- No client-side password gate overlay - pure server-side validation
 
 **Example URLs:**
 - Local: `http://localhost:3000/cs242?password=cs242-security`
