@@ -13,10 +13,11 @@ This document describes the comprehensive security demonstration system for Weat
 
 1. [Site-Wide Lockout System](#site-wide-lockout-system)
 2. [Security Demo Panel](#security-demo-panel)
-3. [Implementation Details](#implementation-details)
-4. [Files Modified](#files-modified)
-5. [Usage Guide](#usage-guide)
-6. [Testing](#testing)
+3. [CS242_DEMO_ENABLED Feature Toggle](#cs242_demo_enabled-feature-toggle)
+4. [Implementation Details](#implementation-details)
+5. [Files Modified](#files-modified)
+6. [Usage Guide](#usage-guide)
+7. [Testing](#testing)
 
 ---
 
@@ -593,6 +594,49 @@ node test-demo-integration.js
 
 ---
 
+## CS242_DEMO_ENABLED Feature Toggle
+
+### Complete Feature Disabling
+
+When `CS242_DEMO_ENABLED=false`, the **entire CS242 demo system** becomes inaccessible as if it never existed:
+
+**What Gets Disabled:**
+- ✅ `/cs242?password=...` route returns **404 Not Found**
+- ✅ `/api/security/enable-cs242-demo` returns **403 Forbidden**
+- ✅ `/api/security/disable-cs242-demo` returns **403 Forbidden**
+- ✅ `/api/security/cs242-status` returns `available: false`
+- ✅ `/api/security/cs242-config` returns `available: false`
+- ✅ IP lockout bypass with `CS242_PASSWORD` is **completely disabled**
+- ✅ Admin panel dashboard control disappears entirely
+
+**What Stays Enabled:**
+- Regular admin panel login with `ADMIN_PASSWORD` works normally
+- IP lockout still functions (but no bypass available)
+- Users must wait 15 minutes for auto-unlock
+
+### Use Cases
+
+- **Production deployments**: Prevent any demo access entirely
+- **Security audits**: Hide demo panel from non-authorized users
+- **Education settings**: Disable between class sessions
+- **Testing**: Verify system works without demo features
+
+### Configuration
+
+```bash
+# Local development (.env file)
+CS242_DEMO_ENABLED=true      # Default: enable all features
+
+# Cloudflare Pages (Environment Variables)
+CS242_DEMO_ENABLED=false     # Set to disable entire system
+
+# Docker (docker-compose.yml)
+environment:
+  - CS242_DEMO_ENABLED=false
+```
+
+---
+
 ## Environment Variables
 
 ```bash
@@ -601,6 +645,15 @@ ADMIN_PASSWORD=your_secure_admin_password
 
 # CS242 Security Demo password (used for /cs242 access AND lockout bypass)
 CS242_PASSWORD=your_cs242_demo_password
+
+# CS242 Demo Dashboard Control (admin panel feature toggle)
+# Set to 'false' to COMPLETELY DISABLE the entire CS242 system:
+# - /cs242?password=... route returns 404
+# - /api/security/* endpoints return 403
+# - Lockout bypass with CS242_PASSWORD is disabled
+# - Admin panel control disappears
+# Default: true (enabled)
+CS242_DEMO_ENABLED=true
 
 # Optional: Override VAPID keys
 VAPID_PUBLIC_KEY=...
@@ -613,9 +666,12 @@ SECURITY_DEMO_ENABLED=true
 
 **Important Notes:**
 - `ADMIN_PASSWORD`: Used only for admin panel authentication
-- `CS242_PASSWORD`: Used for both demo panel access (`/cs242?password=...`) AND lockout screen bypass
-- Default values (if not set): `ADMIN_PASSWORD=weathernow`, `CS242_PASSWORD=cs242-security`
-- In production, **always** set both variables securely
+- `CS242_PASSWORD`: Used for both demo panel access (`/cs242?password=...`) AND lockout bypass (when enabled)
+- `CS242_DEMO_ENABLED`: Controls entire CS242 system availability
+  - `true` (default): All features enabled (demo page, lockout bypass, admin control)
+  - `false`: Complete disabling (route returns 404, bypass disabled, admin control hidden)
+- Default values: `ADMIN_PASSWORD=weathernow`, `CS242_PASSWORD=cs242-security`, `CS242_DEMO_ENABLED=true`
+- In production, **always** set passwords securely
 
 ---
 

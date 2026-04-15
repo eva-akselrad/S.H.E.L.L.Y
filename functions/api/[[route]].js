@@ -28,6 +28,7 @@ const KV_RELEASE_NOTES_KEY = 'release_notes';
 const KV_APP_UPDATE_SETTINGS_KEY = 'app_update_settings';
 const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
 const KV_ARMAGEDDON_KEY = 'armageddon';
+const KV_CS242_DEMO_STATE_KEY = 'cs242_demo_state';
 const KV_MSG_SEQ_KEY = 'msg_next_id'; // persistent counter — never resets on message delete
 const KV_ACKS_KEY = 'msg_acks'; // { [msgId]: [visitorId, ...] }
 const KV_SECURITY_LOGS_KEY = 'security_logs';
@@ -119,6 +120,19 @@ async function saveArmageddonState(env, state) {
         await env.WEATHERNOW_KV.put(KV_ARMAGEDDON_KEY, JSON.stringify(state));
     }
 }
+
+async function getCS242DemoState(env) {
+    return (await env.WEATHERNOW_KV.get(KV_CS242_DEMO_STATE_KEY, 'json')) ?? null;
+}
+async function saveCS242DemoState(env, state) {
+    if (state === null) {
+        await env.WEATHERNOW_KV.delete(KV_CS242_DEMO_STATE_KEY);
+    } else {
+        await env.WEATHERNOW_KV.put(KV_CS242_DEMO_STATE_KEY, JSON.stringify(state));
+    }
+}
+    
+
 
 // ── Auth helpers ───────────────────────────────────────────────────
 async function hmacSha256(message, secret) {
@@ -313,6 +327,97 @@ export async function onRequest({ request, env }) {
         failed[ip] = { count: 5, lockedUntil: Date.now() + 60 * 60 * 1000 };
         await saveFailedLogins(env, failed);
         return json({ error: 'Access denied' }, 403);
+    }
+
+    // ── POST /api/security/unlock ───────────────────────────────────
+    // Allows locked-out users to enter CS242 password to bypass lockout (if enabled)
+    if (path === '/api/security/unlock' && method === 'POST') {
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+        const { password } = await request.json().catch(() => ({}));
+        const CS242_DEMO_ENABLED = (env.CS242_DEMO_ENABLED ?? 'true') !== 'false';
+        const CS242_PASSWORD = env.CS242_PASSWORD || 'cs242-security';
+
+        if (CS242_DEMO_ENABLED && password === CS242_PASSWORD) {
+            const failed = await getFailedLogins(env);
+            delete failed[ip];
+            await saveFailedLogins(env, failed);
+            await saveSecurityLog(env, 'Lockout Bypassed', ip, 'User entered CS242 password to unlock');
+            return json({ ok: true, message: 'Lockout cleared' });
+        } else {
+            await saveSecurityLog(env, 'Unlock Failed', ip, 'Invalid unlock password attempt');
+            return json({ error: 'Invalid lockout password' }, 401);
+        }
+    }
+
+    // ── GET /api/security/check-lockout ────────────────────────────
+    if (path === '/api/security/check-lockout' && method === 'GET') {
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+        const failed = await getFailedLogins(env);
+        const status = failed[ip];
+        
+        if (status && status.lockedUntil > Date.now()) {
+            const minutesRemaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
+            return json({
+                locked: true,
+                minutesRemaining,
+                reason: 'Too many failed login attempts'
+            });
+        } else {
+            return json({ locked: false });
+        }
+    }
+
+    // ── POST /api/security/enable-cs242-demo ───────────────────────
+    if (path === '/api/security/enable-cs242-demo' && method === 'POST') {
+        const CS242_DEMO_ENABLED = (env.CS242_DEMO_ENABLED ?? 'true') !== 'false';
+        if (!CS242_DEMO_ENABLED) return json({ error: 'CS242 demo is disabled' }, 403);
+        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        
+        const { duration = 30 } = await request.json().catch(() => ({}));
+        const durationMs = Math.max(1, Math.min(1440, parseInt(duration) || 30)) * 60 * 1000;
+        const expiresAt = Date.now() + durationMs;
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+        
+        await saveCS242DemoState(env, { enabledAt: Date.now(), expiresAt });
+        await saveAuditLog(env, 'CS242 Demo Enabled', ip, `Duration: ${duration} minutes`);
+        return json({ ok: true, expiresAt, message: `CS242 demo enabled for ${duration} minutes` });
+    }
+
+    // ── POST /api/security/disable-cs242-demo ──────────────────────
+    if (path === '/api/security/disable-cs242-demo' && method === 'POST') {
+        const CS242_DEMO_ENABLED = (env.CS242_DEMO_ENABLED ?? 'true') !== 'false';
+        if (!CS242_DEMO_ENABLED) return json({ error: 'CS242 demo is disabled' }, 403);
+        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+        await saveCS242DemoState(env, null);
+        await saveAuditLog(env, 'CS242 Demo Disabled', ip, 'Demo access revoked');
+        return json({ ok: true, message: 'CS242 demo disabled' });
+    }
+
+    // ── GET /api/security/cs242-status ────────────────────────────
+    if (path === '/api/security/cs242-status' && method === 'GET') {
+        const CS242_DEMO_ENABLED = (env.CS242_DEMO_ENABLED ?? 'true') !== 'false';
+        if (!CS242_DEMO_ENABLED) return json({ enabled: false, available: false });
+        
+        let state = await getCS242DemoState(env);
+        if (state?.expiresAt && Date.now() > state.expiresAt) {
+            await saveCS242DemoState(env, null);
+            state = null;
+        }
+        const enabled = state !== null && state.expiresAt > Date.now();
+        return json({
+            enabled,
+            expiresAt: enabled ? state.expiresAt : null,
+            available: CS242_DEMO_ENABLED
+        });
+    }
+
+    // ── GET /api/security/cs242-config ─────────────────────────────
+    if (path === '/api/security/cs242-config' && method === 'GET') {
+        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        const CS242_DEMO_ENABLED = (env.CS242_DEMO_ENABLED ?? 'true') !== 'false';
+        return json({ available: CS242_DEMO_ENABLED });
     }
 
     // ── Messages ────────────────────────────────────────────────

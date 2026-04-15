@@ -707,9 +707,20 @@
                     lockoutSubmit.disabled = true;
                     lockoutSubmit.textContent = 'Verifying...';
                     
-                    // For now, client-side only - the backend endpoint will be created separately
-                    // This is a placeholder that will be replaced when /api/security/unlock is implemented
-                    showLockoutError('Unlock endpoint not yet implemented');
+                    const response = await fetch('/api/security/unlock', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: lockoutPassword.value })
+                    });
+                    
+                    if (response.ok) {
+                        sessionStorage.removeItem('lockout_checked');
+                        hideLockoutScreen();
+                        location.reload();
+                    } else {
+                        const data = await response.json();
+                        showLockoutError(data.error || 'Invalid password');
+                    }
                     
                 } catch (err) {
                     showLockoutError('Error: ' + err.message);

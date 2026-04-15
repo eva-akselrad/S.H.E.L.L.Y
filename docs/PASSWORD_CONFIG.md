@@ -4,11 +4,12 @@
 
 WeatherNow now has **separate password system** for different access levels:
 
-| Feature | Password Variable | Default Value | Purpose |
+| Feature | Config Variable | Default Value | Purpose |
 |---------|-----------------|---------------|---------|
 | Admin Panel (`/admin`) | `ADMIN_PASSWORD` | `weathernow` | Announcement management, E.S.T.O.P. control |
-| Demo Panel (`/cs242`) | `CS242_PASSWORD` | `cs242-security` | Security vulnerability demonstrations |
-| Lockout Bypass | `CS242_PASSWORD` | `cs242-security` | Override full-site IP lockout |
+| Demo Panel (`/cs242`) | `CS242_PASSWORD` | `cs242-security` | Security vulnerability demonstrations (when enabled) |
+| Lockout Bypass | `CS242_PASSWORD` | `cs242-security` | Override full-site IP lockout (when enabled) |
+| Demo Dashboard Control | `CS242_DEMO_ENABLED` | `true` | **Entire CS242 system** (set `false` to completely disable) |
 
 ## Why Separate Passwords?
 
@@ -16,6 +17,7 @@ WeatherNow now has **separate password system** for different access levels:
 2. **Access Control**: Students/presenters get demo access without admin privileges
 3. **Audit Trail**: Separate passwords allow tracking who accessed what
 4. **Flexibility**: Easy to change CS242 password for new class without disrupting admin
+5. **Complete Control**: Disable entire CS242 system with `CS242_DEMO_ENABLED=false` (no routes, no backdoors, no passwords)
 
 ## Setup Instructions
 
@@ -27,6 +29,7 @@ Create `.env` file in project root:
 # .env
 ADMIN_PASSWORD=your_secure_admin_password
 CS242_PASSWORD=your_cs242_demo_password
+CS242_DEMO_ENABLED=true
 ```
 
 Start server:
@@ -37,9 +40,10 @@ npm start
 ### Cloudflare Pages Deployment
 
 1. Go to **Cloudflare Pages → Settings → Environment Variables**
-2. Add two production variables:
+2. Add three production variables:
    - `ADMIN_PASSWORD` = your secure admin password
    - `CS242_PASSWORD` = your CS242 demo password
+   - `CS242_DEMO_ENABLED` = `true` (or `false` to disable dashboard)
 3. Redeploy the site
 
 ### Docker
@@ -50,6 +54,7 @@ Add to `docker-compose.yml`:
 environment:
   - ADMIN_PASSWORD=your_admin_password
   - CS242_PASSWORD=your_cs242_password
+  - CS242_DEMO_ENABLED=true
 ```
 
 ## Usage Examples
@@ -74,6 +79,38 @@ Body: { "password": "cs242-security" }
 ```
 
 When user is IP-locked, they enter CS242 password on lockout screen to bypass.
+
+### Enabling CS242 Demo Dashboard (Admin Panel)
+
+Once logged into admin panel, go to the **🛡 Security** tab:
+```
+📲 CS242 Security Demo Dashboard
+- Set duration (minutes): 1-1440
+- Click "Enable Demo Access"
+- Timer shows remaining time
+- Click "Disable" to revoke immediately
+```
+
+When enabled, users can access `/cs242?password=...` without IP lockout restrictions.
+
+## CS242_DEMO_ENABLED Feature Toggle
+
+To **completely disable** the entire CS242 demo system as if it never existed:
+
+```bash
+# In .env file or environment variables
+CS242_DEMO_ENABLED=false
+```
+
+**Effects when disabled:**
+- ❌ CS242 demo dashboard control disappears from admin panel entirely
+- ❌ Admin cannot temporarily enable demo access via admin panel
+- ❌ `/cs242?password=...` route returns 404 Not Found
+- ❌ `/api/security/*` CS242 endpoints return 403 Forbidden
+- ❌ IP lockout bypass with `CS242_PASSWORD` is completely disabled
+- ❌ Feature becomes completely inaccessible (as if it never existed)
+
+**Use case**: Disable in production to remove all traces of CS242 demo system entirely. No passwords, routes, or backdoors.
 
 ## Security Event Logging
 
@@ -156,10 +193,12 @@ A: Verify:
 4. Check browser console for error messages
 
 **Q: Want to disable CS242 demo**
-A: Either:
-1. Set `SECURITY_DEMO_ENABLED=false` in env
-2. Don't provide CS242_PASSWORD to users
-3. Remove `/cs242?password=...` link from docs
+A: Set `CS242_DEMO_ENABLED=false` in env. Effects:
+1. `/cs242?password=...` route returns 404
+2. `/api/security/*` endpoints return 403
+3. Lockout bypass with `CS242_PASSWORD` is disabled
+4. Admin panel control disappears
+5. Feature becomes completely inaccessible
 
 ## Production Deployment Checklist
 

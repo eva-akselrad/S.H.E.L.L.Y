@@ -88,8 +88,11 @@ app.get('/sw.js', (req, res) => {
 });
 
 // ── GET /cs242 (Security Demo) ────────────────────────────────
-// Password-protected route: requires CS242_PASSWORD query param
+// Password-protected route: requires CS242_PASSWORD query param (only if enabled)
 app.get('/cs242', (req, res) => {
+    if (!CS242_DEMO_ENABLED) {
+        return res.status(404).send('Not found');
+    }
     const providedPassword = req.query.password || '';
     if (providedPassword !== CS242_PASSWORD) {
         return res.status(403).json({ error: 'Access denied. Invalid or missing password.' });
@@ -163,12 +166,17 @@ let customForecastId = 1;
 // Shape: { title, text, type, activatedAt, expiresAt } or null when inactive
 let armageddonState = null;
 
+// CS242 Demo temporary access control
+// Shape: { enabledAt, expiresAt } or null when inactive
+let cs242DemoState = null;
+
 // Acknowledgements: tracks which visitor IDs have acknowledged each message
 // Map<msgId, Set<visitorId>>
 const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
 const CS242_PASSWORD = process.env.CS242_PASSWORD || 'cs242-security';
+const CS242_DEMO_ENABLED = process.env.CS242_DEMO_ENABLED !== 'false'; // Disable with CS242_DEMO_ENABLED=false
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 // ── Security & Audit (Task 1.2 & 2.1) ──────────────────────────
@@ -301,12 +309,12 @@ app.post('/api/login', adminLimiter, (req, res) => {
 });
 
 // ── POST /api/security/unlock ───────────────────────────────────
-// Allows locked-out users to enter CS242 password to bypass lockout
+// Allows locked-out users to enter CS242 password to bypass lockout (if enabled)
 app.post('/api/security/unlock', unlockLimiter, (req, res) => {
     const ip = req.ip;
     const { password } = req.body;
 
-    if (password === CS242_PASSWORD) {
+    if (CS242_DEMO_ENABLED && password === CS242_PASSWORD) {
         failedLogins.delete(ip);
         logSecurityEvent('Lockout Bypassed', ip, 'User entered CS242 password to unlock');
         res.json({ ok: true, message: 'Lockout cleared' });
@@ -314,6 +322,68 @@ app.post('/api/security/unlock', unlockLimiter, (req, res) => {
         logSecurityEvent('Unlock Failed', ip, 'Invalid unlock password attempt');
         res.status(401).json({ error: 'Invalid lockout password' });
     }
+});
+
+// ── POST /api/security/enable-cs242-demo ───────────────────────
+// Admin-only: Enable temporary CS242 demo access for presentations
+app.post('/api/security/enable-cs242-demo', (req, res) => {
+    if (!CS242_DEMO_ENABLED) {
+        return res.status(403).json({ error: 'CS242 demo is disabled' });
+    }
+    if (!checkAuth(req, res)) return;
+    
+    const { durationMinutes } = req.body;
+    const duration = parseInt(durationMinutes) || 30;
+    
+    if (duration < 1 || duration > 1440) {
+        return res.status(400).json({ error: 'Duration must be 1-1440 minutes' });
+    }
+    
+    const expiresAt = Date.now() + (duration * 60 * 1000);
+    cs242DemoState = { enabledAt: Date.now(), expiresAt };
+    
+    logAuditAction('CS242 Demo Enabled', req.ip, `Duration: ${duration} minutes`);
+    res.json({ ok: true, expiresAt, message: `CS242 demo enabled for ${duration} minutes` });
+});
+
+// ── POST /api/security/disable-cs242-demo ──────────────────────
+// Admin-only: Disable CS242 demo access
+app.post('/api/security/disable-cs242-demo', (req, res) => {
+    if (!CS242_DEMO_ENABLED) {
+        return res.status(403).json({ error: 'CS242 demo is disabled' });
+    }
+    if (!checkAuth(req, res)) return;
+    
+    cs242DemoState = null;
+    logAuditAction('CS242 Demo Disabled', req.ip, 'Demo access revoked');
+    res.json({ ok: true, message: 'CS242 demo disabled' });
+});
+
+// ── GET /api/security/cs242-status ────────────────────────────
+// Public: Check if CS242 demo access is currently enabled
+app.get('/api/security/cs242-status', (req, res) => {
+    if (!CS242_DEMO_ENABLED) {
+        return res.json({ enabled: false, available: false });
+    }
+    
+    // Check if demo access is expired
+    if (cs242DemoState?.expiresAt && Date.now() > cs242DemoState.expiresAt) {
+        cs242DemoState = null;
+    }
+    
+    const enabled = cs242DemoState !== null && cs242DemoState.expiresAt > Date.now();
+    res.json({ 
+        enabled,
+        expiresAt: enabled ? cs242DemoState.expiresAt : null,
+        available: CS242_DEMO_ENABLED
+    });
+});
+
+// ── GET /api/security/cs242-config ─────────────────────────────
+// Admin-only: Check if CS242 demo feature is available for admin panel
+app.get('/api/security/cs242-config', (req, res) => {
+    if (!checkAuth(req, res)) return;
+    res.json({ available: CS242_DEMO_ENABLED });
 });
 
 // ── Honeypot (Task 2.3) ────────────────────────────────────────

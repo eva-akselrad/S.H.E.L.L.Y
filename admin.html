@@ -1398,6 +1398,30 @@
 
         <!-- Security Tab -->
         <div class="tab-panel" id="tab-security">
+            <!-- CS242 Demo Dashboard Control -->
+            <div class="card">
+                <div class="card-title">🎓 CS242 Security Demo Dashboard</div>
+                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                    Enable temporary public access to the security demo panel for presentations. Timer automatically expires access.
+                </p>
+                <div class="row">
+                    <div class="field-group">
+                        <label>Demo Access Duration (minutes)</label>
+                        <input type="number" id="cs242-duration" value="30" min="1" max="1440" step="1" style="width:100%"/>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:12px">
+                    <button class="send-btn" id="cs242-enable-btn" style="flex:1;background:linear-gradient(135deg,#10b981,#059669)">
+                        ✓ Enable Demo Access
+                    </button>
+                    <button class="clear-all-btn" id="cs242-disable-btn" style="flex:0">Disable</button>
+                </div>
+                <div id="cs242-status" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px;color:var(--accent2)"></div>
+                <div id="cs242-timer" style="text-align:center;font-size:.9rem;font-weight:600;margin-top:8px;color:var(--warn);display:none">
+                    ⏱ <span id="cs242-time-remaining">--:--</span>
+                </div>
+            </div>
+
             <!-- Security & Audit -->
             <div class="card">
                 <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -1631,6 +1655,10 @@
                 // Security & Audit
                 document.getElementById('refresh-security-btn').addEventListener('click', loadSecurityLogs);
 
+                // CS242 Demo Dashboard Control
+                document.getElementById('cs242-enable-btn').addEventListener('click', enableCS242Demo);
+                document.getElementById('cs242-disable-btn').addEventListener('click', disableCS242Demo);
+
                 initTargetingUI();
                 initMsgTargetingUI();
                 initTabs();
@@ -1643,6 +1671,7 @@
                 loadCustomForecast();
                 loadArmageddonState();
                 loadSecurityLogs();
+                checkCS242Status();
 
                 // Fast poll: messages + armageddon combined (10 s instead of 3 × 5 s)
                 pollTimer = setInterval(() => { loadMessages(); loadArmageddonState(); }, 10000);
@@ -1979,6 +2008,128 @@
                 fb.style.color = color;
                 fb.textContent = msg;
                 setTimeout(() => { fb.textContent = ''; }, 6000);
+            }
+
+            // ── CS242 Dashboard Control ────────────────────────────────
+            let cs242Timer = null;
+            let cs242EndTime = null;
+
+            async function enableCS242Demo() {
+                const durationInput = document.getElementById('cs242-duration');
+                const duration = parseInt(durationInput.value) || 30;
+                if (duration < 1 || duration > 1440) {
+                    cs242Feedback('⚠ Duration must be 1-1440 minutes', '#f59e0b');
+                    return;
+                }
+                
+                const btn = document.getElementById('cs242-enable-btn');
+                btn.disabled = true;
+                try {
+                    const r = await authFetch(`${API}/security/enable-cs242-demo`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ durationMinutes: duration })
+                    });
+                    if (!r.ok) throw new Error();
+                    const data = await r.json();
+                    cs242EndTime = data.expiresAt;
+                    cs242Feedback(`✓ Demo enabled for ${duration} minutes!`, '#22c55e');
+                    startCS242Timer();
+                    document.getElementById('cs242-enable-btn').style.display = 'none';
+                    document.getElementById('cs242-disable-btn').style.display = 'inline-block';
+                } catch {
+                    cs242Feedback('⚠ Failed to enable demo', '#ef4444');
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+
+            async function disableCS242Demo() {
+                try {
+                    const r = await authFetch(`${API}/security/disable-cs242-demo`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (!r.ok) throw new Error();
+                    cs242EndTime = null;
+                    if (cs242Timer) clearInterval(cs242Timer);
+                    cs242Feedback('✓ Demo access disabled', '#22c55e');
+                    document.getElementById('cs242-timer').style.display = 'none';
+                    document.getElementById('cs242-enable-btn').style.display = 'inline-block';
+                    document.getElementById('cs242-disable-btn').style.display = 'none';
+                } catch {
+                    cs242Feedback('⚠ Failed to disable demo', '#ef4444');
+                }
+            }
+
+            function startCS242Timer() {
+                if (cs242Timer) clearInterval(cs242Timer);
+                const timerEl = document.getElementById('cs242-timer');
+                timerEl.style.display = 'block';
+                
+                function updateTimer() {
+                    if (!cs242EndTime) return;
+                    const now = Date.now();
+                    const remaining = cs242EndTime - now;
+                    if (remaining <= 0) {
+                        clearInterval(cs242Timer);
+                        timerEl.style.display = 'none';
+                        document.getElementById('cs242-enable-btn').style.display = 'inline-block';
+                        document.getElementById('cs242-disable-btn').style.display = 'none';
+                        cs242Feedback('⏱ Demo access expired', '#f59e0b');
+                        return;
+                    }
+                    const minutes = Math.floor(remaining / 60000);
+                    const seconds = Math.floor((remaining % 60000) / 1000);
+                    document.getElementById('cs242-time-remaining').textContent = 
+                        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                updateTimer();
+                cs242Timer = setInterval(updateTimer, 1000);
+            }
+
+            async function checkCS242Status() {
+                try {
+                    const r = await authFetch(`${API}/security/cs242-config`);
+                    if (!r.ok) return;
+                    const config = await r.json();
+                    
+                    const card = document.querySelector('[class*="card"]');
+                    const cs242Card = Array.from(document.querySelectorAll('.card')).find(c => 
+                        c.textContent.includes('CS242 Security Demo Dashboard')
+                    );
+                    
+                    if (!config.available && cs242Card) {
+                        cs242Card.style.display = 'none';
+                        return;
+                    }
+                    
+                    const statusR = await authFetch(`${API}/security/cs242-status`);
+                    if (!statusR.ok) return;
+                    const data = await statusR.json();
+                    
+                    if (data.enabled && data.expiresAt > Date.now()) {
+                        cs242EndTime = data.expiresAt;
+                        startCS242Timer();
+                        document.getElementById('cs242-enable-btn').style.display = 'none';
+                        document.getElementById('cs242-disable-btn').style.display = 'inline-block';
+                        cs242Feedback('ℹ Demo currently active', '#3b82f6');
+                    } else {
+                        document.getElementById('cs242-timer').style.display = 'none';
+                        document.getElementById('cs242-enable-btn').style.display = 'inline-block';
+                        document.getElementById('cs242-disable-btn').style.display = 'none';
+                    }
+                } catch { /* ignore */ }
+            }
+
+            function cs242Feedback(msg, color) {
+                const fb = document.getElementById('cs242-status');
+                if (fb) { 
+                    fb.style.color = color; 
+                    fb.textContent = msg; 
+                    setTimeout(() => fb.textContent = '', 4000); 
+                }
             }
 
             // ── Release Notes ──────────────────────────────────────────
