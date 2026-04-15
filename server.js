@@ -87,6 +87,16 @@ app.get('/sw.js', (req, res) => {
     res.send(SW_CONTENT);
 });
 
+// ── GET /cs242 (Security Demo) ────────────────────────────────
+app.get('/cs242', (req, res) => {
+    res.sendFile(path.join(__dirname, 'demo.html'));
+});
+
+// ── GET /cs242 (Security Demo) ────────────────────────────────
+app.get('/cs242', (req, res) => {
+    res.sendFile(path.join(__dirname, 'demo.html'));
+});
+
 // ── Static files ───────────────────────────────────────────────
 app.use(express.static(__dirname, {
     setHeaders(res, filePath) {
