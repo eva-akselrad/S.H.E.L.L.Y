@@ -20,12 +20,11 @@ S.H.E.L.L.Y. is built with a "Security by Default" mindset to protect critical w
 - **HSTS (HTTP Strict Transport Security)**: Enforced in production to ensure all communication is encrypted via TLS.
 - **Payload Validation**: All `POST` and `PUT` requests have strict type and length checks, with a 10kb body size limit.
 
-## 4. Security Command Center (`demo.html`)
-The specialized dashboard at `/cs242` provides a real-time visualization of these security measures:
-- **Active Lockouts**: Shows a countdown for all IPs currently under temporary ban.
-- **Security Audit Logs**: A live-scrolling view of all security-relevant events (logins, lockouts, honeypot triggers).
-- **Admin Audit Trail**: A record of all authorized state-changing actions.
-- **XSS Lab**: An interactive sandbox to verify the server-side sanitization of arbitrary inputs.
+## 4. Operational Security Visibility
+Security visibility is available through the admin workflows and API responses:
+- **Active Lockouts**: Lockout state is tracked and enforced for repeated failed login attempts.
+- **Security Audit Logs**: Security-relevant events are recorded for investigation.
+- **Admin Audit Trail**: Authorized state-changing actions are logged for accountability.
 
 ## 5. Deployment Best Practices
 1. **Change the Default Password**: Always set a strong `ADMIN_PASSWORD` environment variable.

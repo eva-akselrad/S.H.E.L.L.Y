@@ -47,26 +47,7 @@ Here is the implementation plan :3 in no particular order
 - [✓] **HTTPS Redirection**:
     - Enforce HTTPS via middleware to ensure all traffic is encrypted.
 
-## 5. Security Demo Mode (/cs242)
-- [✓] **Create Demo Dashboard**: `demo.html` with a specialized "Command Center" UI.
-    - Matrix-style aesthetics (monochrome green, terminal fonts, "digital rain" background).
-    - Real-time visualization of the ring buffers (Security & Audit).
-- [✓] **Interactive Attack Simulators**:
-    - "Simulate Brute Force": Button to trigger 5 failed logins and show the resulting lockout.
-    - "Trigger Honeypot": Button to hit the `/api/admin-backdoor` and show the 403 response + log.
-    - "JWT Decoder": Tool to inspect the current session token's payload/expiry.
-    - "XSS Lab": A sandbox to test how announcements are sanitized before being sent to clients.
-- [✓] **Threat Visualization**:
-    - "Active Lockouts": A live list of IPs currently under brute-force or honeypot lockout with remaining time.
-    - "Payload Inspector": A real-time capture of outgoing API requests and their JSON structure.
-- [✓] **Backend Demo Controls**:
-    - `POST /api/security/demo/reset`: Endpoint to clear `failedLogins` and logs for easy re-testing.
-    - `POST /api/security/demo/expire-token`: Artificially expire the current session to demo auto-logout.
-    - `SECURITY_DEMO_ENABLED` env variable to disable these endpoints in production.
-- [✓] **Live Audit Trail**: A dedicated terminal-style view that scrolls as admin actions happen.
-
-
-## 6. Bonus Tasks (Advanced)
+## 5. Bonus Tasks (Advanced) (will most likely not be doing at this point in time but may implement later)
 - [ ] **MFA (TOTP)**: Add Google Authenticator support for the `/api/login` step.
 - [ ] **CSRF Protection**: Implement `csurf` or similar for state-changing endpoints.
 - [ ] **IP Whitelisting**: Add an optional `ADMIN_IP_WHITELIST` environment variable check.

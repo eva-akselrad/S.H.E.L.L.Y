@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   server.js – WeatherNow Express backend
+   server.js – Shelly Express backend
    Serves static files + admin announcement API + Web Push
    ════════════════════════════════════════════════════════════════ */
 
@@ -683,7 +683,7 @@ app.get('/api/spc-outlook', async (req, res) => {
 // ── Start ─────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`WeatherNow running on http://0.0.0.0:${PORT}`);
+    console.log(`Shelly running on http://0.0.0.0:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin.html`);
     console.log(`Admin password: ${ADMIN_PASSWORD}`);
     console.log(`VAPID public key: ${vapidKeys.publicKey.slice(0, 20)}…`);

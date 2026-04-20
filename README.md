@@ -25,7 +25,6 @@ npm start
 ```
 The server will be running at `http://localhost:3000`.
 - **Admin Panel**: `http://localhost:3000/admin.html` (Password: `weathernow`)
-- **Security Dashboard**: `http://localhost:3000/cs242`
 
 ### 2. Deployment Options
 
@@ -43,8 +42,8 @@ The server will be running at `http://localhost:3000`.
 
 ---
 
-## 🛡 Security Demo
-S.H.E.L.L.Y. includes a built-in Security Command Center at `/cs242`. Use this to test and visualize:
+## 🛡 Security Features
+S.H.E.L.L.Y. includes built-in platform security controls, including:
 - **Brute Force Mitigation**
 - **Honeypot Triggers**
 - **XSS Sanitization**

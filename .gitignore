@@ -3,7 +3,7 @@ node_modules/
 tasks.mdtmp_screenshots/
 tasks.md
 leaflet*.tgz
-
+demo/
 # wrangler files
 .wrangler
 .dev.vars*
