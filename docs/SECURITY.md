@@ -3,9 +3,9 @@
 S.H.E.L.L.Y. is built with a "Security by Default" mindset to protect critical weather communication from malicious actors.
 
 ## 1. Authentication & Session Management
-- **JWT (JSON Web Tokens)**: All administrative endpoints are protected by short-lived, signed JWTs.
-- **Short-Lived Sessions**: Tokens expire after 1 hour of activity.
-- **Auto-Logout**: Clients automatically clear tokens on expiration or manually via the admin panel.
+- **Signed Admin Tokens**: Administrative endpoints use signed authentication tokens; the Express server uses JWTs, while the Cloudflare Worker/Pages deployments use custom HMAC-signed expiry tokens.
+- **Short-Lived Sessions**: Tokens expire 1 hour after issuance with absolute expiration (no activity-based refresh).
+- **Auto-Logout**: Clients automatically clear auth tokens on expiration or manually via the admin panel.
 
 ## 2. Brute-Force & IP Protection
 - **Rate Limiting**: Admin endpoints (`/api/login`, `/api/announce`) are rate-limited to 60 requests per minute.
