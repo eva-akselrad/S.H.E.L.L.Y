@@ -310,7 +310,7 @@ app.post('/api/announce', async (req, res) => {
     if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
     if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
     if (!['info', 'warning', 'emergency', 'success'].includes(type)) return res.status(400).json({ error: 'invalid type' });
-    if (!['banner', 'kiosk', 'modal'].includes(display)) return res.status(400).json({ error: 'invalid display' });
+    if (!['banner', 'kiosk', 'modal', 'popup'].includes(display)) return res.status(400).json({ error: 'invalid display' });
 
     const msg = {
         id: nextId++,
