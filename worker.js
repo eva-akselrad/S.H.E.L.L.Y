@@ -158,15 +158,15 @@ async function signVapidJwt(audience, privateKeyB64Url, publicKeyB64Url, email) 
     const headerPayload = `${encode(header)}.${encode(payload)}`;
     const fromBase64Url = (value) => {
         const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-        const paddingNeeded = (4 - (base64.length % 4)) % 4;
-        const padded = base64.padEnd(base64.length + paddingNeeded, '=');
+        const paddingLength = (4 - (base64.length % 4)) % 4;
+        const padded = base64.padEnd(base64.length + paddingLength, '=');
         return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
     };
     const privateBytes = fromBase64Url(privateKeyB64Url);
     let cryptoKey;
     if (privateBytes.length === 32) {
         if (!publicKeyB64Url) {
-            throw new Error('VAPID_PUBLIC_KEY is required when VAPID_PRIVATE_KEY is a raw key');
+            throw new Error('VAPID_PUBLIC_KEY is required when VAPID_PRIVATE_KEY is a 32-byte raw key (not PKCS#8)');
         }
         const publicBytes = fromBase64Url(publicKeyB64Url);
         if (publicBytes.length !== 65 || publicBytes[0] !== 4) {
