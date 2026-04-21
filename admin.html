@@ -177,27 +177,6 @@
         .admin-status {
             font-size: .78rem;
             color: var(--muted);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logout-btn {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #f87171;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: .72rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all .2s;
-        }
-
-        .logout-btn:hover {
-            background: rgba(239, 68, 68, 0.2);
-            border-color: #ef4444;
-            color: #fff;
         }
 
         #status-dot {
@@ -212,38 +191,6 @@
         #status-dot.ok {
             background: #22c55e;
         }
-
-
-        /* ── Tabs ── */
-        .admin-tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 24px;
-            overflow-x: auto;
-            padding-bottom: 8px;
-            scrollbar-width: none;
-        }
-        .admin-tabs::-webkit-scrollbar { display: none; }
-        .admin-tab {
-            padding: 10px 20px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--muted);
-            font-size: .85rem;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all .2s;
-        }
-        .admin-tab:hover { border-color: var(--accent); color: var(--text); }
-        .admin-tab.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: #fff;
-        }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
 
         /* ── Composer card ──────────────────────────────────── */
         .card {
@@ -943,10 +890,8 @@
             </div>
             <div class="login-title">Admin Panel</div>
             <div class="login-sub">Enter your admin password to continue.</div>
-            <form id="login-form">
-                <input type="password" id="pw-input" placeholder="Admin password" autocomplete="current-password" />
-                <button id="pw-btn" type="submit">Sign In</button>
-            </form>
+            <input type="password" id="pw-input" placeholder="Admin password" autocomplete="current-password" />
+            <button id="pw-btn">Sign In</button>
             <div id="login-error"></div>
         </div>
     </div>
@@ -961,464 +906,443 @@
             <span class="admin-status"><span id="status-dot"></span><span id="status-text">Connecting…</span></span>
         </div>
 
-        <div class="admin-tabs">
-            <div class="admin-tab active" data-tab="alerts">📣 Alerts</div>
-            <div class="admin-tab" data-tab="emergency">🛑 Emergency</div>
-            <div class="admin-tab" data-tab="forecast">🌤 Forecast</div>
-            <div class="admin-tab" data-tab="updates">📝 Updates</div>
-        </div>
+        <!-- Composer -->
+        <div class="card">
+            <div class="card-title">📣 Send Announcement</div>
 
-        <!-- Alerts Tab -->
-        <div class="tab-panel active" id="tab-alerts">
-            <!-- Composer -->
-            <div class="card">
-                <div class="card-title">📣 Send Announcement</div>
-
-                <div class="field-group">
-                    <label>Message Type</label>
-                    <div class="type-grid">
-                        <div class="type-btn active" data-val="info">ℹ Info</div>
-                        <div class="type-btn" data-val="warning">⚠ Warning</div>
-                        <div class="type-btn" data-val="emergency">🚨 Emergency</div>
-                    </div>
+            <div class="field-group">
+                <label>Message Type</label>
+                <div class="type-grid">
+                    <div class="type-btn active" data-val="info">ℹ Info</div>
+                    <div class="type-btn" data-val="warning">⚠ Warning</div>
+                    <div class="type-btn" data-val="emergency">🚨 Emergency</div>
                 </div>
-
-                <div class="field-group">
-                    <label>Display Style</label>
-                    <div class="display-grid">
-                        <div class="display-btn active" data-val="banner">
-                            <span class="disp-icon">📰</span>
-                            <div class="disp-name">Banner</div>
-                            <div class="disp-desc">Slide-in bar at top</div>
-                        </div>
-                        <div class="display-btn" data-val="popup">
-                            <span class="disp-icon">💬</span>
-                            <div class="disp-name">Popup</div>
-                            <div class="disp-desc">Full-screen overlay</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="field-group">
-                        <label>Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-                        <input type="text" id="msg-title" placeholder="e.g. Road Closure" maxlength="60" />
-                    </div>
-                    <div class="field-group">
-                        <label>Auto-dismiss after</label>
-                        <select id="msg-duration">
-                            <option value="0">Manual dismiss</option>
-                            <option value="15">15 seconds</option>
-                            <option value="30">30 seconds</option>
-                            <option value="60" selected>1 minute</option>
-                            <option value="120">2 minutes</option>
-                            <option value="300">5 minutes</option>
-                            <option value="600">10 minutes</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="field-group">
-                    <label>Message</label>
-                    <textarea id="msg-text" placeholder="Type your announcement here…"></textarea>
-                </div>
-
-                <div class="field-group"
-                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px">
-                    <input type="checkbox" id="msg-tts"
-                        style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
-                    <div style="flex:1">
-                        <label for="msg-tts" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔊
-                            Read aloud with TTS on display</label>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Speaks the message on the weather
-                            display. Music will be ducked while speaking.</div>
-                    </div>
-                </div>
-
-                <div class="field-group"
-                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                    <input type="checkbox" id="msg-push"
-                        style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;cursor:pointer" />
-                    <div style="flex:1">
-                        <label for="msg-push" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📲
-                            Send as Push Notification</label>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Pushes to all subscribed devices.
-                            Requires push to be enabled by the viewer.</div>
-                    </div>
-                </div>
-
-                <!-- Location Targeting -->
-                <div style="margin-bottom:16px">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                        <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">📍 Target Audience</span>
-                        <span id="msg-target-badge" class="fc-target-badge">All Viewers</span>
-                    </div>
-                    <p style="font-size:.72rem;color:var(--muted);margin-bottom:10px">Restrict who sees this message by location, or leave as All Viewers to show everywhere.</p>
-                    <div class="fc-target-tabs">
-                        <div class="msg-target-tab fc-target-tab active" data-msgmode="all">🌍 All Viewers</div>
-                        <div class="msg-target-tab fc-target-tab" data-msgmode="radius">📍 Map Area</div>
-                        <div class="msg-target-tab fc-target-tab" data-msgmode="zips">🏷 ZIP Codes</div>
-                        <div class="msg-target-tab fc-target-tab" data-msgmode="counties">🗺 Counties</div>
-                    </div>
-                    <!-- All -->
-                    <div class="fc-target-panel" id="msg-target-all">
-                        <div style="font-size:.82rem;color:var(--muted)">This message will be visible to <strong style="color:var(--text)">all viewers</strong> regardless of their location.</div>
-                    </div>
-                    <!-- Radius -->
-                    <div class="fc-target-panel" id="msg-target-radius" style="display:none">
-                        <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center point, then set the radius in miles.</p>
-                        <div id="msg-radius-map" style="height:200px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px"></div>
-                        <div class="fc-target-grid">
-                            <div class="fc-field"><label>Center Lat</label><input type="number" id="msg-radius-lat" step="0.0001" placeholder="e.g. 37.77" /></div>
-                            <div class="fc-field"><label>Center Lon</label><input type="number" id="msg-radius-lon" step="0.0001" placeholder="e.g. -122.42" /></div>
-                            <div class="fc-field"><label>Radius (miles)</label><input type="number" id="msg-radius-mi" min="1" max="1000" placeholder="e.g. 50" /></div>
-                        </div>
-                    </div>
-                    <!-- ZIPs -->
-                    <div class="fc-target-panel" id="msg-target-zips" style="display:none">
-                        <div class="fc-field">
-                            <label>ZIP Codes — comma-separated</label>
-                            <input type="text" id="msg-zip-input" placeholder="e.g. 90210, 10001, 60601" />
-                        </div>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will only appear for viewers whose location reverse-geocodes to one of these ZIP codes.</div>
-                    </div>
-                    <!-- Counties -->
-                    <div class="fc-target-panel" id="msg-target-counties" style="display:none">
-                        <div class="fc-field">
-                            <label>Counties — comma-separated (include state abbreviation)</label>
-                            <input type="text" id="msg-county-input" placeholder="e.g. Jefferson County AL, Cook County IL" />
-                        </div>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will show for viewers whose county matches any entry in this list.</div>
-                    </div>
-                </div>
-
-                <button class="send-btn" id="send-btn">📡 SEND ANNOUNCEMENT</button>
-                <div id="send-feedback"></div>
             </div>
 
-            <!-- Active messages -->
-            <div class="card">
+            <div class="field-group">
+                <label>Display Style</label>
+                <div class="display-grid">
+                    <div class="display-btn active" data-val="banner">
+                        <span class="disp-icon">📰</span>
+                        <div class="disp-name">Banner</div>
+                        <div class="disp-desc">Slide-in bar at top</div>
+                    </div>
+                    <div class="display-btn" data-val="popup">
+                        <span class="disp-icon">💬</span>
+                        <div class="disp-name">Popup</div>
+                        <div class="disp-desc">Full-screen overlay</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="field-group">
+                    <label>Title <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+                    <input type="text" id="msg-title" placeholder="e.g. Road Closure" maxlength="60" />
+                </div>
+                <div class="field-group">
+                    <label>Auto-dismiss after</label>
+                    <select id="msg-duration">
+                        <option value="0">Manual dismiss</option>
+                        <option value="15">15 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60" selected>1 minute</option>
+                        <option value="120">2 minutes</option>
+                        <option value="300">5 minutes</option>
+                        <option value="600">10 minutes</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label>Message</label>
+                <textarea id="msg-text" placeholder="Type your announcement here…"></textarea>
+            </div>
+
+            <div class="field-group"
+                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px">
+                <input type="checkbox" id="msg-tts"
+                    style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
+                <div style="flex:1">
+                    <label for="msg-tts" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔊
+                        Read aloud with TTS on display</label>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Speaks the message on the weather
+                        display. Music will be ducked while speaking.</div>
+                </div>
+            </div>
+
+            <div class="field-group"
+                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                <input type="checkbox" id="msg-push"
+                    style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;cursor:pointer" />
+                <div style="flex:1">
+                    <label for="msg-push" style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📲
+                        Send as Push Notification</label>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Pushes to all subscribed devices.
+                        Requires push to be enabled by the viewer.</div>
+                </div>
+            </div>
+
+            <!-- Location Targeting -->
+            <div style="margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <span style="font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">📍 Target Audience</span>
+                    <span id="msg-target-badge" class="fc-target-badge">All Viewers</span>
+                </div>
+                <p style="font-size:.72rem;color:var(--muted);margin-bottom:10px">Restrict who sees this message by location, or leave as All Viewers to show everywhere.</p>
+                <div class="fc-target-tabs">
+                    <div class="msg-target-tab fc-target-tab active" data-msgmode="all">🌍 All Viewers</div>
+                    <div class="msg-target-tab fc-target-tab" data-msgmode="radius">📍 Map Area</div>
+                    <div class="msg-target-tab fc-target-tab" data-msgmode="zips">🏷 ZIP Codes</div>
+                    <div class="msg-target-tab fc-target-tab" data-msgmode="counties">🗺 Counties</div>
+                </div>
+                <!-- All -->
+                <div class="fc-target-panel" id="msg-target-all">
+                    <div style="font-size:.82rem;color:var(--muted)">This message will be visible to <strong style="color:var(--text)">all viewers</strong> regardless of their location.</div>
+                </div>
+                <!-- Radius -->
+                <div class="fc-target-panel" id="msg-target-radius" style="display:none">
+                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center point, then set the radius in miles.</p>
+                    <div id="msg-radius-map" style="height:200px;border-radius:6px;border:1px solid var(--border);margin-bottom:12px"></div>
+                    <div class="fc-target-grid">
+                        <div class="fc-field"><label>Center Lat</label><input type="number" id="msg-radius-lat" step="0.0001" placeholder="e.g. 37.77" /></div>
+                        <div class="fc-field"><label>Center Lon</label><input type="number" id="msg-radius-lon" step="0.0001" placeholder="e.g. -122.42" /></div>
+                        <div class="fc-field"><label>Radius (miles)</label><input type="number" id="msg-radius-mi" min="1" max="1000" placeholder="e.g. 50" /></div>
+                    </div>
+                </div>
+                <!-- ZIPs -->
+                <div class="fc-target-panel" id="msg-target-zips" style="display:none">
+                    <div class="fc-field">
+                        <label>ZIP Codes — comma-separated</label>
+                        <input type="text" id="msg-zip-input" placeholder="e.g. 90210, 10001, 60601" />
+                    </div>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will only appear for viewers whose location reverse-geocodes to one of these ZIP codes.</div>
+                </div>
+                <!-- Counties -->
+                <div class="fc-target-panel" id="msg-target-counties" style="display:none">
+                    <div class="fc-field">
+                        <label>Counties — comma-separated (include state abbreviation)</label>
+                        <input type="text" id="msg-county-input" placeholder="e.g. Jefferson County AL, Cook County IL" />
+                    </div>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">Message will show for viewers whose county matches any entry in this list.</div>
+                </div>
+            </div>
+
+            <button class="send-btn" id="send-btn">📡 SEND ANNOUNCEMENT</button>
+            <div id="send-feedback"></div>
+        </div>
+
+        <!-- Push Notifications -->
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                <span>📲 Push Notifications</span>
+                <span id="push-sub-count" style="font-size:.78rem;color:var(--accent2);font-weight:600">…
+                    subscribers</span>
+            </div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                Send a test push to all subscribed devices. Viewers subscribe via the notification button in Settings.
+            </p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="send-btn" id="push-test-btn"
+                    style="flex:1;background:linear-gradient(135deg,var(--accent2),var(--accent))">
+                    🔔 Send Test Push
+                </button>
+                <button class="clear-all-btn" id="push-clear-btn" style="flex:none">Clear All Subs</button>
+            </div>
+            <div id="push-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+        </div>
+
+        <!-- Active messages -->
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+                <span>📋 Active Messages</span>
+                <button class="clear-all-btn" id="clear-all-btn">Clear All</button>
+            </div>
+            <div id="active-list">
+                <div class="no-msgs">No active messages</div>
+            </div>
+        </div>
+
+        <!-- E.S.T.O.P. (Exigent Site Take-down Operational Procedure) -->
+        <div class="card" id="armageddon-card" style="border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.05)">
+            <div class="card-title" style="color:#f87171">🛑 E.S.T.O.P. <span style="font-size:.72rem;font-weight:400;letter-spacing:.03em">(Exigent Site Take-down Operational Procedure)</span></div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
+                Overrides the entire display with a full-screen message that <strong style="color:#f87171">cannot be dismissed by viewers</strong>.
+                Only the admin can deactivate it. Use for critical emergencies only.
+            </p>
+
+            <!-- Active status bar -->
+            <div id="armageddon-status-bar" style="display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:#fca5a5">
+                <span id="armageddon-status-icon" style="font-size:1.3em">🔴</span>
+                <div style="flex:1;min-width:0">
+                    <strong>ACTIVE:</strong>
+                    <span id="armageddon-active-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                    <div id="armageddon-countdown" style="font-size:.72rem;color:#f59e0b;margin-top:2px"></div>
+                </div>
+            </div>
+
+            <!-- Emergency type presets -->
+            <div class="field-group">
+                <label>Emergency Type</label>
+                <div class="arm-type-grid" id="arm-type-grid">
+                    <button class="arm-type-btn selected" data-type="tornado"      data-icon="🌪️" data-default-title="TORNADO WARNING"       data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                        <span class="arm-type-icon">🌪️</span>Tornado
+                    </button>
+                    <button class="arm-type-btn" data-type="hurricane"   data-icon="🌀" data-default-title="HURRICANE WARNING"     data-color="#a855f7" data-bg="#05000f" data-glow="rgba(168,85,247,0.8)">
+                        <span class="arm-type-icon">🌀</span>Hurricane
+                    </button>
+                    <button class="arm-type-btn" data-type="flood"       data-icon="🌊" data-default-title="FLASH FLOOD WARNING"   data-color="#3b82f6" data-bg="#000514" data-glow="rgba(59,130,246,0.8)">
+                        <span class="arm-type-icon">🌊</span>Flash Flood
+                    </button>
+                    <button class="arm-type-btn" data-type="fire"        data-icon="🔥" data-default-title="WILDFIRE EMERGENCY"    data-color="#f97316" data-bg="#0f0300" data-glow="rgba(249,115,22,0.8)">
+                        <span class="arm-type-icon">🔥</span>Wildfire
+                    </button>
+                    <button class="arm-type-btn" data-type="winter"      data-icon="❄️" data-default-title="WINTER STORM WARNING"  data-color="#bae6fd" data-bg="#00050f" data-glow="rgba(186,230,253,0.8)">
+                        <span class="arm-type-icon">❄️</span>Winter Storm
+                    </button>
+                    <button class="arm-type-btn" data-type="thunderstorm" data-icon="⛈️" data-default-title="SEVERE THUNDERSTORM"  data-color="#fbbf24" data-bg="#050500" data-glow="rgba(251,191,36,0.8)">
+                        <span class="arm-type-icon">⛈️</span>Thunderstorm
+                    </button>
+                    <button class="arm-type-btn" data-type="nuclear"     data-icon="☢️" data-default-title="NUCLEAR ALERT"         data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                        <span class="arm-type-icon">☢️</span>Nuclear
+                    </button>
+                    <button class="arm-type-btn" data-type="civil"       data-icon="📻" data-default-title="CIVIL EMERGENCY"       data-color="#f97316" data-bg="#0a0500" data-glow="rgba(249,115,22,0.8)">
+                        <span class="arm-type-icon">📻</span>Civil Emergency
+                    </button>
+                    <button class="arm-type-btn" data-type="custom"      data-icon="🚨" data-default-title=""                      data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
+                        <span class="arm-type-icon">🚨</span>Custom
+                    </button>
+                </div>
+            </div>
+
+            <!-- Title -->
+            <div class="field-group">
+                <label>Title <span style="color:var(--muted);font-weight:400">(optional — pre-filled by type)</span></label>
+                <input type="text" id="arm-title" placeholder="e.g. TORNADO WARNING" maxlength="80" />
+            </div>
+
+            <!-- Message -->
+            <div class="field-group">
+                <label>Message</label>
+                <textarea id="arm-text" rows="3" placeholder="Enter the override message to display on all screens…"></textarea>
+            </div>
+
+            <!-- Options row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                <div class="field-group" style="margin-bottom:0">
+                    <label>Auto-deactivate</label>
+                    <select id="arm-duration" style="width:100%;padding:9px 12px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem">
+                        <option value="0">Manual only</option>
+                        <option value="5">5 minutes</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">1 hour</option>
+                        <option value="120">2 hours</option>
+                    </select>
+                </div>
+                <div class="field-group" style="margin-bottom:0;justify-content:flex-end">
+                    <label style="visibility:hidden;height:18px">.</label>
+                    <div style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px">
+                        <input type="checkbox" id="arm-push" style="width:16px;height:16px;accent-color:#ef4444;flex-shrink:0;cursor:pointer" />
+                        <label for="arm-push" style="cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);line-height:1.3">
+                            📲 Push notify subscribers
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+                <button class="send-btn" id="arm-activate-btn"
+                    style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b)">
+                    🛑 ACTIVATE E.S.T.O.P.
+                </button>
+                <button class="clear-all-btn" id="arm-deactivate-btn" style="flex:none;display:none">
+                    ✕ Deactivate
+                </button>
+            </div>
+            <div id="arm-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+        </div>
+
+        <!-- E.S.T.O.P. confirmation modal -->
+        <div id="arm-confirm-modal">
+            <div class="arm-confirm-box">
+                <div class="arm-confirm-icon" id="arm-confirm-icon">🛑</div>
+                <div class="arm-confirm-title">ACTIVATE E.S.T.O.P.?</div>
+                <div class="arm-confirm-body">
+                    This will immediately override <strong style="color:#fff">all connected displays</strong>
+                    with a full-screen emergency message. Viewers <strong style="color:#f87171">cannot dismiss it</strong>.
+                    <div class="arm-confirm-preview" id="arm-confirm-preview">
+                        <div class="arm-confirm-preview-type" id="arm-confirm-preview-type"></div>
+                        <div class="arm-confirm-preview-title" id="arm-confirm-preview-title"></div>
+                        <div class="arm-confirm-preview-text" id="arm-confirm-preview-text"></div>
+                        <div class="arm-confirm-preview-timer" id="arm-confirm-preview-timer"></div>
+                    </div>
+                </div>
+                <div class="arm-confirm-btns">
+                    <button id="arm-confirm-cancel">Cancel</button>
+                    <button id="arm-confirm-ok">🛑 ACTIVATE NOW</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Release Notes -->
+        <div class="card">
+            <div class="card-title">📝 Release Notes</div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Post a release note to document updates.
+                It will be saved here and can optionally be announced on the display.</p>
+
+            <div class="row">
+                <div class="field-group">
+                    <label>Release Version</label>
+                    <input type="text" id="rn-version" placeholder="e.g. v2.1.0" maxlength="30" />
+                </div>
+                <div class="field-group">
+                    <label>Date</label>
+                    <input type="text" id="rn-date" placeholder="Auto-filled on post" readonly
+                        style="opacity:.5;cursor:default" />
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label>Release Notes</label>
+                <textarea id="rn-notes" placeholder="What changed in this update?&#10;• New feature: …&#10;• Fixed: …&#10;• Improved: …"
+                    style="min-height:110px"></textarea>
+            </div>
+
+            <div class="field-group"
+                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                <input type="checkbox" id="rn-announce"
+                    style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
+                <div style="flex:1">
+                    <label for="rn-announce"
+                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📣 Also announce on
+                        display</label>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Sends a popup announcement to the
+                        weather display so viewers can see what's new.</div>
+                </div>
+            </div>
+
+            <div class="field-group"
+                style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
+                <input type="checkbox" id="rn-autoupdate"
+                    style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
+                <div style="flex:1">
+                    <label for="rn-autoupdate"
+                        style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Force client updates on version mismatch</label>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
+                </div>
+            </div>
+
+            <button class="clear-all-btn" id="rn-save-settings-btn" style="margin-bottom:10px">💾 Save Update Settings</button>
+
+            <button class="send-btn" id="rn-post-btn"
+                style="background:linear-gradient(135deg,var(--accent2),#0ea5e9)">📝 POST RELEASE NOTES</button>
+            <div id="rn-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+
+            <div style="margin-top:24px">
                 <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>📋 Active Messages</span>
-                    <button class="clear-all-btn" id="clear-all-btn">Clear All</button>
+                    <span>🗒 History</span>
+                    <button class="clear-all-btn" id="rn-clear-all-btn">Clear All</button>
                 </div>
-                <div id="active-list">
-                    <div class="no-msgs">No active messages</div>
+                <div id="rn-list">
+                    <div class="no-msgs">No release notes posted yet</div>
                 </div>
             </div>
         </div>
 
-        <!-- Emergency Tab -->
-        <div class="tab-panel" id="tab-emergency">
-            <!-- E.S.T.O.P. (Exigent Site Take-down Operational Procedure) -->
-            <div class="card" id="armageddon-card" style="border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.05)">
-                <div class="card-title" style="color:#f87171">🛑 E.S.T.O.P. <span style="font-size:.72rem;font-weight:400;letter-spacing:.03em">(Exigent Site Take-down Operational Procedure)</span></div>
-                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
-                    Overrides the entire display with a full-screen message that <strong style="color:#f87171">cannot be dismissed by viewers</strong>.
-                    Only the admin can deactivate it. Use for critical emergencies only.
-                </p>
+        <!-- Custom Forecast -->
+        <div class="card">
+            <div class="card-title">🌤 Custom Forecast</div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Build your own forecast periods. Only fill
+                in the fields you want — everything is optional except the period name. You can publish multiple
+                forecasts at once (e.g. for different areas). Each forecast needs a unique label.</p>
 
-                <!-- Active status bar -->
-                <div id="armageddon-status-bar" style="display:none;align-items:center;gap:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.5);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;color:#fca5a5">
-                    <span id="armageddon-status-icon" style="font-size:1.3em">🔴</span>
-                    <div style="flex:1;min-width:0">
-                        <strong>ACTIVE:</strong>
-                        <span id="armageddon-active-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-                        <div id="armageddon-countdown" style="font-size:.72rem;color:#f59e0b;margin-top:2px"></div>
-                    </div>
-                </div>
-
-                <!-- Emergency type presets -->
-                <div class="field-group">
-                    <label>Emergency Type</label>
-                    <div class="arm-type-grid" id="arm-type-grid">
-                        <button class="arm-type-btn selected" data-type="tornado"      data-icon="🌪️" data-default-title="TORNADO WARNING"       data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                            <span class="arm-type-icon">🌪️</span>Tornado
-                        </button>
-                        <button class="arm-type-btn" data-type="hurricane"   data-icon="🌀" data-default-title="HURRICANE WARNING"     data-color="#a855f7" data-bg="#05000f" data-glow="rgba(168,85,247,0.8)">
-                            <span class="arm-type-icon">🌀</span>Hurricane
-                        </button>
-                        <button class="arm-type-btn" data-type="flood"       data-icon="🌊" data-default-title="FLASH FLOOD WARNING"   data-color="#3b82f6" data-bg="#000514" data-glow="rgba(59,130,246,0.8)">
-                            <span class="arm-type-icon">🌊</span>Flash Flood
-                        </button>
-                        <button class="arm-type-btn" data-type="fire"        data-icon="🔥" data-default-title="WILDFIRE EMERGENCY"    data-color="#f97316" data-bg="#0f0300" data-glow="rgba(249,115,22,0.8)">
-                            <span class="arm-type-icon">🔥</span>Wildfire
-                        </button>
-                        <button class="arm-type-btn" data-type="winter"      data-icon="❄️" data-default-title="WINTER STORM WARNING"  data-color="#bae6fd" data-bg="#00050f" data-glow="rgba(186,230,253,0.8)">
-                            <span class="arm-type-icon">❄️</span>Winter Storm
-                        </button>
-                        <button class="arm-type-btn" data-type="thunderstorm" data-icon="⛈️" data-default-title="SEVERE THUNDERSTORM"  data-color="#fbbf24" data-bg="#050500" data-glow="rgba(251,191,36,0.8)">
-                            <span class="arm-type-icon">⛈️</span>Thunderstorm
-                        </button>
-                        <button class="arm-type-btn" data-type="nuclear"     data-icon="☢️" data-default-title="NUCLEAR ALERT"         data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                            <span class="arm-type-icon">☢️</span>Nuclear
-                        </button>
-                        <button class="arm-type-btn" data-type="civil"       data-icon="📻" data-default-title="CIVIL EMERGENCY"       data-color="#f97316" data-bg="#0a0500" data-glow="rgba(249,115,22,0.8)">
-                            <span class="arm-type-icon">📻</span>Civil Emergency
-                        </button>
-                        <button class="arm-type-btn" data-type="custom"      data-icon="🚨" data-default-title=""                      data-color="#ef4444" data-bg="#0a0000" data-glow="rgba(239,68,68,0.8)">
-                            <span class="arm-type-icon">🚨</span>Custom
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Title -->
-                <div class="field-group">
-                    <label>Title <span style="color:var(--muted);font-weight:400">(optional — pre-filled by type)</span></label>
-                    <input type="text" id="arm-title" placeholder="e.g. TORNADO WARNING" maxlength="80" />
-                </div>
-
-                <!-- Message -->
-                <div class="field-group">
-                    <label>Message</label>
-                    <textarea id="arm-text" rows="3" placeholder="Enter the override message to display on all screens…"></textarea>
-                </div>
-
-                <!-- Options row -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-                    <div class="field-group" style="margin-bottom:0">
-                        <label>Auto-deactivate</label>
-                        <select id="arm-duration" style="width:100%;padding:9px 12px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem">
-                            <option value="0">Manual only</option>
-                            <option value="5">5 minutes</option>
-                            <option value="15">15 minutes</option>
-                            <option value="30">30 minutes</option>
-                            <option value="60">1 hour</option>
-                            <option value="120">2 hours</option>
-                        </select>
-                    </div>
-                    <div class="field-group" style="margin-bottom:0;justify-content:flex-end">
-                        <label style="visibility:hidden;height:18px">.</label>
-                        <div style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px">
-                            <input type="checkbox" id="arm-push" style="width:16px;height:16px;accent-color:#ef4444;flex-shrink:0;cursor:pointer" />
-                            <label for="arm-push" style="cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text);line-height:1.3">
-                                📲 Push notify subscribers
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Buttons -->
-                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-                    <button class="send-btn" id="arm-activate-btn"
-                        style="flex:1;background:linear-gradient(135deg,#dc2626,#991b1b)">
-                        🛑 ACTIVATE E.S.T.O.P.
-                    </button>
-                    <button class="clear-all-btn" id="arm-deactivate-btn" style="flex:none;display:none">
-                        ✕ Deactivate
-                    </button>
-                </div>
-                <div id="arm-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+            <!-- Forecast label (used to identify this forecast among multiple) -->
+            <div class="fc-field" style="margin-bottom:14px">
+                <label>Forecast Label <span style="font-size:.72rem;color:var(--muted)">(optional — used to distinguish multiple forecasts)</span></label>
+                <input type="text" id="fc-label" placeholder="e.g. Downtown, North Suburbs, Airport…" style="width:100%" />
             </div>
-        </div>
 
-        <!-- Forecast Tab -->
-        <div class="tab-panel" id="tab-forecast">
-            <!-- Custom Forecast -->
-            <div class="card">
-                <div class="card-title">🌤 Custom Forecast</div>
-                <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Build your own forecast periods. Only fill
-                    in the fields you want — everything is optional except the period name. You can publish multiple
-                    forecasts at once (e.g. for different areas). Each forecast needs a unique label.</p>
+            <div id="fc-periods"></div>
 
-                <!-- Forecast label (used to identify this forecast among multiple) -->
-                <div class="fc-field" style="margin-bottom:14px">
-                    <label>Forecast Label <span style="font-size:.72rem;color:var(--muted)">(optional — used to distinguish multiple forecasts)</span></label>
-                    <input type="text" id="fc-label" placeholder="e.g. Downtown, North Suburbs, Airport…" style="width:100%" />
+            <button class="fc-add-btn" id="fc-add-btn">＋ Add Forecast Period</button>
+
+            <!-- Target Area -->
+            <div style="margin-bottom:16px">
+                <div class="card-title" style="margin-bottom:12px">📍 Target Area <span id="fc-target-badge" class="fc-target-badge">All Viewers</span></div>
+                <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Restrict who sees this forecast by
+                    location. Select a map area, ZIP codes, or counties — or leave as All Viewers to show everywhere.</p>
+
+                <div class="fc-target-tabs">
+                    <div class="fc-target-tab active" data-tmode="all">🌍 All Viewers</div>
+                    <div class="fc-target-tab" data-tmode="radius">📍 Map Area</div>
+                    <div class="fc-target-tab" data-tmode="zips">🏷 ZIP Codes</div>
+                    <div class="fc-target-tab" data-tmode="counties">🗺 Counties</div>
                 </div>
 
-                <div id="fc-periods"></div>
+                <!-- All -->
+                <div class="fc-target-panel" id="fc-target-all">
+                    <div style="font-size:.82rem;color:var(--muted)">This forecast will be visible to <strong
+                            style="color:var(--text)">all viewers</strong> regardless of their location.</div>
+                </div>
 
-                <button class="fc-add-btn" id="fc-add-btn">＋ Add Forecast Period</button>
-
-                <!-- Target Area -->
-                <div style="margin-bottom:16px">
-                    <div class="card-title" style="margin-bottom:12px">📍 Target Area <span id="fc-target-badge" class="fc-target-badge">All Viewers</span></div>
-                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Restrict who sees this forecast by
-                        location. Select a map area, ZIP codes, or counties — or leave as All Viewers to show everywhere.</p>
-
-                    <div class="fc-target-tabs">
-                        <div class="fc-target-tab active" data-tmode="all">🌍 All Viewers</div>
-                        <div class="fc-target-tab" data-tmode="radius">📍 Map Area</div>
-                        <div class="fc-target-tab" data-tmode="zips">🏷 ZIP Codes</div>
-                        <div class="fc-target-tab" data-tmode="counties">🗺 Counties</div>
-                    </div>
-
-                    <!-- All -->
-                    <div class="fc-target-panel" id="fc-target-all">
-                        <div style="font-size:.82rem;color:var(--muted)">This forecast will be visible to <strong
-                                style="color:var(--text)">all viewers</strong> regardless of their location.</div>
-                    </div>
-
-                    <!-- Radius / Map Area -->
-                    <div class="fc-target-panel" id="fc-target-radius" style="display:none">
-                        <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center
-                            point, then set the radius in miles. The forecast will show for viewers inside that circle.</p>
-                        <div id="fc-radius-map"></div>
-                        <div class="fc-target-grid">
-                            <div class="fc-field">
-                                <label>Center Lat</label>
-                                <input type="number" id="fc-radius-lat" step="0.0001" placeholder="e.g. 37.77" />
-                            </div>
-                            <div class="fc-field">
-                                <label>Center Lon</label>
-                                <input type="number" id="fc-radius-lon" step="0.0001" placeholder="e.g. -122.42" />
-                            </div>
-                            <div class="fc-field">
-                                <label>Radius (miles)</label>
-                                <input type="number" id="fc-radius-mi" min="1" max="1000" placeholder="e.g. 50" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ZIP Codes -->
-                    <div class="fc-target-panel" id="fc-target-zips" style="display:none">
+                <!-- Radius / Map Area -->
+                <div class="fc-target-panel" id="fc-target-radius" style="display:none">
+                    <p style="font-size:.75rem;color:var(--muted);margin-bottom:10px">Click the map to place a center
+                        point, then set the radius in miles. The forecast will show for viewers inside that circle.</p>
+                    <div id="fc-radius-map"></div>
+                    <div class="fc-target-grid">
                         <div class="fc-field">
-                            <label>ZIP Codes — comma-separated</label>
-                            <input type="text" id="fc-zip-input"
-                                placeholder="e.g. 90210, 10001, 60601" />
+                            <label>Center Lat</label>
+                            <input type="number" id="fc-radius-lat" step="0.0001" placeholder="e.g. 37.77" />
                         </div>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will only appear for
-                            viewers whose location reverse-geocodes to one of these ZIP codes.</div>
-                    </div>
-
-                    <!-- Counties -->
-                    <div class="fc-target-panel" id="fc-target-counties" style="display:none">
                         <div class="fc-field">
-                            <label>Counties — comma-separated (include state abbreviation)</label>
-                            <input type="text" id="fc-county-input"
-                                placeholder="e.g. Jefferson County AL, Cook County IL, Los Angeles County CA" />
+                            <label>Center Lon</label>
+                            <input type="number" id="fc-radius-lon" step="0.0001" placeholder="e.g. -122.42" />
                         </div>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will show for viewers
-                            whose county matches any entry in this list.</div>
+                        <div class="fc-field">
+                            <label>Radius (miles)</label>
+                            <input type="number" id="fc-radius-mi" min="1" max="1000" placeholder="e.g. 50" />
+                        </div>
                     </div>
                 </div>
 
-                <div class="fc-btn-row">
-                    <button class="send-btn" id="fc-publish-btn" style="flex:1">📡 PUBLISH FORECAST</button>
-                    <button class="fc-clear-btn" id="fc-clear-btn">Clear All Forecasts</button>
+                <!-- ZIP Codes -->
+                <div class="fc-target-panel" id="fc-target-zips" style="display:none">
+                    <div class="fc-field">
+                        <label>ZIP Codes — comma-separated</label>
+                        <input type="text" id="fc-zip-input"
+                            placeholder="e.g. 90210, 10001, 60601" />
+                    </div>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will only appear for
+                        viewers whose location reverse-geocodes to one of these ZIP codes.</div>
                 </div>
-                <div id="fc-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
 
-                <div id="fc-active-preview" style="display:none;margin-top:20px">
-                    <div class="card-title">📺 Currently Published</div>
-                    <div id="fc-active-list" style="font-size:.82rem;color:var(--muted)"></div>
+                <!-- Counties -->
+                <div class="fc-target-panel" id="fc-target-counties" style="display:none">
+                    <div class="fc-field">
+                        <label>Counties — comma-separated (include state abbreviation)</label>
+                        <input type="text" id="fc-county-input"
+                            placeholder="e.g. Jefferson County AL, Cook County IL, Los Angeles County CA" />
+                    </div>
+                    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">The forecast will show for viewers
+                        whose county matches any entry in this list.</div>
                 </div>
+            </div>
+
+            <div class="fc-btn-row">
+                <button class="send-btn" id="fc-publish-btn" style="flex:1">📡 PUBLISH FORECAST</button>
+                <button class="fc-clear-btn" id="fc-clear-btn">Clear All Forecasts</button>
+            </div>
+            <div id="fc-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
+
+            <div id="fc-active-preview" style="display:none;margin-top:20px">
+                <div class="card-title">📺 Currently Published</div>
+                <div id="fc-active-list" style="font-size:.82rem;color:var(--muted)"></div>
             </div>
         </div>
 
-        <!-- Updates Tab -->
-        <div class="tab-panel" id="tab-updates">
-            <!-- Push Notifications -->
-            <div class="card">
-                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                    <span>📲 Push Notifications</span>
-                    <span id="push-sub-count" style="font-size:.78rem;color:var(--accent2);font-weight:600">…
-                        subscribers</span>
-                </div>
-                <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px">
-                    Send a test push to all subscribed devices. Viewers subscribe via the notification button in Settings.
-                </p>
-                <div style="display:flex;gap:10px;flex-wrap:wrap">
-                    <button class="send-btn" id="push-test-btn"
-                        style="flex:1;background:linear-gradient(135deg,var(--accent2),var(--accent))">
-                        🔔 Send Test Push
-                    </button>
-                    <button class="clear-all-btn" id="push-clear-btn" style="flex:none">Clear All Subs</button>
-                </div>
-                <div id="push-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-            </div>
-
-            <!-- Release Notes -->
-            <div class="card">
-                <div class="card-title">📝 Release Notes</div>
-                <p style="font-size:.82rem;color:var(--muted);margin-bottom:18px">Post a release note to document updates.
-                    It will be saved here and can optionally be announced on the display.</p>
-
-                <div class="row">
-                    <div class="field-group">
-                        <label>Release Version</label>
-                        <input type="text" id="rn-version" placeholder="e.g. v2.1.0" maxlength="30" />
-                    </div>
-                    <div class="field-group">
-                        <label>Date</label>
-                        <input type="text" id="rn-date" placeholder="Auto-filled on post" readonly
-                            style="opacity:.5;cursor:default" />
-                    </div>
-                </div>
-
-                <div class="field-group">
-                    <label>Release Notes</label>
-                    <textarea id="rn-notes" placeholder="What changed in this update?&#10;• New feature: …&#10;• Fixed: …&#10;• Improved: …"
-                        style="min-height:110px"></textarea>
-                </div>
-
-                <div class="field-group"
-                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                    <input type="checkbox" id="rn-announce"
-                        style="width:18px;height:18px;accent-color:var(--accent2);flex-shrink:0;cursor:pointer" />
-                    <div style="flex:1">
-                        <label for="rn-announce"
-                            style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">📣 Also announce on
-                            display</label>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Sends a popup announcement to the
-                            weather display so viewers can see what's new.</div>
-                    </div>
-                </div>
-
-                <div class="field-group"
-                    style="flex-direction:row;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:18px">
-                    <input type="checkbox" id="rn-autoupdate"
-                        style="width:18px;height:18px;accent-color:#22c55e;flex-shrink:0;cursor:pointer" checked />
-                    <div style="flex:1">
-                        <label for="rn-autoupdate"
-                            style="cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text)">🔄 Force client updates on version mismatch</label>
-                        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">If enabled, display clients force-refresh when their saved version mismatches this version.</div>
-                    </div>
-                </div>
-
-                <button class="clear-all-btn" id="rn-save-settings-btn" style="margin-bottom:10px">💾 Save Update Settings</button>
-
-                <button class="send-btn" id="rn-post-btn"
-                    style="background:linear-gradient(135deg,var(--accent2),#0ea5e9)">📝 POST RELEASE NOTES</button>
-                <div id="rn-feedback" style="text-align:center;font-size:.82rem;margin-top:10px;min-height:18px"></div>
-
-                <div style="margin-top:24px">
-                    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-                        <span>🗒 History</span>
-                        <button class="clear-all-btn" id="rn-clear-all-btn">Clear All</button>
-                    </div>
-                    <div id="rn-list">
-                        <div class="no-msgs">No release notes posted yet</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        </div>
-
-    </div>
-
-    <!-- Armageddon confirmation modal -->
-    <div id="arm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="arm-confirm-title">
-        <div class="arm-confirm-box">
-            <div id="arm-confirm-icon" class="arm-confirm-icon">🚨</div>
-            <div id="arm-confirm-title" class="arm-confirm-title">CONFIRM E.S.T.O.P.</div>
-            <div class="arm-confirm-body">
-                You are about to override all viewer displays with an emergency message.
-                Please confirm the details below.
-            </div>
-            <div class="arm-confirm-preview">
-                <div id="arm-confirm-preview-type" class="arm-confirm-preview-type"></div>
-                <div id="arm-confirm-preview-title" class="arm-confirm-preview-title"></div>
-                <div id="arm-confirm-preview-text" class="arm-confirm-preview-text"></div>
-                <div id="arm-confirm-preview-timer" class="arm-confirm-preview-timer"></div>
-            </div>
-            <div class="arm-confirm-btns" style="margin-top:18px">
-                <button id="arm-confirm-cancel" type="button">Cancel</button>
-                <button id="arm-confirm-ok" type="button">Activate E.S.T.O.P.</button>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -1426,37 +1350,24 @@
     <script>
         (function () {
             const API = '/api';
-            let sessionToken = localStorage.getItem('shelly_admin_token') || '';
-            let lastActivity = Date.now();
+            let adminPassword = '';
             let pollTimer = null;
             let pushSubCount = 0;
 
             // ── Login ──────────────────────────────────────────────────────
             const loginScreen = document.getElementById('login-screen');
             const adminUi = document.getElementById('admin-ui');
-            const loginForm = document.getElementById('login-form');
             const pwInput = document.getElementById('pw-input');
+            const pwBtn = document.getElementById('pw-btn');
             const loginError = document.getElementById('login-error');
 
             async function tryLogin() {
                 const pw = pwInput.value.trim();
                 if (!pw) return;
                 try {
-                    const r = await fetch(`${API}/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ password: pw })
-                    });
+                    const r = await fetch(`${API}/verify`, { headers: { 'x-admin-password': pw } });
                     if (r.status === 401) { loginError.textContent = 'Wrong password.'; return; }
-                    if (r.status === 429) {
-                        const data = await r.json();
-                        loginError.textContent = data.error;
-                        return;
-                    }
-                    const data = await r.json();
-                    sessionToken = data.token;
-                    localStorage.setItem('shelly_admin_token', sessionToken);
-                    lastActivity = Date.now();
+                    adminPassword = pw;
                     loginScreen.style.display = 'none';
                     adminUi.classList.add('visible');
                     startApp();
@@ -1464,44 +1375,8 @@
                     loginError.textContent = '⚠ Could not reach server.';
                 }
             }
-
-            function logout() {
-                sessionToken = '';
-                localStorage.removeItem('shelly_admin_token');
-                adminUi.classList.remove('visible');
-                loginScreen.style.display = 'flex';
-                if (pollTimer) clearInterval(pollTimer);
-            }
-
-            // Session timeout (30 mins inactivity)
-            setInterval(() => {
-                if (sessionToken && Date.now() - lastActivity > 30 * 60 * 1000) {
-                    alert('Session expired due to inactivity.');
-                    logout();
-                }
-            }, 60000);
-
-            function updateActivity() { lastActivity = Date.now(); }
-            ['mousedown', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, updateActivity));
-
-            loginForm.addEventListener('submit', e => {
-                e.preventDefault();
-                tryLogin();
-            });
-
-            // Auto-login if token exists
-            if (sessionToken) {
-                // Verify token by trying to fetch something protected
-                fetch(`${API}/messages`, { headers: { 'Authorization': `Bearer ${sessionToken}` } }).then(r => {
-                    if (r.ok) {
-                        loginScreen.style.display = 'none';
-                        adminUi.classList.add('visible');
-                        startApp();
-                    } else {
-                        logout();
-                    }
-                }).catch(() => {});
-            }
+            pwBtn.addEventListener('click', tryLogin);
+            pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 
             // ── App ────────────────────────────────────────────────────────
             const sendBtn = document.getElementById('send-btn');
@@ -1515,17 +1390,6 @@
             let selectedDisplay = 'banner';
             let msgTargetMode = 'all';
             let msgRadiusMap = null, msgRadiusMarker = null, msgRadiusCircle = null;
-
-            // Helper for protected fetches
-            async function authFetch(url, options = {}) {
-                options.headers = {
-                    ...options.headers,
-                    'Authorization': `Bearer ${sessionToken}`
-                };
-                const r = await fetch(url, options);
-                if (r.status === 401) { logout(); throw new Error('Unauthorized'); }
-                return r;
-            }
 
             // ── Sent confirmation chime ────────────────────────────
             function playChime() {
@@ -1545,16 +1409,6 @@
             }
 
             function startApp() {
-                // Add Logout button if not already there
-                if (!document.querySelector('.logout-btn')) {
-                    const header = document.querySelector('.admin-status');
-                    const btn = document.createElement('button');
-                    btn.className = 'logout-btn';
-                    btn.textContent = 'Logout';
-                    btn.onclick = logout;
-                    header.appendChild(btn);
-                }
-
                 // Type buttons
                 document.querySelectorAll('.type-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
@@ -1599,10 +1453,8 @@
                     const btn = e.target.closest('[data-fc-delete]');
                     if (btn) deleteForecast(parseInt(btn.dataset.fcDelete, 10));
                 });
-
                 initTargetingUI();
                 initMsgTargetingUI();
-                initTabs();
 
                 checkHealth();
                 loadMessages();
@@ -1611,24 +1463,11 @@
                 loadUpdateSettings();
                 loadCustomForecast();
                 loadArmageddonState();
-
                 // Fast poll: messages + armageddon combined (10 s instead of 3 × 5 s)
                 pollTimer = setInterval(() => { loadMessages(); loadArmageddonState(); }, 10000);
                 // Slow poll: push count (rarely changes), health check
                 setInterval(loadPushCount, 60000);
                 setInterval(checkHealth, 30000);
-            }
-
-            function initTabs() {
-                const tabs = document.querySelectorAll('.admin-tab');
-                const panels = document.querySelectorAll('.tab-panel');
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        const target = tab.dataset.tab;
-                        tabs.forEach(t => t.classList.toggle('active', t === tab));
-                        panels.forEach(p => p.classList.toggle('active', p.id === `tab-${target}`));
-                    });
-                });
             }
 
             async function sendAnnouncement() {
@@ -1637,9 +1476,9 @@
 
                 sendBtn.disabled = true;
                 try {
-                    const r = await authFetch(`${API}/announce`, {
+                    const r = await fetch(`${API}/announce`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({
                             text,
                             title: document.getElementById('msg-title').value.trim(),
@@ -1667,7 +1506,7 @@
 
             async function loadMessages() {
                 try {
-                    const r = await authFetch(`${API}/messages`);
+                    const r = await fetch(`${API}/messages`, { headers: { 'x-admin-password': adminPassword } });
                     const msgs = await r.json();
                     renderMessages(msgs);
                 } catch { /* ignore */ }
@@ -1714,19 +1553,26 @@
             }
 
             async function deleteMsg(id) {
-                await authFetch(`${API}/messages/${id}`, { method: 'DELETE' });
+                await fetch(`${API}/messages/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'x-admin-password': adminPassword }
+                });
                 loadMessages();
             }
 
             async function clearAll() {
                 if (!confirm('Clear all active messages?')) return;
-                await authFetch(`${API}/messages`, { method: 'DELETE' });
+                await fetch(`${API}/messages`, {
+                    method: 'DELETE',
+                    headers: { 'x-admin-password': adminPassword }
+                });
                 loadMessages();
             }
 
             async function checkHealth() {
                 try {
                     const r = await fetch(`${API}/health`);
+                    const data = await r.json();
                     const ok = r.ok;
                     statusDot.className = ok ? 'ok' : '';
                     statusText.textContent = ok ? 'Server connected' : 'Server error';
@@ -1738,7 +1584,7 @@
 
             async function loadPushCount() {
                 try {
-                    const r = await authFetch(`${API}/push/count`);
+                    const r = await fetch(`${API}/push/count`, { headers: { 'x-admin-password': adminPassword } });
                     if (r.ok) {
                         const { count } = await r.json();
                         pushSubCount = count;
@@ -1753,9 +1599,9 @@
                 const fb = document.getElementById('push-feedback');
                 btn.disabled = true;
                 try {
-                    const r = await authFetch(`${API}/push/send`, {
+                    const r = await fetch(`${API}/push/send`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ title: 'S.H.E.L.L.Y. Test', body: 'Push notifications are working! 🌤', type: 'info' })
                     });
                     const data = await r.json();
@@ -1772,6 +1618,7 @@
 
             async function clearPushSubs() {
                 if (!confirm('Remove all push subscriptions? Devices will need to re-subscribe.')) return;
+                // We don't have a bulk-clear endpoint, so we fetch count and note it
                 const fb = document.getElementById('push-feedback');
                 fb.style.color = 'var(--muted)';
                 fb.textContent = 'Use the KV dashboard or redeploy to clear subscriptions manually.';
@@ -1779,6 +1626,8 @@
             }
 
             // ── E.S.T.O.P. Mode ─────────────────────────────────────────
+
+            // Emergency type metadata (icons, colours, default titles)
             const ARM_TYPES = {
                 tornado:      { icon: '🌪️', label: 'Tornado Warning' },
                 hurricane:    { icon: '🌀', label: 'Hurricane Warning' },
@@ -1794,18 +1643,21 @@
 
             let selectedArmType = 'tornado';
 
+            // Type preset button selection
             document.getElementById('arm-type-grid').addEventListener('click', e => {
                 const btn = e.target.closest('.arm-type-btn');
                 if (!btn) return;
                 document.querySelectorAll('.arm-type-btn').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
                 selectedArmType = btn.dataset.type;
+                // Pre-fill title with default if the field is empty or already shows a preset default
                 const titleEl = document.getElementById('arm-title');
                 const defaultTitle = btn.dataset.defaultTitle || '';
                 const currentVal = titleEl.value.trim();
                 const isAutoFilled = !currentVal || [...document.querySelectorAll('.arm-type-btn')].some(b => b.dataset.defaultTitle === currentVal);
                 if (isAutoFilled) titleEl.value = defaultTitle;
             });
+            // Set initial title for default selected type
             document.getElementById('arm-title').value = document.querySelector('.arm-type-btn.selected')?.dataset.defaultTitle || '';
 
             async function loadArmageddonState() {
@@ -1867,73 +1719,63 @@
                 const title = document.getElementById('arm-title').value.trim();
                 const duration = parseInt(document.getElementById('arm-duration').value) || 0;
                 const meta = ARM_TYPES[selectedArmType] || ARM_TYPES.emergency;
-                const modal = document.getElementById('arm-confirm-modal');
-                const iconEl = document.getElementById('arm-confirm-icon');
-                const typeEl = document.getElementById('arm-confirm-preview-type');
-                const titleEl = document.getElementById('arm-confirm-preview-title');
-                const textEl = document.getElementById('arm-confirm-preview-text');
-                const timerEl = document.getElementById('arm-confirm-preview-timer');
 
-                if (!modal || !iconEl || !typeEl || !titleEl || !textEl || !timerEl) {
-                    armFeedback('⚠ Confirmation dialog unavailable.', '#ef4444');
-                    return;
-                }
-
-                iconEl.textContent = meta.icon;
-                typeEl.textContent = meta.label.toUpperCase();
-                titleEl.textContent = title || '';
-                textEl.textContent = text;
-                timerEl.textContent =
+                // Populate confirmation modal
+                document.getElementById('arm-confirm-icon').textContent = meta.icon;
+                document.getElementById('arm-confirm-preview-type').textContent = meta.label.toUpperCase();
+                document.getElementById('arm-confirm-preview-title').textContent = title || '';
+                document.getElementById('arm-confirm-preview-text').textContent = text;
+                document.getElementById('arm-confirm-preview-timer').textContent =
                     duration > 0 ? `⏱ Auto-deactivates after ${duration < 60 ? duration + ' minute' + (duration !== 1 ? 's' : '') : (duration / 60) + ' hour' + (duration / 60 !== 1 ? 's' : '')}` : '⚠ Manual deactivation only';
-                modal.classList.add('open');
-                modal.dataset.pending = JSON.stringify({ title, text, type: selectedArmType, duration });
+                document.getElementById('arm-confirm-modal').classList.add('open');
+
+                // Store pending payload for confirm handler
+                document.getElementById('arm-confirm-modal').dataset.pending = JSON.stringify({ title, text, type: selectedArmType, duration });
             }
 
-            const armConfirmCancel = document.getElementById('arm-confirm-cancel');
-            const armConfirmOk = document.getElementById('arm-confirm-ok');
-            const armConfirmModal = document.getElementById('arm-confirm-modal');
+            document.getElementById('arm-confirm-cancel').addEventListener('click', () => {
+                document.getElementById('arm-confirm-modal').classList.remove('open');
+            });
 
-            if (armConfirmCancel && armConfirmModal) {
-                armConfirmCancel.addEventListener('click', () => {
-                    armConfirmModal.classList.remove('open');
-                });
-            }
-
-            if (armConfirmOk && armConfirmModal) {
-                armConfirmOk.addEventListener('click', async () => {
-                    armConfirmModal.classList.remove('open');
-                    const payload = JSON.parse(armConfirmModal.dataset.pending || '{}');
-                    const btn = document.getElementById('arm-activate-btn');
-                    btn.disabled = true;
-                    try {
-                        const r = await authFetch(`${API}/armageddon`, {
+            document.getElementById('arm-confirm-ok').addEventListener('click', async () => {
+                const modal = document.getElementById('arm-confirm-modal');
+                modal.classList.remove('open');
+                const payload = JSON.parse(modal.dataset.pending || '{}');
+                const btn = document.getElementById('arm-activate-btn');
+                btn.disabled = true;
+                try {
+                    const r = await fetch(`${API}/armageddon`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!r.ok) throw new Error();
+                    // Optionally push-notify subscribers
+                    if (document.getElementById('arm-push').checked) {
+                        const meta = ARM_TYPES[payload.type] || ARM_TYPES.emergency;
+                        await fetch(`${API}/push/send`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        if (!r.ok) throw new Error();
-                        if (document.getElementById('arm-push').checked) {
-                            const meta = ARM_TYPES[payload.type] || ARM_TYPES.emergency;
-                            await authFetch(`${API}/push/send`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ title: `${meta.icon} ${payload.title || meta.label}`, body: payload.text, type: 'emergency' })
-                            }).catch(() => {});
-                        }
-                        armFeedback('🛑 E.S.T.O.P. ACTIVE!', '#ef4444');
-                        loadArmageddonState();
-                    } catch {
-                        armFeedback('⚠ Failed to activate.', '#ef4444');
-                    } finally {
-                        btn.disabled = false;
+                            headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                            body: JSON.stringify({
+                                title: `${meta.icon} ${payload.title || meta.label}`,
+                                body: payload.text,
+                                type: 'emergency'
+                            })
+                        }).catch(() => { /* push failure is non-critical */ });
                     }
-                });
-            }
+                    armFeedback('🛑 E.S.T.O.P. ACTIVE!', '#ef4444');
+                    loadArmageddonState();
+                } catch {
+                    armFeedback('⚠ Failed to activate.', '#ef4444');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
 
             async function deactivateArmageddon() {
-                if (!confirm('Deactivate E.S.T.O.P.?')) return;
+                if (!confirm('Deactivate E.S.T.O.P.? The display will return to normal.')) return;
                 try {
-                    await authFetch(`${API}/armageddon`, { method: 'DELETE' });
+                    await fetch(`${API}/armageddon`, { method: 'DELETE', headers: { 'x-admin-password': adminPassword } });
                     armFeedback('✓ E.S.T.O.P. deactivated.', '#22c55e');
                     loadArmageddonState();
                 } catch {
@@ -1957,22 +1799,24 @@
                 const btn = document.getElementById('rn-post-btn');
                 btn.disabled = true;
                 try {
-                    const r = await authFetch(`${API}/release-notes`, {
+                    const r = await fetch(`${API}/release-notes`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ version, notes })
                     });
                     if (!r.ok) throw new Error();
                     playChime();
                     rnFeedback('✓ Release note posted!', '#22c55e');
                     document.getElementById('rn-notes').value = '';
+                    document.getElementById('rn-date').value = new Date().toLocaleDateString();
                     loadReleaseNotes();
+
                     if (announce) {
                         const title = version ? `What's New in ${version}` : "What's New";
-                        await authFetch(`${API}/announce`, {
+                        await fetch(`${API}/announce`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text: notes, title, type: 'info', display: 'popup', duration: 0 })
+                            headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+                            body: JSON.stringify({ text: notes, title, type: 'info', display: 'popup', duration: 0, tts: false, push: false })
                         });
                     }
                 } catch {
@@ -1996,20 +1840,20 @@
 
             async function saveUpdateSettings() {
                 const version = document.getElementById('rn-version').value.trim();
-                if (!version) { rnFeedback('⚠ Version is required.', '#f59e0b'); return; }
+                if (!version) { rnFeedback('⚠ Version is required to save update settings.', '#f59e0b'); return; }
                 const autoUpdateEnabled = document.getElementById('rn-autoupdate').checked;
                 const btn = document.getElementById('rn-save-settings-btn');
                 btn.disabled = true;
                 try {
-                    const r = await authFetch(`${API}/app-update`, {
+                    const r = await fetch(`${API}/app-update`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ version, autoUpdateEnabled })
                     });
                     if (!r.ok) throw new Error();
-                    rnFeedback('✓ Saved.', '#22c55e');
+                    rnFeedback('✓ Update settings saved.', '#22c55e');
                 } catch {
-                    rnFeedback('⚠ Failed to save.', '#ef4444');
+                    rnFeedback('⚠ Failed to save update settings.', '#ef4444');
                 } finally {
                     btn.disabled = false;
                 }
@@ -2017,7 +1861,7 @@
 
             async function loadReleaseNotes() {
                 try {
-                    const r = await authFetch(`${API}/release-notes`);
+                    const r = await fetch(`${API}/release-notes`, { headers: { 'x-admin-password': adminPassword } });
                     if (!r.ok) return;
                     const notes = await r.json();
                     renderReleaseNotes(notes);
@@ -2027,7 +1871,7 @@
             function renderReleaseNotes(notes) {
                 const list = document.getElementById('rn-list');
                 if (!list) return;
-                if (!notes.length) { list.innerHTML = '<div class="no-msgs">No release notes.</div>'; return; }
+                if (!notes.length) { list.innerHTML = '<div class="no-msgs">No release notes posted yet</div>'; return; }
                 list.innerHTML = '';
                 notes.forEach(note => {
                     const div = document.createElement('div');
@@ -2038,7 +1882,7 @@
                             <div class="rn-notes markdown-body">${typeof marked !== 'undefined' ? marked.parse(note.notes, { breaks: true }) : esc(note.notes)}</div>
                             <div class="rn-meta">${new Date(note.created).toLocaleString()}</div>
                         </div>
-                        <button class="amsg-del" data-id="${note.id}">✕</button>
+                        <button class="amsg-del" data-id="${note.id}">✕ Delete</button>
                     `;
                     div.querySelector('.amsg-del').addEventListener('click', () => deleteReleaseNote(note.id));
                     list.appendChild(div);
@@ -2046,19 +1890,28 @@
             }
 
             async function deleteReleaseNote(id) {
-                await authFetch(`${API}/release-notes/${id}`, { method: 'DELETE' });
+                await fetch(`${API}/release-notes/${id}`, {
+                    method: 'DELETE', headers: { 'x-admin-password': adminPassword }
+                });
                 loadReleaseNotes();
             }
 
             async function clearAllReleaseNotes() {
-                if (!confirm('Clear all?')) return;
-                await authFetch(`${API}/release-notes`, { method: 'DELETE' });
-                loadReleaseNotes();
+                if (!confirm('Clear all release notes?')) return;
+                try {
+                    await fetch(`${API}/release-notes`, {
+                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
+                    });
+                    loadReleaseNotes();
+                } catch { /* ignore */ }
             }
 
             function rnFeedback(msg, color) {
                 const el = document.getElementById('rn-feedback');
-                if (el) { el.style.color = color; el.textContent = msg; setTimeout(() => el.textContent = '', 4000); }
+                if (!el) return;
+                el.style.color = color;
+                el.textContent = msg;
+                setTimeout(() => { el.textContent = ''; }, 4000);
             }
 
             // ── Custom Forecast ────────────────────────────────────────
@@ -2068,14 +1921,20 @@
                 row.className = 'fc-period-row';
                 row.innerHTML = `
                     <div class="fc-row-top">
-                        <div class="fc-field"><label>Period Name *</label><input type="text" name="name" placeholder="e.g. Today" /></div>
-                        <div class="fc-field"><label>Icon</label><input type="text" name="icon" placeholder="⛅" style="text-align:center" /></div>
-                        <div class="fc-field"><label>High</label><input type="text" name="hi" /></div>
-                        <div class="fc-field"><label>Low</label><input type="text" name="lo" /></div>
-                        <button class="fc-del-row">✕</button>
+                        <div class="fc-field"><label>Period Name *</label><input type="text" name="name" placeholder="e.g. Today, Tonight, Thursday…" value="" /></div>
+                        <div class="fc-field"><label>Icon</label><input type="text" name="icon" placeholder="⛅" value="" style="text-align:center;font-size:1.2rem" /></div>
+                        <div class="fc-field"><label>High Temp</label><input type="text" name="hi" placeholder="e.g. 72°F" value="" /></div>
+                        <div class="fc-field"><label>Low Temp</label><input type="text" name="lo" placeholder="e.g. 54°F" value="" /></div>
+                        <button class="fc-del-row" title="Remove period">✕</button>
                     </div>
                     <div class="fc-row-bot">
-                        <div class="fc-field" style="grid-column:1/3"><label>Description</label><input type="text" name="desc" /></div>
+                        <div class="fc-field" style="grid-column:1/3"><label>Description</label><input type="text" name="desc" placeholder="e.g. Partly cloudy with a chance of afternoon showers" value="" /></div>
+                        <div></div>
+                    </div>
+                    <div class="fc-row-bot" style="margin-top:8px">
+                        <div class="fc-field"><label>Precip Chance %</label><input type="number" name="precip" min="0" max="100" placeholder="0–100" value="" /></div>
+                        <div class="fc-field"><label>Wind</label><input type="text" name="wind" placeholder="e.g. SW 15 mph" value="" /></div>
+                        <div></div>
                     </div>
                 `;
                 row.querySelector('[name=name]').value = p.name || '';
@@ -2083,6 +1942,8 @@
                 row.querySelector('[name=hi]').value = p.hi || '';
                 row.querySelector('[name=lo]').value = p.lo || '';
                 row.querySelector('[name=desc]').value = p.desc || '';
+                row.querySelector('[name=precip]').value = p.precip != null ? p.precip : '';
+                row.querySelector('[name=wind]').value = p.wind || '';
                 row.querySelector('.fc-del-row').addEventListener('click', () => row.remove());
                 document.getElementById('fc-periods').appendChild(row);
             }
@@ -2090,119 +1951,260 @@
             async function publishForecast() {
                 const rows = document.querySelectorAll('.fc-period-row');
                 const periods = [];
+                let hasError = false;
                 rows.forEach(row => {
                     const name = row.querySelector('[name=name]').value.trim();
-                    if (name) periods.push({
-                        name, icon: row.querySelector('[name=icon]').value.trim(),
+                    if (!name) { hasError = true; return; }
+                    periods.push({
+                        name,
+                        icon: row.querySelector('[name=icon]').value.trim(),
                         hi: row.querySelector('[name=hi]').value.trim(),
                         lo: row.querySelector('[name=lo]').value.trim(),
-                        desc: row.querySelector('[name=desc]').value.trim()
+                        desc: row.querySelector('[name=desc]').value.trim(),
+                        precip: row.querySelector('[name=precip]').value.trim(),
+                        wind: row.querySelector('[name=wind]').value.trim()
                     });
                 });
-                if (!periods.length) { fcFeedback('⚠ Add a period.', '#f59e0b'); return; }
+                if (hasError) { fcFeedback('⚠ All period rows need a name.', '#f59e0b'); return; }
+                if (!periods.length) { fcFeedback('⚠ Add at least one forecast period.', '#f59e0b'); return; }
                 const targeting = getTargetingData();
-                const label = document.getElementById('fc-label').value.trim();
+                const label = document.getElementById('fc-label')?.value.trim() || '';
+                const btn = document.getElementById('fc-publish-btn');
+                btn.disabled = true;
                 try {
-                    await authFetch(`${API}/custom-forecast`, {
+                    const r = await fetch(`${API}/custom-forecast`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
                         body: JSON.stringify({ periods, targeting, label })
                     });
+                    if (!r.ok) throw new Error();
                     playChime();
-                    fcFeedback('✓ Published!', '#22c55e');
+                    fcFeedback(`✓ Forecast published! (${periods.length} period${periods.length !== 1 ? 's' : ''})`, '#22c55e');
+                    // Clear the builder form for the next forecast
                     document.getElementById('fc-periods').innerHTML = '';
+                    document.getElementById('fc-label').value = '';
+                    setTargetingMode('all');
                     loadCustomForecast();
-                } catch { fcFeedback('⚠ Failed.', '#ef4444'); }
+                } catch {
+                    fcFeedback('⚠ Failed to publish forecast.', '#ef4444');
+                } finally {
+                    btn.disabled = false;
+                }
             }
 
             async function deleteForecast(id) {
-                if (!confirm('Remove?')) return;
-                await authFetch(`${API}/custom-forecast/${id}`, { method: 'DELETE' });
-                loadCustomForecast();
+                if (!confirm('Remove this forecast from the display?')) return;
+                try {
+                    await fetch(`${API}/custom-forecast/${id}`, {
+                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
+                    });
+                    fcFeedback('✓ Forecast removed.', '#22c55e');
+                    loadCustomForecast();
+                } catch {
+                    fcFeedback('⚠ Failed to remove forecast.', '#ef4444');
+                }
             }
 
             async function clearForecast() {
-                if (!confirm('Clear all?')) return;
-                await authFetch(`${API}/custom-forecast`, { method: 'DELETE' });
-                loadCustomForecast();
+                if (!confirm('Clear ALL custom forecasts from the display?')) return;
+                try {
+                    await fetch(`${API}/custom-forecast`, {
+                        method: 'DELETE', headers: { 'x-admin-password': adminPassword }
+                    });
+                    fcFeedback('✓ All forecasts cleared.', '#22c55e');
+                    document.getElementById('fc-periods').innerHTML = '';
+                    document.getElementById('fc-label').value = '';
+                    setTargetingMode('all');
+                    loadCustomForecast();
+                } catch {
+                    fcFeedback('⚠ Failed to clear forecasts.', '#ef4444');
+                }
             }
 
             async function loadCustomForecast() {
                 try {
-                    const r = await authFetch(`${API}/custom-forecast`);
+                    const r = await fetch(`${API}/custom-forecast`, { headers: { 'x-admin-password': adminPassword } });
+                    if (!r.ok) return;
                     const data = await r.json();
-                    renderFcPreview(Array.isArray(data) ? data : []);
+                    // API now returns an array
+                    const forecasts = Array.isArray(data) ? data : (data?.periods?.length ? [data] : []);
+                    renderFcPreview(forecasts);
                 } catch { /* ignore */ }
             }
 
             function renderFcPreview(forecasts) {
                 const preview = document.getElementById('fc-active-preview');
                 const list = document.getElementById('fc-active-list');
-                if (!forecasts.length) { preview.style.display = 'none'; return; }
+                if (!preview || !list) return;
+                if (!forecasts?.length) { preview.style.display = 'none'; return; }
                 preview.style.display = 'block';
-                list.innerHTML = forecasts.map(cf => `
-                    <div style="padding:8px 0;border-bottom:1px solid var(--border)">
-                        <div style="display:flex;justify-content:space-between;align-items:center">
-                            <span><strong>${esc(cf.label || 'Forecast')}</strong> (${cf.periods.length} periods) · 📍 ${esc(targetingSummary(cf.targeting))}</span>
-                            <button data-fc-delete="${cf.id}" class="amsg-del">✕</button>
+                list.innerHTML = forecasts.map(cf => {
+                    const updated = cf.updatedAt ? ` — Updated ${new Date(cf.updatedAt).toLocaleString()}` : '';
+                    const targetingLabel = targetingSummary(cf.targeting);
+                    const labelHtml = cf.label ? `<strong style="color:var(--text)">${esc(cf.label)}</strong> · ` : '';
+                    const periodsHtml = cf.periods.map(p =>
+                        `<div style="padding:3px 0 3px 8px;border-left:2px solid var(--border)">
+                            <strong>${esc(p.name)}</strong>${p.icon ? ` ${esc(p.icon)}` : ''}
+                            ${p.hi || p.lo ? ` · ${[p.hi, p.lo].filter(Boolean).map(esc).join(' / ')}` : ''}
+                            ${p.desc ? ` · ${esc(p.desc)}` : ''}
+                            ${p.precip ? ` · 💧${esc(String(p.precip))}%` : ''}
+                            ${p.wind ? ` · 💨${esc(p.wind)}` : ''}
+                        </div>`
+                    ).join('');
+                    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                            <span>${labelHtml}${esc(cf.periods.length)} period${cf.periods.length !== 1 ? 's' : ''} · 📍 ${esc(targetingLabel)}${esc(updated)}</span>
+                            <button data-fc-delete="${cf.id}" style="font-size:.72rem;padding:2px 8px;cursor:pointer;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:4px;color:var(--danger);flex-shrink:0;margin-left:8px">✕ Remove</button>
                         </div>
-                    </div>
-                `).join('');
+                        ${periodsHtml}
+                    </div>`;
+                }).join('');
             }
 
             function targetingSummary(t) {
                 if (!t || t.mode === 'all') return 'All Viewers';
-                if (t.mode === 'radius') return 'Map Area';
-                if (t.mode === 'zips') return 'ZIP Codes';
-                if (t.mode === 'counties') return 'Counties';
-                return 'All';
+                if (t.mode === 'radius') {
+                    const c = t.center;
+                    if (c?.lat && c?.lon) return `Within ${t.radiusMiles || 'unset'} mi of (${parseFloat(c.lat).toFixed(3)}, ${parseFloat(c.lon).toFixed(3)})`;
+                    return 'Map Area (not configured)';
+                }
+                if (t.mode === 'zips') return `ZIP codes: ${(t.zips || []).join(', ') || 'none'}`;
+                if (t.mode === 'counties') return `Counties: ${(t.counties || []).join(', ') || 'none'}`;
+                return 'All Viewers';
             }
 
-            // ── Targeting UI (Simplified for brevity) ──────────────────
+            // ── Targeting UI ───────────────────────────────────────────
             let fcTargetMode = 'all';
-            let fcRadiusMap = null;
+            let fcRadiusMap = null, fcRadiusMarker = null, fcRadiusCircle = null;
+
             function initTargetingUI() {
+                // Scope to forecast tabs only ([data-tmode]); message tabs use [data-msgmode] and are wired in initMsgTargetingUI
                 document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        fcTargetMode = tab.dataset.tmode;
-                        document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(t => t.classList.toggle('active', t === tab));
-                        ['all', 'radius', 'zips', 'counties'].forEach(m => {
-                            const el = document.getElementById(`fc-target-${m}`);
-                            if (el) el.style.display = m === fcTargetMode ? '' : 'none';
-                        });
-                        document.getElementById('fc-target-badge').textContent = tab.textContent;
-                    });
+                    tab.addEventListener('click', () => setTargetingMode(tab.dataset.tmode));
+                });
+
+                // Sync lat/lon inputs → map circle
+                ['fc-radius-lat', 'fc-radius-lon', 'fc-radius-mi'].forEach(id => {
+                    document.getElementById(id)?.addEventListener('input', syncRadiusCircle);
                 });
             }
 
-            function initMsgTargetingUI() {
-                document.querySelectorAll('.msg-target-tab').forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        msgTargetMode = tab.dataset.msgmode;
-                        document.querySelectorAll('.msg-target-tab').forEach(t => t.classList.toggle('active', t === tab));
-                        ['all', 'radius', 'zips', 'counties'].forEach(m => {
-                            const el = document.getElementById(`msg-target-${m}`);
-                            if (el) el.style.display = m === msgTargetMode ? '' : 'none';
-                        });
-                        document.getElementById('msg-target-badge').textContent = tab.textContent;
-                    });
+            function setTargetingMode(mode) {
+                fcTargetMode = mode;
+                // Only target forecast tabs ([data-tmode]); message tabs use [data-msgmode]
+                document.querySelectorAll('.fc-target-tab[data-tmode]').forEach(t => t.classList.toggle('active', t.dataset.tmode === mode));
+                ['all', 'radius', 'zips', 'counties'].forEach(m => {
+                    const el = document.getElementById(`fc-target-${m}`);
+                    if (el) el.style.display = m === mode ? '' : 'none';
                 });
+                updateTargetBadge(mode);
+                if (mode === 'radius') initRadiusMap();
+            }
+
+            function updateTargetBadge(mode) {
+                const badge = document.getElementById('fc-target-badge');
+                if (!badge) return;
+                const labels = { all: 'All Viewers', radius: 'Map Area', zips: 'ZIP Codes', counties: 'Counties' };
+                badge.textContent = labels[mode] || 'All Viewers';
+            }
+
+            function initRadiusMap() {
+                if (fcRadiusMap) { fcRadiusMap.invalidateSize(); return; }
+                if (typeof L === 'undefined') return;
+                const container = document.getElementById('fc-radius-map');
+                if (!container) return;
+                fcRadiusMap = L.map(container, { zoomControl: true }).setView([39.5, -98.35], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors', maxZoom: 18
+                }).addTo(fcRadiusMap);
+                fcRadiusMap.on('click', e => {
+                    const { lat, lng } = e.latlng;
+                    document.getElementById('fc-radius-lat').value = lat.toFixed(5);
+                    document.getElementById('fc-radius-lon').value = lng.toFixed(5);
+                    syncRadiusCircle();
+                });
+                // Init from existing inputs
+                syncRadiusCircle();
+            }
+
+            function syncRadiusCircle() {
+                if (!fcRadiusMap || typeof L === 'undefined') return;
+                const lat = parseFloat(document.getElementById('fc-radius-lat')?.value);
+                const lon = parseFloat(document.getElementById('fc-radius-lon')?.value);
+                const mi = parseFloat(document.getElementById('fc-radius-mi')?.value);
+                if (fcRadiusMarker) { fcRadiusMap.removeLayer(fcRadiusMarker); fcRadiusMarker = null; }
+                if (fcRadiusCircle) { fcRadiusMap.removeLayer(fcRadiusCircle); fcRadiusCircle = null; }
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    const METERS_PER_MILE = 1609.344;
+                    fcRadiusMarker = L.marker([lat, lon]).addTo(fcRadiusMap);
+                    if (!isNaN(mi) && mi > 0) {
+                        fcRadiusCircle = L.circle([lat, lon], { radius: mi * METERS_PER_MILE, color: '#06b6d4', fillOpacity: 0.12 }).addTo(fcRadiusMap);
+                        fcRadiusMap.fitBounds(fcRadiusCircle.getBounds(), { maxZoom: 10 });
+                    } else {
+                        fcRadiusMap.setView([lat, lon], 8);
+                    }
+                }
             }
 
             function getTargetingData() {
                 const mode = fcTargetMode;
-                if (mode === 'radius') return { mode: 'radius', center: { lat: parseFloat(document.getElementById('fc-radius-lat').value), lon: parseFloat(document.getElementById('fc-radius-lon').value) }, radiusMiles: parseFloat(document.getElementById('fc-radius-mi').value) };
-                if (mode === 'zips') return { mode: 'zips', zips: document.getElementById('fc-zip-input').value.split(',').map(z => z.trim()).filter(Boolean) };
-                if (mode === 'counties') return { mode: 'counties', counties: document.getElementById('fc-county-input').value.split(',').map(c => c.trim()).filter(Boolean) };
+                if (mode === 'all') return { mode: 'all' };
+                if (mode === 'radius') {
+                    const lat = parseFloat(document.getElementById('fc-radius-lat')?.value);
+                    const lon = parseFloat(document.getElementById('fc-radius-lon')?.value);
+                    const mi = parseFloat(document.getElementById('fc-radius-mi')?.value);
+                    return {
+                        mode: 'radius',
+                        center: (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
+                        radiusMiles: !isNaN(mi) ? mi : null
+                    };
+                }
+                if (mode === 'zips') {
+                    const raw = document.getElementById('fc-zip-input')?.value || '';
+                    return { mode: 'zips', zips: raw.split(',').map(z => z.trim()).filter(Boolean) };
+                }
+                if (mode === 'counties') {
+                    const raw = document.getElementById('fc-county-input')?.value || '';
+                    return { mode: 'counties', counties: raw.split(',').map(c => c.trim()).filter(Boolean) };
+                }
                 return { mode: 'all' };
             }
 
-            function getMsgTargetingData() {
-                const mode = msgTargetMode;
-                if (mode === 'radius') return { mode: 'radius', center: { lat: parseFloat(document.getElementById('msg-radius-lat').value), lon: parseFloat(document.getElementById('msg-radius-lon').value) }, radiusMiles: parseFloat(document.getElementById('msg-radius-mi').value) };
-                if (mode === 'zips') return { mode: 'zips', zips: document.getElementById('msg-zip-input').value.split(',').map(z => z.trim()).filter(Boolean) };
-                if (mode === 'counties') return { mode: 'counties', counties: document.getElementById('msg-county-input').value.split(',').map(c => c.trim()).filter(Boolean) };
-                return { mode: 'all' };
+            function restoreTargeting(t) {
+                if (!t) return;
+                setTargetingMode(t.mode || 'all');
+                if (t.mode === 'radius') {
+                    if (t.center?.lat != null) document.getElementById('fc-radius-lat').value = t.center.lat;
+                    if (t.center?.lon != null) document.getElementById('fc-radius-lon').value = t.center.lon;
+                    if (t.radiusMiles != null) document.getElementById('fc-radius-mi').value = t.radiusMiles;
+                    syncRadiusCircle();
+                }
+                if (t.mode === 'zips' && t.zips?.length) {
+                    const el = document.getElementById('fc-zip-input');
+                    if (el) el.value = t.zips.join(', ');
+                }
+                if (t.mode === 'counties' && t.counties?.length) {
+                    const el = document.getElementById('fc-county-input');
+                    if (el) el.value = t.counties.join(', ');
+                }
+            }
+
+            function fcFeedback(msg, color) {
+                const el = document.getElementById('fc-feedback');
+                if (!el) return;
+                el.style.color = color;
+                el.textContent = msg;
+                setTimeout(() => { el.textContent = ''; }, 4000);
+            }
+
+            // ── Message Location Targeting UI ──────────────────────────
+            function initMsgTargetingUI() {
+                document.querySelectorAll('.msg-target-tab').forEach(tab => {
+                    tab.addEventListener('click', () => setMsgTargetingMode(tab.dataset.msgmode));
+                });
+                ['msg-radius-lat', 'msg-radius-lon', 'msg-radius-mi'].forEach(id => {
+                    document.getElementById(id)?.addEventListener('input', syncMsgRadiusCircle);
+                });
             }
 
             function setMsgTargetingMode(mode) {
@@ -2212,11 +2214,84 @@
                     const el = document.getElementById(`msg-target-${m}`);
                     if (el) el.style.display = m === mode ? '' : 'none';
                 });
+                const badge = document.getElementById('msg-target-badge');
+                if (badge) {
+                    const labels = { all: 'All Viewers', radius: 'Map Area', zips: 'ZIP Codes', counties: 'Counties' };
+                    badge.textContent = labels[mode] || 'All Viewers';
+                }
+                if (mode === 'radius') initMsgRadiusMap();
             }
 
-            function fcFeedback(msg, color) { const el = document.getElementById('fc-feedback'); el.style.color = color; el.textContent = msg; setTimeout(() => el.textContent = '', 4000); }
-            function feedback(msg, color) { sendFeedback.style.color = color; sendFeedback.textContent = msg; setTimeout(() => sendFeedback.textContent = '', 4000); }
-            function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+            function initMsgRadiusMap() {
+                if (msgRadiusMap) { msgRadiusMap.invalidateSize(); return; }
+                if (typeof L === 'undefined') return;
+                const container = document.getElementById('msg-radius-map');
+                if (!container) return;
+                msgRadiusMap = L.map(container, { zoomControl: true }).setView([39.5, -98.35], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors', maxZoom: 18
+                }).addTo(msgRadiusMap);
+                msgRadiusMap.on('click', e => {
+                    const { lat, lng } = e.latlng;
+                    document.getElementById('msg-radius-lat').value = lat.toFixed(5);
+                    document.getElementById('msg-radius-lon').value = lng.toFixed(5);
+                    syncMsgRadiusCircle();
+                });
+                syncMsgRadiusCircle();
+            }
+
+            function syncMsgRadiusCircle() {
+                if (!msgRadiusMap || typeof L === 'undefined') return;
+                const lat = parseFloat(document.getElementById('msg-radius-lat')?.value);
+                const lon = parseFloat(document.getElementById('msg-radius-lon')?.value);
+                const mi = parseFloat(document.getElementById('msg-radius-mi')?.value);
+                if (msgRadiusMarker) { msgRadiusMap.removeLayer(msgRadiusMarker); msgRadiusMarker = null; }
+                if (msgRadiusCircle) { msgRadiusMap.removeLayer(msgRadiusCircle); msgRadiusCircle = null; }
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    const METERS_PER_MILE = 1609.344;
+                    msgRadiusMarker = L.marker([lat, lon]).addTo(msgRadiusMap);
+                    if (!isNaN(mi) && mi > 0) {
+                        msgRadiusCircle = L.circle([lat, lon], { radius: mi * METERS_PER_MILE, color: '#06b6d4', fillOpacity: 0.12 }).addTo(msgRadiusMap);
+                        msgRadiusMap.fitBounds(msgRadiusCircle.getBounds(), { maxZoom: 10 });
+                    } else {
+                        msgRadiusMap.setView([lat, lon], 8);
+                    }
+                }
+            }
+
+            function getMsgTargetingData() {
+                const mode = msgTargetMode;
+                if (mode === 'all') return { mode: 'all' };
+                if (mode === 'radius') {
+                    const lat = parseFloat(document.getElementById('msg-radius-lat')?.value);
+                    const lon = parseFloat(document.getElementById('msg-radius-lon')?.value);
+                    const mi = parseFloat(document.getElementById('msg-radius-mi')?.value);
+                    return {
+                        mode: 'radius',
+                        center: (!isNaN(lat) && !isNaN(lon)) ? { lat, lon } : null,
+                        radiusMiles: !isNaN(mi) ? mi : null
+                    };
+                }
+                if (mode === 'zips') {
+                    const raw = document.getElementById('msg-zip-input')?.value || '';
+                    return { mode: 'zips', zips: raw.split(',').map(z => z.trim()).filter(Boolean) };
+                }
+                if (mode === 'counties') {
+                    const raw = document.getElementById('msg-county-input')?.value || '';
+                    return { mode: 'counties', counties: raw.split(',').map(c => c.trim()).filter(Boolean) };
+                }
+                return { mode: 'all' };
+            }
+
+            function feedback(msg, color) {
+                sendFeedback.style.color = color;
+                sendFeedback.textContent = msg;
+                setTimeout(() => { sendFeedback.textContent = ''; }, 4000);
+            }
+
+            function esc(s) {
+                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
         })();
     </script>
 </body>

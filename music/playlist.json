@@ -1,8 +1,11 @@
 {
-  "name": "Shelly BGM",
+  "name": "WeatherNow BGM",
   "description": "Auto-generated on 2026-03-12T16:43:38.235Z — 14 track(s) found.",
   "tracks": [
-
+    {
+      "title": "Ashtray On The Windowsill(1)",
+      "file": "music/Ashtray On The Windowsill(1).mp3"
+    },
     {
       "title": "Ashtray On The Windowsill",
       "file": "music/Ashtray On The Windowsill.mp3"
@@ -50,10 +53,6 @@
     {
       "title": "Rolling Clouds",
       "file": "music/Rolling Clouds.mp3"
-    },
-    {
-      "title": "Ashtray On The Windowsill(1)",
-      "file": "music/Ashtray On The Windowsill(1).mp3"
     },
     {
       "title": "Strong Breeze",

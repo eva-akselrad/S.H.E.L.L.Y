@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────
-#  Shelly – Dockerfile (Node.js / Express)
+#  WeatherNow – Dockerfile (Node.js / Express)
 # ─────────────────────────────────────────────────────────────────────
 FROM node:22-alpine
 

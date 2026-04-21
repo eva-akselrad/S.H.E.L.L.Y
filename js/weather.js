@@ -120,7 +120,7 @@ const WeatherAPI = (() => {
     async function fetchAlerts(lat, lon) {
         const url = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}&status=actual&message_type=alert`;
         try {
-            const resp = await fetch(url, { headers: { Accept: 'application/geo+json', 'User-Agent': 'Shelly/1.0' } });
+            const resp = await fetch(url, { headers: { Accept: 'application/geo+json', 'User-Agent': 'WeatherNow/1.0' } });
             if (!resp.ok) return [];
             const data = await resp.json();
             return (data.features || []).map(f => f.properties);

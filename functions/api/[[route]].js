@@ -18,7 +18,7 @@ const CORS = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-password',
+    'Access-Control-Allow-Headers': 'Content-Type, x-admin-password',
     'Cache-Control': 'no-store',
 };
 
@@ -28,41 +28,11 @@ const KV_RELEASE_NOTES_KEY = 'release_notes';
 const KV_APP_UPDATE_SETTINGS_KEY = 'app_update_settings';
 const KV_CUSTOM_FORECAST_KEY = 'custom_forecast';
 const KV_ARMAGEDDON_KEY = 'armageddon';
-
 const KV_MSG_SEQ_KEY = 'msg_next_id'; // persistent counter — never resets on message delete
 const KV_ACKS_KEY = 'msg_acks'; // { [msgId]: [visitorId, ...] }
-const KV_SECURITY_LOGS_KEY = 'security_logs';
-const KV_AUDIT_LOGS_KEY = 'audit_logs';
-const KV_FAILED_LOGINS_KEY = 'failed_logins';
 const MAX_APP_VERSION_LENGTH = 30;
 
 // ── Helpers ────────────────────────────────────────────────────────
-async function getSecurityLogs(env) {
-    return (await env.WEATHERNOW_KV.get(KV_SECURITY_LOGS_KEY, 'json')) ?? [];
-}
-async function saveSecurityLog(env, event, ip, details = '') {
-    const logs = await getSecurityLogs(env);
-    logs.unshift({ timestamp: new Date().toISOString(), event, ip, details });
-    if (logs.length > 50) logs.pop();
-    await env.WEATHERNOW_KV.put(KV_SECURITY_LOGS_KEY, JSON.stringify(logs));
-}
-
-async function getAuditLogs(env) {
-    return (await env.WEATHERNOW_KV.get(KV_AUDIT_LOGS_KEY, 'json')) ?? [];
-}
-async function saveAuditLog(env, action, ip, details = '') {
-    const logs = await getAuditLogs(env);
-    logs.unshift({ timestamp: new Date().toISOString(), action, ip, details });
-    if (logs.length > 100) logs.pop();
-    await env.WEATHERNOW_KV.put(KV_AUDIT_LOGS_KEY, JSON.stringify(logs));
-}
-
-async function getFailedLogins(env) {
-    return (await env.WEATHERNOW_KV.get(KV_FAILED_LOGINS_KEY, 'json')) ?? {};
-}
-async function saveFailedLogins(env, failed) {
-    await env.WEATHERNOW_KV.put(KV_FAILED_LOGINS_KEY, JSON.stringify(failed));
-}
 async function getMessages(env) {
     return (await env.WEATHERNOW_KV.get(KV_MESSAGES_KEY, 'json')) ?? [];
 }
@@ -121,51 +91,9 @@ async function saveArmageddonState(env, state) {
     }
 }
 
-
-
-
-// ── Auth helpers ───────────────────────────────────────────────────
-async function hmacSha256(message, secret) {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-        'raw', encoder.encode(secret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false, ['sign']
-    );
-    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-    return btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-async function signToken(env) {
-    const expiry = Date.now() + 3600000; // 1 hour
-    const payload = `${expiry}`;
-    const signature = await hmacSha256(payload, env.ADMIN_PASSWORD || 'weathernow');
-    return `${payload}.${signature}`;
-}
-
-async function verifyToken(token, env) {
-    if (!token) return false;
-    const [payload, signature] = token.split('.');
-    if (!payload || !signature) return false;
-    const expiry = parseInt(payload);
-    if (isNaN(expiry) || Date.now() > expiry) return false;
-    const expected = await hmacSha256(payload, env.ADMIN_PASSWORD || 'weathernow');
-    return signature === expected;
-}
-
-async function checkAuth(request, env) {
-    const authHeader = request.headers.get('authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.substring(7);
-        if (await verifyToken(token, env)) return true;
-    }
-
-    // Fallback for legacy /api/poll and others that might still use headers/body
-    const pw = request.headers.get('x-admin-password');
-    if (pw === (env.ADMIN_PASSWORD ?? 'weathernow')) return true;
-
-    // Check body if it was parsed (only for announce)
-    return false;
+function checkAuth(request, env) {
+    const pw = request.headers.get('x-admin-password') ?? '';
+    return pw === (env.ADMIN_PASSWORD ?? 'weathernow');
 }
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -272,58 +200,6 @@ export async function onRequest({ request, env }) {
         return noStore({ ok: true, pushSubscribers: subs.length });
     }
 
-    // ── Security & Audit ────────────────────────────────────────
-    if (path === '/api/security/logs' && method === 'GET') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
-        const [security, audit] = await Promise.all([getSecurityLogs(env), getAuditLogs(env)]);
-        return json({ security, audit });
-    }
-
-    if (path === '/api/login' && method === 'POST') {
-        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-        const { password } = await request.json();
-        
-        const failed = await getFailedLogins(env);
-        const status = failed[ip];
-        if (status && status.lockedUntil > Date.now()) {
-            const remaining = Math.ceil((status.lockedUntil - Date.now()) / 1000 / 60);
-            return json({ error: `Locked out. Try again in ${remaining} min.` }, 429);
-        }
-
-        if (password === (env.ADMIN_PASSWORD || 'weathernow')) {
-            delete failed[ip];
-            await saveFailedLogins(env, failed);
-            const token = await signToken(env);
-            await saveSecurityLog(env, 'Login Success', ip);
-            return json({ token });
-        } else {
-            const count = (status?.count || 0) + 1;
-            const MAX_FAILED = 5;
-            const lockedUntil = count >= MAX_FAILED ? Date.now() + 15 * 60 * 1000 : 0;
-            failed[ip] = { count, lockedUntil };
-            await saveFailedLogins(env, failed);
-            
-            await saveSecurityLog(env, 'Login Failed', ip, `Attempt ${count}/${MAX_FAILED}`);
-            if (lockedUntil > 0) await saveSecurityLog(env, 'IP Locked', ip, '15-minute lockout');
-            
-            return json({ error: 'Invalid password' }, 401);
-        }
-    }
-
-    if (path === '/api/admin-backdoor' && method === 'GET') {
-        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-        await saveSecurityLog(env, 'Honeypot Triggered', ip, 'Accessed /api/admin-backdoor');
-        const failed = await getFailedLogins(env);
-        const lockedUntil = Date.now() + 60 * 60 * 1000;
-        failed[ip] = { count: 5, lockedUntil };
-        await saveFailedLogins(env, failed);
-        return json({ error: 'Access denied' }, 403);
-    }
-
-
-
-
-
     // ── Messages ────────────────────────────────────────────────
     if (path === '/api/messages' && method === 'GET') {
         const since = parseInt(url.searchParams.get('since') ?? '0') || 0;
@@ -350,17 +226,19 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/verify' && method === 'GET') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         return json({ ok: true });
     }
 
     if (path === '/api/announce' && method === 'POST') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const { text = '', title = '', type = 'info', display = 'banner',
             duration = 0, tts = false, push = false, targeting = { mode: 'all' } } = await request.json();
         if (!text.trim()) return json({ error: 'text is required' }, 400);
 
         const msgs = await getMessages(env);
+        // Use a persistent KV counter so IDs never recycle when messages are deleted.
+        // Fall back to max(existing)+1 for legacy deployments where the counter is absent.
         const stored = parseInt(await env.WEATHERNOW_KV.get(KV_MSG_SEQ_KEY) || '0', 10);
         const maxExisting = msgs.length ? Math.max(...msgs.map(m => m.id)) : 0;
         const nextId = Math.max(stored, maxExisting) + 1;
@@ -368,7 +246,6 @@ export async function onRequest({ request, env }) {
         const msg = { id: nextId, text: text.trim(), title: title.trim(), type, display, duration, tts: !!tts, push: !!push, targeting, created: Date.now() };
         msgs.push(msg);
         await saveMessages(env, msgs);
-        await saveAuditLog(env, 'Created Announcement', request.headers.get('cf-connecting-ip') || 'unknown', text.slice(0, 50));
 
         // Fan-out push if requested
         if (push) {
@@ -387,20 +264,18 @@ export async function onRequest({ request, env }) {
 
     const oneMatch = path.match(/^\/api\/messages\/(\d+)$/);
     if (oneMatch && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const id = parseInt(oneMatch[1]);
         const [msgs, acks] = await Promise.all([getMessages(env), getAcks(env)]);
         await saveMessages(env, msgs.filter(m => m.id !== id));
         delete acks[id];
         await saveAcks(env, acks);
-        await saveAuditLog(env, 'Deleted Message', request.headers.get('cf-connecting-ip') || 'unknown', `ID: ${id}`);
         return json({ ok: true });
     }
 
     if (path === '/api/messages' && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await Promise.all([saveMessages(env, []), saveAcks(env, {})]);
-        await saveAuditLog(env, 'Cleared All Messages', request.headers.get('cf-connecting-ip') || 'unknown');
         return json({ ok: true });
     }
 
@@ -477,7 +352,7 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/app-update' && method === 'PUT') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const body = await request.json();
         const version = String(body?.version ?? '').trim();
         if (!version || version.length > MAX_APP_VERSION_LENGTH) {
@@ -493,42 +368,38 @@ export async function onRequest({ request, env }) {
             updatedAt: Date.now(),
         };
         await saveAppUpdateSettings(env, settings);
-        await saveAuditLog(env, 'Updated App Settings', request.headers.get('cf-connecting-ip') || 'unknown', `v:${version}, auto:${autoUpdateEnabled}`);
         return json(settings);
     }
 
     // ── Release Notes ────────────────────────────────────────────
     if (path === '/api/release-notes' && method === 'GET') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         return json(await getReleaseNotes(env));
     }
 
     if (path === '/api/release-notes' && method === 'POST') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const { version = '', notes = '' } = await request.json();
         if (!notes.trim()) return json({ error: 'notes is required' }, 400);
         const existing = await getReleaseNotes(env);
         const nextId = existing.length ? Math.max(...existing.map(n => n.id)) + 1 : 1;
         const note = { id: nextId, version: version.trim(), notes: notes.trim(), created: Date.now() };
         await saveReleaseNotes(env, [note, ...existing]);
-        await saveAuditLog(env, 'Posted Release Note', request.headers.get('cf-connecting-ip') || 'unknown', version.trim());
         return json(note, 201);
     }
 
     const releaseNoteMatch = path.match(/^\/api\/release-notes\/(\d+)$/);
     if (releaseNoteMatch && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const id = parseInt(releaseNoteMatch[1]);
         const existing = await getReleaseNotes(env);
         await saveReleaseNotes(env, existing.filter(n => n.id !== id));
-        await saveAuditLog(env, 'Deleted Release Note', request.headers.get('cf-connecting-ip') || 'unknown', `ID: ${id}`);
         return json({ ok: true });
     }
 
     if (path === '/api/release-notes' && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await saveReleaseNotes(env, []);
-        await saveAuditLog(env, 'Cleared All Release Notes', request.headers.get('cf-connecting-ip') || 'unknown');
         return json({ ok: true });
     }
 
@@ -538,11 +409,12 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/custom-forecast' && method === 'POST') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = await request.json();
         const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
         if (!periods.length) return json({ error: 'periods required' }, 400);
         const forecasts = await getCustomForecasts(env);
+        // Replace in-place if a non-empty label already exists, otherwise append
         const existing = label ? forecasts.findIndex(c => c.label === label) : -1;
         const nextId = forecasts.length ? Math.max(...forecasts.map(c => c.id ?? 0)) + 1 : 1;
         const entry = { id: existing >= 0 ? forecasts[existing].id : nextId, label, periods, targeting, updatedAt: Date.now() };
@@ -552,26 +424,23 @@ export async function onRequest({ request, env }) {
             forecasts.push(entry);
         }
         await saveCustomForecasts(env, forecasts);
-        await saveAuditLog(env, existing >= 0 ? 'Updated Custom Forecast' : 'Added Custom Forecast', request.headers.get('cf-connecting-ip') || 'unknown', label || entry.id);
         return json(entry, 201);
     }
 
     const customFcMatch = path.match(/^\/api\/custom-forecast\/(\d+)$/);
     if (customFcMatch && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         const id = parseInt(customFcMatch[1], 10);
         const forecasts = await getCustomForecasts(env);
         const updated = forecasts.filter(c => c.id !== id);
         if (updated.length === forecasts.length) return json({ error: 'not found' }, 404);
         await saveCustomForecasts(env, updated);
-        await saveAuditLog(env, 'Deleted Custom Forecast', request.headers.get('cf-connecting-ip') || 'unknown', `ID: ${id}`);
         return json({ ok: true });
     }
 
     if (path === '/api/custom-forecast' && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await saveCustomForecasts(env, []);
-        await saveAuditLog(env, 'Cleared All Custom Forecasts', request.headers.get('cf-connecting-ip') || 'unknown');
         return json({ ok: true });
     }
 
@@ -587,7 +456,7 @@ export async function onRequest({ request, env }) {
     }
 
     if (path === '/api/armageddon' && method === 'POST') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         let body;
         try { body = await request.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }
         const { title = '', text, type = 'emergency', duration = 0 } = body;
@@ -599,14 +468,12 @@ export async function onRequest({ request, env }) {
             expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
         };
         await saveArmageddonState(env, state);
-        await saveAuditLog(env, 'Activated Armageddon', request.headers.get('cf-connecting-ip') || 'unknown', text.slice(0, 50));
         return json({ ok: true, ...state });
     }
 
     if (path === '/api/armageddon' && method === 'DELETE') {
-        if (!await checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
+        if (!checkAuth(request, env)) return json({ error: 'Unauthorized' }, 401);
         await saveArmageddonState(env, null);
-        await saveAuditLog(env, 'Deactivated Armageddon', request.headers.get('cf-connecting-ip') || 'unknown');
         return json({ ok: true });
     }
 

@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════
-   server.js – Shelly Express backend
+   server.js – WeatherNow Express backend
    Serves static files + admin announcement API + Web Push
    ════════════════════════════════════════════════════════════════ */
 
@@ -9,45 +9,9 @@ const fs = require('fs');
 const crypto = require('crypto');
 const webPush = require('web-push');
 const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
-const helmet = require('helmet');
-const xss = require('xss');
 
 const app = express();
-app.set('trust proxy', 1);
-
-// ── Security Headers & HTTPS Redirection (Task 3.1 & 4.3) ──────
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://*.tile.weather.gov", "https://api.weather.gov"],
-            connectSrc: ["'self'", "https://api.weather.gov", "https://nominatim.openstreetmap.org"],
-            frameSrc: ["'none'"],
-            objectSrc: ["'none'"],
-            upgradeInsecureRequests: [],
-        },
-    },
-    crossOriginEmbedderPolicy: false,
-    referrerPolicy: { policy: 'same-origin' },
-}));
-
-// Enforce HTTPS in production
-app.use((req, res, next) => {
-    if (process.env.NODE_ENV === 'production' && req.headers['x-forwarded-proto'] !== 'https') {
-        return res.redirect(`https://${req.headers.host}${req.url}`);
-    }
-    // Task 3.1: HSTS
-    if (process.env.NODE_ENV === 'production') {
-        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    }
-    next();
-});
-
-app.use(express.json({ limit: '10kb' })); // Payload size limit
+app.use(express.json());
 
 // ── Build hash (automatic cache busting) ───────────────────────
 // Hash all local JS, CSS, and HTML files so that any code change
@@ -87,8 +51,6 @@ app.get('/sw.js', (req, res) => {
     res.send(SW_CONTENT);
 });
 
-
-
 // ── Static files ───────────────────────────────────────────────
 app.use(express.static(__dirname, {
     setHeaders(res, filePath) {
@@ -100,8 +62,6 @@ app.use(express.static(__dirname, {
         // gets the latest markup (and triggers a SW update check).
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('X-Frame-Options', 'DENY');
-            res.setHeader('X-Content-Type-Options', 'nosniff');
         }
         res.setHeader('Accept-Ranges', 'bytes');
     }
@@ -160,33 +120,6 @@ const acknowledgements = new Map();
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'weathernow';
 
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
-
-// ── Security & Audit (Task 1.2 & 2.1) ──────────────────────────
-let securityLogs = [];
-function logSecurityEvent(event, ip, details = '') {
-    securityLogs.unshift({
-        timestamp: new Date().toISOString(),
-        event,
-        ip,
-        details
-    });
-    if (securityLogs.length > 50) securityLogs.pop();
-    console.log(`[Security] ${event} from ${ip} ${details ? '(' + details + ')' : ''}`);
-}
-
-let auditLogs = [];
-function logAuditAction(action, ip, details = '') {
-    auditLogs.unshift({
-        timestamp: new Date().toISOString(),
-        action,
-        ip,
-        details
-    });
-    if (auditLogs.length > 100) auditLogs.pop();
-    console.log(`[Audit] ${action} by ${ip} ${details ? '(' + details + ')' : ''}`);
-}
-
 // ── Rate limiter (admin routes) ────────────────────────────────
 const adminLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -203,72 +136,13 @@ app.use('/api/release-notes', adminLimiter);
 
 // ── Auth helper ────────────────────────────────────────────────
 function checkAuth(req, res) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    
-    if (!token) {
-        // Fallback for legacy /api/poll and others that might still use headers/body
-        const provided = req.headers['x-admin-password'] || req.body?.password;
-        if (provided === ADMIN_PASSWORD) return true;
-        
-        res.status(401).json({ error: 'Authentication required' });
+    const provided = req.headers['x-admin-password'] || req.body?.password;
+    if (provided !== ADMIN_PASSWORD) {
+        res.status(401).json({ error: 'Unauthorized' });
         return false;
     }
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.admin = decoded;
-        return true;
-    } catch (err) {
-        res.status(401).json({ error: 'Invalid or expired session' });
-        return false;
-    }
+    return true;
 }
-
-// ── GET /api/security/logs ─────────────────────────────────────
-app.get('/api/security/logs', adminLimiter, (req, res) => {
-    if (!checkAuth(req, res)) return;
-    res.json({ security: securityLogs, audit: auditLogs });
-});
-
-
-
-// ── POST /api/login ────────────────────────────────────────────
-app.post('/api/login', adminLimiter, (req, res) => {
-    const ip = req.ip;
-    const { password } = req.body;
-
-    if (password === ADMIN_PASSWORD) {
-        const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '1h' });
-        logSecurityEvent('Login Success', ip);
-        res.json({ token });
-    } else {
-        logSecurityEvent('Login Failed', ip);
-        res.status(401).json({ error: 'Invalid password' });
-    }
-});
-
-
-
-
-
-
-
-
-
-
-// ── Honeypot (Task 2.3) ────────────────────────────────────────
-app.get('/api/admin-backdoor', (req, res) => {
-    const ip = req.ip;
-    logSecurityEvent('Honeypot Triggered', ip, 'Accessed /api/admin-backdoor');
-    res.status(403).json({ error: 'Access denied' });
-});
-
-
-
-
-
-
 
 // ── GET /api/messages?since=ID ─────────────────────────────────
 app.get('/api/messages', (req, res) => {
@@ -305,30 +179,22 @@ app.get('/api/verify', (req, res) => {
 app.post('/api/announce', async (req, res) => {
     if (!checkAuth(req, res)) return;
     const { text, type = 'info', display = 'banner', duration = 0, title = '', tts = false, push = false, targeting = { mode: 'all' } } = req.body;
-    
-    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
-    if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
-    if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
-    if (!['info', 'warning', 'emergency', 'success'].includes(type)) return res.status(400).json({ error: 'invalid type' });
-    if (!['banner', 'kiosk', 'modal', 'popup'].includes(display)) return res.status(400).json({ error: 'invalid display' });
+    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
 
     const msg = {
         id: nextId++,
-        // Task 3.2: Input Sanitization
-        text: xss(text.trim()),
-        title: xss(title.trim()),
+        text: text.trim(),
+        title: title.trim(),
         type,
         display,
-        duration: Math.max(0, parseInt(duration) || 0),
+        duration,
         tts: !!tts,
         push: !!push,
         targeting,
         created: Date.now()
     };
     messages.push(msg);
-    logAuditAction('Created Announcement', req.ip, text.slice(0, 50));
     console.log(`[Admin] New ${type} ${display}: ${text.slice(0, 80)}`);
-
 
     // Fan-out push notification if requested
     if (push && pushSubscriptions.length > 0) {
@@ -367,7 +233,6 @@ app.delete('/api/messages/:id', (req, res) => {
     const id = parseInt(req.params.id);
     messages = messages.filter(m => m.id !== id);
     acknowledgements.delete(id);
-    logAuditAction('Deleted Message', req.ip, `ID: ${id}`);
     res.json({ ok: true });
 });
 
@@ -376,7 +241,6 @@ app.delete('/api/messages', (req, res) => {
     if (!checkAuth(req, res)) return;
     messages = [];
     acknowledgements.clear();
-    logAuditAction('Cleared All Messages', req.ip);
     res.json({ ok: true });
 });
 
@@ -395,21 +259,13 @@ app.get('/api/armageddon', (req, res) => {
 app.post('/api/armageddon', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { title = '', text, type = 'emergency', duration = 0 } = req.body;
-    
-    // Task 3.3: API Payload Validation
-    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
-    if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
-    
+    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
     const durationMs = Math.max(0, parseInt(duration) || 0) * 60 * 1000;
     armageddonState = {
-        // Task 3.2: Input Sanitization
-        title: xss(title.trim()), 
-        text: xss(text.trim()), 
-        type: xss(type),
+        title: title.trim(), text: text.trim(), type,
         activatedAt: Date.now(),
         expiresAt: durationMs > 0 ? Date.now() + durationMs : null,
     };
-    logAuditAction('Activated Armageddon', req.ip, text.slice(0, 50));
     console.log('[Admin] Armageddon mode ACTIVATED');
     res.json({ ok: true, ...armageddonState });
 });
@@ -418,7 +274,6 @@ app.post('/api/armageddon', adminLimiter, (req, res) => {
 app.delete('/api/armageddon', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     armageddonState = null;
-    logAuditAction('Deactivated Armageddon', req.ip);
     console.log('[Admin] Armageddon mode deactivated');
     res.json({ ok: true });
 });
@@ -517,11 +372,10 @@ app.put('/api/app-update', adminLimiter, (req, res) => {
         ? req.body.autoUpdateEnabled
         : appUpdateSettings.autoUpdateEnabled;
     appUpdateSettings = {
-        version: xss(version),
+        version,
         autoUpdateEnabled,
         updatedAt: Date.now(),
     };
-    logAuditAction('Updated App Settings', req.ip, `v:${version}, auto:${autoUpdateEnabled}`);
     console.log(`[Admin] Update settings saved: version=${version}, autoUpdateEnabled=${autoUpdateEnabled}`);
     res.json(appUpdateSettings);
 });
@@ -535,15 +389,9 @@ app.get('/api/release-notes', adminLimiter, (req, res) => {
 app.post('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { version = '', notes = '', autoUpdateEnabled } = req.body;
-    if (!notes || typeof notes !== 'string' || !notes.trim()) return res.status(400).json({ error: 'notes required' });
-    
-    const normalizedVersion = xss(version.trim());
-    const note = { 
-        id: releaseNoteId++, 
-        version: normalizedVersion, 
-        notes: xss(notes.trim()), 
-        created: Date.now() 
-    };
+    if (!notes.trim()) return res.status(400).json({ error: 'notes required' });
+    const normalizedVersion = version.trim();
+    const note = { id: releaseNoteId++, version: normalizedVersion, notes: notes.trim(), created: Date.now() };
     releaseNotes.unshift(note);
     if (normalizedVersion) {
         appUpdateSettings = {
@@ -552,23 +400,19 @@ app.post('/api/release-notes', adminLimiter, (req, res) => {
             updatedAt: Date.now(),
         };
     }
-    logAuditAction('Posted Release Note', req.ip, normalizedVersion);
     console.log(`[Admin] Release note posted: ${version}`);
     res.json(note);
 });
 
 app.delete('/api/release-notes/:id', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
-    const id = parseInt(req.params.id);
-    releaseNotes = releaseNotes.filter(n => n.id !== id);
-    logAuditAction('Deleted Release Note', req.ip, `ID: ${id}`);
+    releaseNotes = releaseNotes.filter(n => n.id !== parseInt(req.params.id));
     res.json({ ok: true });
 });
 
 app.delete('/api/release-notes', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     releaseNotes = [];
-    logAuditAction('Cleared All Release Notes', req.ip);
     res.json({ ok: true });
 });
 
@@ -586,23 +430,15 @@ app.post('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     const { periods = [], targeting = { mode: 'all' }, label: rawLabel = '' } = req.body;
     const label = typeof rawLabel === 'string' ? rawLabel.trim() : '';
-    if (!periods || !Array.isArray(periods) || !periods.length) return res.status(400).json({ error: 'periods required' });
-    
+    if (!periods.length) return res.status(400).json({ error: 'periods required' });
     // If a non-empty label is given and a forecast with that label already exists, replace it
     const existing = label ? customForecasts.findIndex(c => c.label === label) : -1;
-    const entry = { 
-        id: existing >= 0 ? customForecasts[existing].id : customForecastId++, 
-        label: xss(label), 
-        periods, 
-        targeting, 
-        updatedAt: Date.now() 
-    };
+    const entry = { id: existing >= 0 ? customForecasts[existing].id : customForecastId++, label, periods, targeting, updatedAt: Date.now() };
     if (existing >= 0) {
         customForecasts[existing] = entry;
     } else {
         customForecasts.push(entry);
     }
-    logAuditAction(existing >= 0 ? 'Updated Custom Forecast' : 'Added Custom Forecast', req.ip, label || entry.id);
     console.log(`[Admin] Custom forecast ${existing >= 0 ? 'updated' : 'added'}: "${label || entry.id}" — ${periods.length} period(s), targeting: ${targeting.mode}`);
     res.json(entry);
 });
@@ -614,7 +450,6 @@ app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
     const before = customForecasts.length;
     customForecasts = customForecasts.filter(c => c.id !== id);
     if (customForecasts.length === before) return res.status(404).json({ error: 'not found' });
-    logAuditAction('Deleted Custom Forecast', req.ip, `ID: ${id}`);
     res.json({ ok: true });
 });
 
@@ -622,7 +457,6 @@ app.delete('/api/custom-forecast/:id', adminLimiter, (req, res) => {
 app.delete('/api/custom-forecast', adminLimiter, (req, res) => {
     if (!checkAuth(req, res)) return;
     customForecasts = [];
-    logAuditAction('Cleared All Custom Forecasts', req.ip);
     res.json({ ok: true });
 });
 
@@ -679,12 +513,10 @@ app.get('/api/spc-outlook', async (req, res) => {
     }
 });
 
-
-
 // ── Start ─────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Shelly running on http://0.0.0.0:${PORT}`);
+    console.log(`WeatherNow running on http://0.0.0.0:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin.html`);
     console.log(`Admin password: ${ADMIN_PASSWORD}`);
     console.log(`VAPID public key: ${vapidKeys.publicKey.slice(0, 20)}…`);
