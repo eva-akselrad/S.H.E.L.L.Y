@@ -149,15 +149,36 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 // ── VAPID / Web Push ───────────────────────────────────────────────
-async function signVapidJwt(audience, privateKeyB64Url, email) {
+async function signVapidJwt(audience, privateKeyB64Url, publicKeyB64Url, email) {
     const now = Math.floor(Date.now() / 1000);
     const header = { typ: 'JWT', alg: 'ES256' };
     const payload = { aud: audience, exp: now + 12 * 3600, sub: email };
     const base64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     const encode = obj => base64Url(new TextEncoder().encode(JSON.stringify(obj)));
     const headerPayload = `${encode(header)}.${encode(payload)}`;
-    const keyBytes = Uint8Array.from(atob(privateKeyB64Url.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    const fromBase64Url = (value) => {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+        return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+    };
+    const privateBytes = fromBase64Url(privateKeyB64Url);
+    let cryptoKey;
+    if (privateBytes.length === 32 && publicKeyB64Url) {
+        const publicBytes = fromBase64Url(publicKeyB64Url);
+        if (publicBytes.length !== 65 || publicBytes[0] !== 4) {
+            throw new Error('Invalid VAPID_PUBLIC_KEY format');
+        }
+        const jwk = {
+            kty: 'EC',
+            crv: 'P-256',
+            d: privateKeyB64Url,
+            x: base64Url(publicBytes.slice(1, 33)),
+            y: base64Url(publicBytes.slice(33, 65)),
+        };
+        cryptoKey = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    } else {
+        cryptoKey = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    }
     const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, cryptoKey, new TextEncoder().encode(headerPayload));
     return `${headerPayload}.${base64Url(new Uint8Array(sig))}`;
 }
@@ -173,7 +194,7 @@ async function fanOutPush(subs, payload, env) {
     await Promise.all(subs.map(async sub => {
         try {
             const endpoint = new URL(sub.endpoint);
-            const jwt = await signVapidJwt(`${endpoint.protocol}//${endpoint.host}`, vapidPrivate, vapidEmail);
+            const jwt = await signVapidJwt(`${endpoint.protocol}//${endpoint.host}`, vapidPrivate, vapidPublic, vapidEmail);
             const res = await fetch(sub.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream', 'Authorization': `vapid t=${jwt},k=${vapidPublic}`, 'TTL': '86400' },

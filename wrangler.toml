@@ -12,7 +12,7 @@ binding = "WEATHERNOW_KV"
 id = "YOUR_KV_NAMESPACE_ID"
 
 [vars]
-ADMIN_PASSWORD = "weathernow"
+# Set ADMIN_PASSWORD with `wrangler secret put ADMIN_PASSWORD`
 VAPID_PUBLIC_KEY = ""
 VAPID_PRIVATE_KEY = ""
 VAPID_EMAIL = "mailto:admin@shelly.local"
