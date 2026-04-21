@@ -255,7 +255,8 @@ app.post('/api/login', adminLimiter, (req, res) => {
 
 
 
-
+
+
 // ── Honeypot (Task 2.3) ────────────────────────────────────────
 app.get('/api/admin-backdoor', (req, res) => {
     const ip = req.ip;
@@ -305,7 +306,7 @@ app.post('/api/announce', async (req, res) => {
     if (!checkAuth(req, res)) return;
     const { text, type = 'info', display = 'banner', duration = 0, title = '', tts = false, push = false, targeting = { mode: 'all' } } = req.body;
     
-    // Task 3.3: API Payload Validation
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
     if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
     if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
     if (!['info', 'warning', 'emergency', 'success'].includes(type)) return res.status(400).json({ error: 'invalid type' });
