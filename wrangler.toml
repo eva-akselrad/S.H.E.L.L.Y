@@ -1,0 +1,20 @@
+name = "shelly-worker"
+main = "worker.js"
+compatibility_date = "2024-04-15"
+
+# Serve static assets (modern Wrangler feature)
+[assets]
+directory = "./"
+binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "WEATHERNOW_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Set ADMIN_PASSWORD with `wrangler secret put ADMIN_PASSWORD`
+VAPID_PUBLIC_KEY = ""
+VAPID_PRIVATE_KEY = ""
+VAPID_EMAIL = "mailto:admin@shelly.local"
+SECURITY_DEMO_ENABLED = "true"
+NODE_VERSION = "20"

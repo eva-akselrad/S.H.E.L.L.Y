@@ -152,7 +152,7 @@ const AlertsManager = (() => {
         const fakeAlert = {
             event: 'Tornado Warning',
             areaDesc: 'test area — this is only a test',
-            description: 'This is a test of the WeatherNow text-to-speech alert system. This is only a test. In an actual emergency, you would receive important weather information here.'
+            description: 'This is a test of the Shelly text-to-speech alert system. This is only a test. In an actual emergency, you would receive important weather information here.'
         };
         if (duckEnabled) onDuck?.();
         const script = buildScript(fakeAlert);

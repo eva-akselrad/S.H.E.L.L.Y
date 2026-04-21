@@ -3,7 +3,7 @@
  * generate-playlist.js
  * Run this with Node.js to scan the music/ folder and generate playlist.json
  * Usage: node generate-playlist.js
- *        (run from the weatherclient/ directory)
+ *        (run from the Shelly/ directory)
  */
 
 const fs = require('fs');
@@ -28,7 +28,7 @@ const tracks = files.map(f => ({
 }));
 
 const playlist = {
-    name: 'WeatherNow BGM',
+    name: 'Shelly BGM',
     description: `Auto-generated on ${new Date().toISOString()} — ${tracks.length} track(s) found.`,
     tracks
 };
