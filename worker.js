@@ -158,7 +158,8 @@ async function signVapidJwt(audience, privateKeyB64Url, publicKeyB64Url, email) 
     const headerPayload = `${encode(header)}.${encode(payload)}`;
     const fromBase64Url = (value) => {
         const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+        const paddingNeeded = (4 - (base64.length % 4)) % 4;
+        const padded = base64.padEnd(base64.length + paddingNeeded, '=');
         return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
     };
     const privateBytes = fromBase64Url(privateKeyB64Url);
