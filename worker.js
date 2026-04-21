@@ -164,7 +164,10 @@ async function signVapidJwt(audience, privateKeyB64Url, publicKeyB64Url, email) 
     };
     const privateBytes = fromBase64Url(privateKeyB64Url);
     let cryptoKey;
-    if (privateBytes.length === 32 && publicKeyB64Url) {
+    if (privateBytes.length === 32) {
+        if (!publicKeyB64Url) {
+            throw new Error('VAPID_PUBLIC_KEY is required when VAPID_PRIVATE_KEY is a raw key');
+        }
         const publicBytes = fromBase64Url(publicKeyB64Url);
         if (publicBytes.length !== 65 || publicBytes[0] !== 4) {
             throw new Error('Invalid VAPID_PUBLIC_KEY format');
@@ -172,7 +175,7 @@ async function signVapidJwt(audience, privateKeyB64Url, publicKeyB64Url, email) 
         const jwk = {
             kty: 'EC',
             crv: 'P-256',
-            d: privateKeyB64Url,
+            d: base64Url(privateBytes),
             x: base64Url(publicBytes.slice(1, 33)),
             y: base64Url(publicBytes.slice(33, 65)),
         };
