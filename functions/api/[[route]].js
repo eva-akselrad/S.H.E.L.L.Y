@@ -18,7 +18,7 @@ const CORS = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-admin-password',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-password',
     'Cache-Control': 'no-store',
 };
 
