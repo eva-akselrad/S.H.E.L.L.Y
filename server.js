@@ -397,7 +397,7 @@ app.post('/api/armageddon', adminLimiter, (req, res) => {
     const { title = '', text, type = 'emergency', duration = 0 } = req.body;
     
     // Task 3.3: API Payload Validation
-    if (!text || typeof text !== 'string' || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 5000) return res.status(400).json({ error: 'text required (max 5000 chars)' });
     if (typeof title !== 'string' || title.length > 200) return res.status(400).json({ error: 'title must be string (max 200 chars)' });
     
     const durationMs = Math.max(0, parseInt(duration) || 0) * 60 * 1000;
