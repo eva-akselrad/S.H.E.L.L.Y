@@ -2248,6 +2248,76 @@ body {
     color: var(--accent);
 }
 
+.radar-ctrl-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.18);
+}
+
+.radar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    user-select: none;
+}
+
+.radar-toggle input {
+    accent-color: var(--accent);
+}
+
+.radar-mode-exit {
+    display: none;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1100;
+    background: rgba(10, 14, 26, 0.9);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+body.radar-mode #slide-radar {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: var(--bg-main);
+}
+
+body.radar-mode #slide-radar.hidden {
+    display: block !important;
+}
+
+body.radar-mode #slide-radar .radar-container {
+    height: 100%;
+    border-radius: 0;
+    border: 0;
+}
+
+body.radar-mode #top-bar,
+body.radar-mode #bottom-bar,
+body.radar-mode #progress-bar-container,
+body.radar-mode #slide-nav,
+body.radar-mode #settings-open,
+body.radar-mode #settings-panel,
+body.radar-mode #settings-overlay {
+    display: none !important;
+}
+
+body.radar-mode #slide-radar .radar-mode-exit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 /* Frame timeline dots */
 .radar-frames {
     flex: 1;

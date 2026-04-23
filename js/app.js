@@ -17,6 +17,8 @@
     let progressDuration = 0;
     let locationSet = false;
     let scrollRaf = null; // requestAnimationFrame handle for autoscroll
+    let radarModeWasPaused = false;
+    let radarModePrevSlide = 0;
 
     const DEFAULT_LOCATION = 'New York, NY';
 
@@ -509,6 +511,22 @@
         });
         navRefresh?.addEventListener('click', () => {
             if (locationSet) fetchAndRender(false);
+        });
+
+        // Radar mode takeover (driven by RadarMap control)
+        document.addEventListener('radar-mode-enter', () => {
+            radarModeWasPaused = isPaused;
+            radarModePrevSlide = currentSlide;
+            pauseCycle();
+            const radarIdx = slideIds.findIndex(s => s.display === 'radar');
+            if (radarIdx >= 0) goToSlide(radarIdx);
+        });
+        document.addEventListener('radar-mode-exit', () => {
+            if (slideIds.length) {
+                const idx = Math.max(0, Math.min(radarModePrevSlide, slideIds.length - 1));
+                goToSlide(idx);
+            }
+            if (!radarModeWasPaused) resumeCycle();
         });
 
         // Settings callbacks

@@ -23,10 +23,21 @@ const RadarMap = (() => {
   let pendingLon = null;
   let refreshTimer = null;
   let building = false; // in-flight guard for buildFrames
+  let radarModeActive = false;
+  let warningsEnabled = false;
+  let warningsLayer = null;
+  let warningsBusy = false;
+  let testPolygonsEnabled = false;
+  let currentLat = null;
+  let currentLon = null;
 
   const FRAME_COUNT = 6;
   const ANIM_INTERVAL = 700; // ms per animation step
   const RADAR_OPACITY = 0.7;
+  const WATCH_FILL_OPACITY = 0.08;
+  const WARNING_FILL_OPACITY = 0.12;
+  const TEST_POLYGON_LAT_OFFSET = 0.18;
+  const TEST_POLYGON_LON_OFFSET = 0.22;
 
   // RainViewer public API – no key required
   const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
@@ -35,6 +46,20 @@ const RadarMap = (() => {
   // color 6 = RAINBOW @ SELEX-SI (primarily green for light/moderate precip), smooth+snow flags = 1_1
   const RV_TILE = (path) =>
     `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/6/1_1.png`;
+
+  function escHtml(str) {
+    return String(str ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function shouldDisplayAlert(properties) {
+    const eventName = (properties?.event || "").toLowerCase();
+    return eventName.includes("warning") || eventName.includes("watch");
+  }
 
   // ── Fetch available radar frames from RainViewer ───────────────
   async function fetchRainViewerFrames() {
@@ -108,9 +133,7 @@ const RadarMap = (() => {
   function showFrame(idx) {
     if (!frames.length) return;
     idx = ((idx % frames.length) + frames.length) % frames.length;
-    frames.forEach((f, i) =>
-      f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0),
-    );
+    frames.forEach((f, i) => f.layer.setOpacity(i === idx ? RADAR_OPACITY : 0));
     currentFrame = idx;
     updateTimestamp();
     updateDots();
@@ -144,6 +167,21 @@ const RadarMap = (() => {
   function jumpToLive() {
     showFrame(frames.length - 1);
     if (!animating) startAnimation();
+  }
+
+  function updateRadarModeUI() {
+    const btn = document.getElementById("radar-mode");
+    if (btn) {
+      btn.classList.toggle("active", radarModeActive);
+    }
+  }
+
+  function toggleRadarMode() {
+    radarModeActive = !radarModeActive;
+    document.body.classList.toggle("radar-mode", radarModeActive);
+    document.dispatchEvent(new CustomEvent(radarModeActive ? "radar-mode-enter" : "radar-mode-exit"));
+    updateRadarModeUI();
+    if (radarModeActive && map) map.invalidateSize();
   }
 
   // ── Timestamp display ─────────────────────────────────────────
@@ -181,6 +219,149 @@ const RadarMap = (() => {
       .forEach((d, i) => d.classList.toggle("active", i === currentFrame));
   }
 
+  function renderTestPolygons() {
+    if (
+      !warningsLayer ||
+      currentLat === null ||
+      currentLat === undefined ||
+      currentLon === null ||
+      currentLon === undefined
+    )
+      return;
+    warningsLayer.clearLayers();
+    const dLat = TEST_POLYGON_LAT_OFFSET;
+    const dLon = TEST_POLYGON_LON_OFFSET;
+    const features = [
+      {
+        type: "Feature",
+        properties: { event: "Test Severe Thunderstorm Warning", severity: "Severe" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [currentLon - dLon, currentLat - dLat],
+            [currentLon - dLon, currentLat + dLat],
+            [currentLon, currentLat + dLat * 1.2],
+            [currentLon + dLon * 0.2, currentLat],
+            [currentLon - dLon, currentLat - dLat],
+          ]],
+        },
+      },
+      {
+        type: "Feature",
+        properties: { event: "Test Tornado Watch", severity: "Moderate" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [currentLon + dLon * 0.1, currentLat - dLat * 1.1],
+            [currentLon + dLon * 0.9, currentLat - dLat * 1.1],
+            [currentLon + dLon * 1.2, currentLat + dLat * 0.8],
+            [currentLon + dLon * 0.3, currentLat + dLat * 1.1],
+            [currentLon + dLon * 0.1, currentLat - dLat * 1.1],
+          ]],
+        },
+      },
+    ];
+    L.geoJSON(features, {
+      style: (feature) => alertStyle(feature?.properties || {}),
+      onEachFeature: (feature, layer) => {
+        const p = feature?.properties || {};
+        layer.bindPopup(`<strong>${escHtml(p.event || "Test Alert")}</strong><div>Test polygon</div>`);
+      },
+    }).addTo(warningsLayer);
+  }
+
+  function alertStyle(properties) {
+    const eventName = (properties?.event || "").toLowerCase();
+    const isWatch = eventName.includes("watch");
+    const isWarning = eventName.includes("warning");
+    const sev = (properties?.severity || "").toLowerCase();
+    const color = isWarning
+      ? "#ef4444"
+      : isWatch
+        ? "#f59e0b"
+        : sev === "severe"
+          ? "#f97316"
+          : sev === "moderate"
+            ? "#f59e0b"
+            : "#fde047";
+    return {
+      color,
+      weight: isWatch ? 2 : 3,
+      dashArray: isWatch ? "6 6" : "",
+      fillColor: color,
+      fillOpacity: isWatch ? WATCH_FILL_OPACITY : WARNING_FILL_OPACITY,
+    };
+  }
+
+  async function refreshWarnings() {
+    if (
+      !map ||
+      !warningsEnabled ||
+      warningsBusy ||
+      currentLat === null ||
+      currentLat === undefined ||
+      currentLon === null ||
+      currentLon === undefined
+    )
+      return;
+    warningsBusy = true;
+    try {
+      const params = new URLSearchParams({
+        point: `${currentLat.toFixed(4)},${currentLon.toFixed(4)}`,
+        status: "actual",
+        message_type: "alert",
+      });
+      const url = `https://api.weather.gov/alerts/active?${params.toString()}`;
+      const resp = await fetch(url, {
+        headers: {
+          Accept: "application/geo+json",
+          "User-Agent": "WeatherNow/1.0",
+        },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (warningsLayer) warningsLayer.clearLayers();
+      const features = (data.features || []).filter((f) => f?.geometry && shouldDisplayAlert(f.properties));
+      if (!features.length) return;
+
+      L.geoJSON(features, {
+        style: (feature) => alertStyle(feature?.properties || {}),
+        onEachFeature: (feature, layer) => {
+          const p = feature?.properties || {};
+          const title = escHtml(p.event || "Weather Alert");
+          const headline = p.headline ? `<div>${escHtml(p.headline)}</div>` : "";
+          const severity = p.severity ? `<div>Severity: ${escHtml(p.severity)}</div>` : "";
+          layer.bindPopup(`<strong>${title}</strong>${severity}${headline}`);
+        },
+      }).addTo(warningsLayer);
+    } catch (e) {
+      console.warn("Warning polygons fetch failed:", e);
+    } finally {
+      warningsBusy = false;
+    }
+  }
+
+  function setWarningsEnabled(enabled) {
+    warningsEnabled = Boolean(enabled);
+    if (warningsLayer) {
+      if (warningsEnabled && map && !map.hasLayer(warningsLayer)) warningsLayer.addTo(map);
+      if (!warningsEnabled) warningsLayer.clearLayers();
+    }
+    if (warningsEnabled) {
+      if (testPolygonsEnabled) renderTestPolygons();
+      else refreshWarnings();
+    }
+  }
+
+  function toggleTestPolygons() {
+    testPolygonsEnabled = !testPolygonsEnabled;
+    const btn = document.getElementById("radar-test");
+    if (btn) btn.classList.toggle("active", testPolygonsEnabled);
+    if (!warningsEnabled || !warningsLayer) return;
+    if (testPolygonsEnabled) renderTestPolygons();
+    else refreshWarnings();
+  }
+
   // ── Init Leaflet map (once) ───────────────────────────────────
   function initMap(lat, lon) {
     if (initialized) {
@@ -203,7 +384,11 @@ const RadarMap = (() => {
       scrollWheelZoom: true,
     });
 
-    // Dark base map
+    currentLat = lat;
+    currentLon = lon;
+
+    warningsLayer = L.layerGroup().addTo(map);
+
     L.tileLayer(
       "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       {
@@ -238,9 +423,33 @@ const RadarMap = (() => {
     document
       .getElementById("radar-live")
       ?.addEventListener("click", jumpToLive);
+    document
+      .getElementById("radar-mode")
+      ?.addEventListener("click", toggleRadarMode);
+    document
+      .getElementById("radar-mode-exit")
+      ?.addEventListener("click", () => {
+        if (radarModeActive) toggleRadarMode();
+      });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && radarModeActive) toggleRadarMode();
+    });
+    document
+      .getElementById("radar-test")
+      ?.addEventListener("click", toggleTestPolygons);
+    document.getElementById("radar-warnings")?.addEventListener("change", (e) => {
+      setWarningsEnabled(e.target.checked);
+    });
+    updateRadarModeUI();
 
     // Refresh frames every 5 minutes
-    refreshTimer = setInterval(refreshAll, 5 * 60_000);
+    refreshTimer = setInterval(() => {
+      refreshAll();
+      if (warningsEnabled) {
+        if (testPolygonsEnabled) renderTestPolygons();
+        else refreshWarnings();
+      }
+    }, 5 * 60_000);
   }
 
   function refreshAll() {
@@ -257,8 +466,14 @@ const RadarMap = (() => {
       pendingLon = lon;
       setTimeout(() => initMap(lat, lon), 150);
     } else {
+      currentLat = lat;
+      currentLon = lon;
       map.setView([lat, lon], map.getZoom());
       refreshAll();
+      if (warningsEnabled) {
+        if (testPolygonsEnabled) renderTestPolygons();
+        else refreshWarnings();
+      }
     }
   }
 
