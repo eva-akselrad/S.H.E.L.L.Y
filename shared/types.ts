@@ -7,6 +7,13 @@ export interface PolygonGeom {
   coordinates: number[][][] | number[][][][];
 }
 
+export interface Bbox {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
 export interface Place {
   lat: number;
   lon: number;
@@ -28,11 +35,15 @@ export interface AlertParams {
   flashFloodDamageThreat?: string;
   maxHailSize?: string;
   maxWindGust?: string;
+  /** raw NWS storm-motion string: "2024-05-01T18:00:00-00:00...245DEG...35KT...39.9,-75.2" */
+  eventMotionDescription?: string;
 }
 
 export interface Alert {
   id: string;
   event: string;
+  /** issuing office, e.g. "NWS Mount Holly NJ"; used for region filtering */
+  senderName?: string;
   severity: "Extreme" | "Severe" | "Moderate" | "Minor" | "Unknown";
   urgency: string;
   certainty: string;

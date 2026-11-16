@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { render } from "preact";
 import { afterEach, expect, test, vi } from "vitest";
+import { detectMode } from "../src/mode";
 import type { Alert, Forecast, Place } from "../shared/types";
 
 vi.stubGlobal("fetch", () => Promise.resolve(new Response("{}", { status: 500 })));
@@ -63,4 +64,11 @@ test("observed tornado escalates to the EMERGENCY takeover", async () => {
   store.alerts.value = [tornadoWarning({ tornadoDetection: "OBSERVED" })];
   await Promise.resolve();
   expect(root.querySelector(".takeover.emergency")).not.toBeNull();
+});
+
+test("broadcast mode is explicit only (?mode or /live), never guessed", () => {
+  expect(detectMode("?mode=broadcast", 1920, "/")).toBe("broadcast");
+  expect(detectMode("", 1920, "/live")).toBe("broadcast");
+  expect(detectMode("?mode=kiosk", 1920, "/live")).toBe("kiosk");
+  expect(detectMode("", 400, "/")).toBe("phone");
 });

@@ -1,5 +1,5 @@
 import type { SegmentId } from "./scheduler";
-import type { Place } from "./types";
+import type { Bbox, Place } from "./types";
 
 export const SEGMENT_IDS: SegmentId[] = ["now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note"];
 export const MODES = ["auto", "kiosk", "web", "phone"] as const;
@@ -28,6 +28,48 @@ export interface ForecasterNote {
   expires: string | null;
 }
 
+export interface LiveCity {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+}
+
+export interface LiveRegion {
+  /** NWS office whose alerts count as "in region" */
+  office: string;
+  /** on-air name, e.g. "Philadelphia region" */
+  name: string;
+  tz: string;
+  bbox: Bbox;
+  /** CALM-rotation cities, editable in the admin */
+  cities: LiveCity[];
+}
+
+export interface LlmConfig {
+  provider: "openrouter" | "openai-compatible";
+  baseUrl: string;
+  /** ordered fallbacks; the L2 phase fills in current ":free" ids */
+  models: string[];
+  dailyRequestCap: number;
+  temperature: number;
+}
+
+export interface LiveConfig {
+  enabled: boolean;
+  region: LiveRegion;
+  /** random value in the OBS URL (?key=...); keeps /live unadvertised, not secret-grade */
+  viewerToken: string;
+  llm: LlmConfig & { enabled: boolean };
+  host: { name: string; /** 0 calm .. 1 playful */ tone: number; bannedTopics: string[] };
+  /** seconds per rundown item kind overrides */
+  itemSeconds: Record<string, number>;
+}
+
+export interface StudioConfig {
+  forecasterName: string;
+}
+
 export interface SiteConfig {
   defaultLocation: Place | null;
   defaultMode: (typeof MODES)[number];
@@ -40,7 +82,41 @@ export interface SiteConfig {
   voice: VoiceConfig;
   music: { enabled: boolean; volume: number; disabledTracks: string[] };
   note: ForecasterNote;
+  live: LiveConfig;
+  studio: StudioConfig;
 }
+
+export const DEFAULT_LIVE: LiveConfig = {
+  enabled: false,
+  region: {
+    office: "PHI",
+    name: "Philadelphia region",
+    tz: "America/New_York",
+    bbox: { south: 38.4, west: -76.4, north: 41.4, east: -73.8 },
+    cities: [
+      { name: "Philadelphia", state: "PA", lat: 39.9526, lon: -75.1652 },
+      { name: "Trenton", state: "NJ", lat: 40.2206, lon: -74.7597 },
+      { name: "Camden", state: "NJ", lat: 39.9259, lon: -75.1196 },
+      { name: "Wilmington", state: "DE", lat: 39.7459, lon: -75.5466 },
+      { name: "Allentown", state: "PA", lat: 40.6084, lon: -75.4902 },
+      { name: "Reading", state: "PA", lat: 40.3356, lon: -75.9269 },
+      { name: "Doylestown", state: "PA", lat: 40.31, lon: -75.13 },
+      { name: "West Chester", state: "PA", lat: 39.9607, lon: -75.6055 },
+      { name: "Norristown", state: "PA", lat: 40.1215, lon: -75.3399 },
+      { name: "Mount Holly", state: "NJ", lat: 39.9926, lon: -74.7879 },
+      { name: "Atlantic City", state: "NJ", lat: 39.3643, lon: -74.4229 },
+      { name: "Cape May", state: "NJ", lat: 38.9351, lon: -74.906 },
+      { name: "Toms River", state: "NJ", lat: 39.9537, lon: -74.1979 },
+      { name: "Dover", state: "DE", lat: 39.1582, lon: -75.5244 },
+    ],
+  },
+  viewerToken: "",
+  llm: { enabled: false, provider: "openrouter", baseUrl: "https://openrouter.ai/api/v1", models: [], dailyRequestCap: 45, temperature: 0.7 },
+  host: { name: "SHELLY", tone: 0.4, bannedTopics: [] },
+  itemSeconds: {},
+};
+
+export const DEFAULT_STUDIO: StudioConfig = { forecasterName: "" };
 
 export const DEFAULT_CONFIG: SiteConfig = {
   defaultLocation: null,
@@ -53,6 +129,8 @@ export const DEFAULT_CONFIG: SiteConfig = {
   voice: { engine: "ai", speaker: "athena", dailyCharCap: 20000 },
   music: { enabled: true, volume: 0.35, disabledTracks: [] },
   note: { enabled: false, title: "", body: "", expires: null },
+  live: DEFAULT_LIVE,
+  studio: DEFAULT_STUDIO,
 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -80,6 +158,73 @@ function normalizePlace(v: unknown): Place | null {
     forecastZone: s(v.forecastZone),
     countyZone: s(v.countyZone),
     fireZone: s(v.fireZone),
+  };
+}
+
+const num = (v: unknown, d: number): number => (v !== undefined && v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : d);
+
+function normalizeBbox(v: unknown, d: Bbox): Bbox {
+  if (!isObj(v)) return d;
+  const south = clamp(num(v.south, d.south), 17, 72);
+  const north = clamp(num(v.north, d.north), 17, 72);
+  const west = clamp(num(v.west, d.west), -180, -64);
+  const east = clamp(num(v.east, d.east), -180, -64);
+  return south < north && west < east ? { south, west, north, east } : d;
+}
+
+function normalizeLive(v: unknown): LiveConfig {
+  const D = DEFAULT_LIVE;
+  const r = isObj(v) ? v : {};
+  const reg = isObj(r.region) ? r.region : {};
+  const llm = isObj(r.llm) ? r.llm : {};
+  const host = isObj(r.host) ? r.host : {};
+
+  const cities: LiveCity[] = Array.isArray(reg.cities)
+    ? reg.cities
+        .filter(isObj)
+        .map((c) => ({ name: str(c.name, 60), state: str(c.state, 2).toUpperCase(), lat: Number(c.lat), lon: Number(c.lon) }))
+        .filter((c) => c.name && Number.isFinite(c.lat) && Number.isFinite(c.lon) && c.lat >= 17 && c.lat <= 72 && c.lon >= -180 && c.lon <= -64)
+        .slice(0, 40)
+    : D.region.cities;
+
+  const secs: Record<string, number> = {};
+  if (isObj(r.itemSeconds)) {
+    for (const [k, val] of Object.entries(r.itemSeconds).slice(0, 20)) {
+      const n = Number(val);
+      if (/^[a-z]{2,20}$/.test(k) && Number.isFinite(n) && n > 0) secs[k] = Math.round(clamp(n, 5, 180));
+    }
+  }
+
+  const baseUrl = typeof llm.baseUrl === "string" && /^https?:\/\//.test(llm.baseUrl) ? llm.baseUrl.slice(0, 300) : D.llm.baseUrl;
+
+  return {
+    enabled: r.enabled === true,
+    region: {
+      office: /^[A-Z]{3,4}$/.test(String(reg.office)) ? String(reg.office) : D.region.office,
+      name: str(reg.name, 60) || D.region.name,
+      tz: str(reg.tz, 60) || D.region.tz,
+      bbox: normalizeBbox(reg.bbox, D.region.bbox),
+      cities,
+    },
+    viewerToken: /^[A-Za-z0-9_-]{16,128}$/.test(String(r.viewerToken)) ? String(r.viewerToken) : "",
+    llm: {
+      enabled: llm.enabled === true,
+      provider: llm.provider === "openai-compatible" ? "openai-compatible" : "openrouter",
+      baseUrl,
+      models: Array.isArray(llm.models)
+        ? llm.models.filter((m): m is string => typeof m === "string" && m.length > 0).slice(0, 5).map((m) => m.slice(0, 100))
+        : [],
+      dailyRequestCap: Math.round(clamp(num(llm.dailyRequestCap, D.llm.dailyRequestCap), 0, 5000)),
+      temperature: clamp(num(llm.temperature, D.llm.temperature), 0, 1.5),
+    },
+    host: {
+      name: str(host.name, 30) || D.host.name,
+      tone: clamp(num(host.tone, D.host.tone), 0, 1),
+      bannedTopics: Array.isArray(host.bannedTopics)
+        ? host.bannedTopics.filter((t): t is string => typeof t === "string" && t.trim() !== "").slice(0, 20).map((t) => t.slice(0, 60))
+        : [],
+    },
+    itemSeconds: secs,
   };
 }
 
@@ -132,6 +277,8 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       body: str(note.body, 1500),
       expires: isoOrNull(note.expires),
     },
+    live: normalizeLive(r.live),
+    studio: { forecasterName: str(isObj(r.studio) ? r.studio.forecasterName : "", 60) },
   };
 }
 

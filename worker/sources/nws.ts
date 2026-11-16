@@ -16,6 +16,7 @@ interface RawAlertFeature {
   properties: {
     id?: string;
     event?: string;
+    senderName?: string;
     severity?: string;
     urgency?: string;
     certainty?: string;
@@ -50,6 +51,8 @@ export function normalizeAlert(f: RawAlertFeature): Alert {
   if (hs) params.maxHailSize = hs;
   const wg = first(par.maxWindGust);
   if (wg) params.maxWindGust = wg;
+  const em = first(par.eventMotionDescription);
+  if (em) params.eventMotionDescription = em.slice(0, 400);
 
   const sevRaw = p.severity ?? "Unknown";
   const severity = (["Extreme", "Severe", "Moderate", "Minor"].includes(sevRaw) ? sevRaw : "Unknown") as Alert["severity"];
@@ -57,6 +60,7 @@ export function normalizeAlert(f: RawAlertFeature): Alert {
   return {
     id: p.id ?? f.id ?? crypto.randomUUID(),
     event: p.event ?? "Alert",
+    ...(p.senderName ? { senderName: p.senderName.slice(0, 80) } : {}),
     severity,
     urgency: p.urgency ?? "Unknown",
     certainty: p.certainty ?? "Unknown",
