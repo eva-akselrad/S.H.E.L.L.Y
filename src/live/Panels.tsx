@@ -6,7 +6,8 @@ import { Logo } from "../components/Chrome";
 import { Host } from "./host/Host";
 import { LiveRadar } from "./LiveRadar";
 import { project } from "./player";
-import { clock, current, rundown, upNext } from "./state";
+import { ProductView } from "../studio/ProductView";
+import { clock, current, products, rundown, upNext } from "./state";
 
 type Region = LiveConfig["region"];
 
@@ -69,7 +70,7 @@ function AlertCard({ alert, item }: { alert: Alert | undefined; item: RundownIte
   );
 }
 
-export function MainPanel({ r, region }: { r: Rundown; region: Region }) {
+export function MainPanel({ r, region, forecaster = "" }: { r: Rundown; region: Region; forecaster?: string }) {
   const it = current.value;
   if (!it) return <div class="bc-card"><h2>{r.region}</h2></div>;
   switch (it.kind) {
@@ -95,14 +96,11 @@ export function MainPanel({ r, region }: { r: Rundown; region: Region }) {
           <p class="bc-sub">From the NOAA Storm Prediction Center, for the {r.region}.</p>
         </div>
       );
-    case "map":
-      // Forecaster Studio graphics arrive in phase L4; until then show the title card
-      return (
-        <div class="bc-card">
-          <p class="bc-kicker">Forecaster graphic</p>
-          <h2>{it.headline}</h2>
-        </div>
-      );
+    case "map": {
+      const p = products.value.find((x) => x.id === it.product);
+      if (!p) return <div class="bc-card"><p class="bc-kicker">Forecaster graphic</p><h2>{it.headline}</h2></div>;
+      return <div class="bc-studio"><ProductView product={p} fmt="wide" forecaster={forecaster} /></div>;
+    }
     case "cam":
       return <div class="bc-card"><p class="bc-kicker">Live camera</p><h2>{it.headline}</h2></div>;
     case "host":

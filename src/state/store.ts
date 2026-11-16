@@ -1,6 +1,7 @@
 import { computed, effect, signal } from "@preact/signals";
 import { DEFAULT_CONFIG, noteActive, type SiteConfig } from "../../shared/config";
 import { buildLoop } from "../../shared/scheduler";
+import type { StudioProduct } from "../../shared/studio";
 import { computeThreat } from "../../shared/threat";
 import type { AirQuality, Alert, Announcement, Forecast, Outlook, Place, RadarFrames } from "../../shared/types";
 import { api } from "../api";
@@ -34,6 +35,7 @@ export const outlook = signal<Outlook | null>(load<Outlook>("outlook"));
 export const air = signal<AirQuality | null>(load<AirQuality>("air"));
 export const radar = signal<RadarFrames | null>(null);
 export const announcements = signal<Announcement[]>([]);
+export const studioProducts = signal<StudioProduct[]>([]);
 export const online = signal(true);
 export const lastError = signal<string | null>(null);
 
@@ -71,6 +73,7 @@ export const loop = computed(() =>
     outlook: outlook.value,
     level: threat.value.level,
     note: noteOn.value,
+    studio: studioProducts.value.length > 0,
     hidden: config.value.hiddenSegments,
     seconds: config.value.segmentSeconds,
   }),
@@ -111,6 +114,13 @@ export async function locateByQuery(query: string): Promise<void> {
 }
 
 export const refresh = {
+  studio: () =>
+    guarded(
+      () => api.studio(),
+      (list) => {
+        studioProducts.value = list;
+      },
+    ),
   alerts: () => {
     const p = place.value;
     return p
@@ -209,6 +219,7 @@ export function startPollers(): void {
   every(30 * 60_000, refresh.air);
   every(2 * 60_000, refresh.radar);
   every(60_000, refresh.announcements);
+  every(60_000, refresh.studio);
   every(60_000, refresh.config);
   every(1_000, () => {
     now.value = Date.now();

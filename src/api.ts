@@ -1,4 +1,5 @@
 import type { SiteConfig } from "../shared/config";
+import type { StudioProduct } from "../shared/studio";
 import type { AirQuality, Alert, Announcement, Forecast, Outlook, Place, RadarFrames } from "../shared/types";
 
 async function get<T>(path: string): Promise<T> {
@@ -23,5 +24,6 @@ export const api = {
   air: (p: Place) => get<AirQuality>(`/api/airquality?${q(p)}`),
   radar: () => get<RadarFrames>("/api/radar"),
   config: () => get<SiteConfig>("/api/config"),
+  studio: () => get<StudioProduct[]>("/api/studio"),
   announcements: () => get<Announcement[]>("/api/announcements"),
 };

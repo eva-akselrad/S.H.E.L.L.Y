@@ -1,7 +1,7 @@
 import { heatIndex, windChill } from "./wx";
 import type { AirQuality, Forecast, Outlook, ThreatLevel } from "./types";
 
-export type SegmentId = "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note";
+export type SegmentId = "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note" | "studio";
 
 export interface SegmentCtx {
   forecast: Forecast | null;
@@ -10,6 +10,8 @@ export interface SegmentCtx {
   level: ThreatLevel;
   /** an active forecaster's note exists */
   note?: boolean;
+  /** at least one Forecaster Studio graphic is published and valid now */
+  studio?: boolean;
   /** segments the admin has turned off ("now" can't be hidden) */
   hidden?: SegmentId[];
   /** per-segment duration overrides in seconds (before threat scaling) */
@@ -26,6 +28,7 @@ interface SegmentDef {
 export const SEGMENTS: SegmentDef[] = [
   { id: "now", title: "Right now", seconds: 12, relevance: () => 1 },
   { id: "note", title: "From the forecaster", seconds: 14, relevance: (c) => (c.note ? 1 : 0) },
+  { id: "studio", title: "Forecaster graphics", seconds: 16, relevance: (c) => (c.studio ? 1 : 0) },
   {
     id: "radar",
     title: "Radar",

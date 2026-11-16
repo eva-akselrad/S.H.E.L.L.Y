@@ -12,7 +12,7 @@ export const SPC_LABELS: Record<SpcCategory, string> = {
   HIGH: "High",
 };
 
-interface SpcCollection {
+export interface SpcCollection {
   features?: { properties?: { LABEL?: string }; geometry?: PolygonGeom | null }[];
 }
 
@@ -27,7 +27,7 @@ export function riskAtPoint(fc: SpcCollection | null, lat: number, lon: number):
   return ORDER[max]!;
 }
 
-async function fetchDay(day: 1 | 2 | 3): Promise<SpcCollection | null> {
+export async function fetchDay(day: 1 | 2 | 3): Promise<SpcCollection | null> {
   try {
     const res = await fetch(`https://www.spc.noaa.gov/products/outlook/day${day}otlk_cat.nolyr.geojson`);
     return res.ok ? ((await res.json()) as SpcCollection) : null;

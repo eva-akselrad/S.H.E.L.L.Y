@@ -1,5 +1,6 @@
 import { computed, signal } from "@preact/signals";
 import type { Rundown, RundownItem } from "../../shared/live/rundown";
+import type { StudioProduct } from "../../shared/studio";
 import type { RadarFrames } from "../../shared/types";
 import { pickIndex } from "./player";
 
@@ -13,6 +14,7 @@ export const status = signal<"loading" | "ok" | "offline" | "disabled" | "forbid
 export const radar = signal<RadarFrames | null>(null);
 export const clock = signal(Date.now());
 /** 0..1 mouth openness while the host speaks (from audio amplitude, or a synthetic flap) */
+export const products = signal<StudioProduct[]>([]);
 export const mouth = signal(0);
 export const speaking = signal(false);
 
@@ -60,4 +62,13 @@ export function advance(): void {
   const n = rundown.value?.items.length ?? 0;
   if (n > 0) index.value = (index.value + 1) % n;
   epoch.value++;
+}
+
+export async function pollProducts(): Promise<void> {
+  try {
+    const res = await fetch("/api/studio");
+    if (res.ok) products.value = (await res.json()) as StudioProduct[];
+  } catch {
+    /* keep the last list */
+  }
 }

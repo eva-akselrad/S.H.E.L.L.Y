@@ -88,7 +88,7 @@ describe("live + studio config (L0)", () => {
 });
 
 describe("studio products", () => {
-  const ok = { id: "p1", kind: "sevenDay", title: "t", validFrom: "2026-11-16T00:00:00Z", validTo: "2026-11-23T00:00:00Z", published: true, body: { overrides: [] } };
+  const ok = { id: "p1", kind: "sevenDay", title: "t", validFrom: "2026-11-16T00:00:00Z", validTo: "2026-11-23T00:00:00Z", published: true, body: { place: "Philadelphia", days: [] } };
   test("drops malformed entries and fills the region", () => {
     const list = normalizeProducts([ok, { ...ok, id: "" }, { ...ok, id: "p2", kind: "bogus" }, { ...ok, id: "p3", validTo: "nope" }, null, "x"]);
     expect(list.map((p) => p.id)).toEqual(["p1"]);

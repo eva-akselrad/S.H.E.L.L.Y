@@ -8,6 +8,7 @@ import { Note } from "./Note";
 import { Now } from "./Now";
 import { Outlook } from "./Outlook";
 import { Radar } from "./Radar";
+import { Studio } from "./Studio";
 import { Text } from "./Text";
 
 export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
@@ -20,4 +21,5 @@ export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
   air: Air,
   almanac: Almanac,
   note: Note,
+  studio: Studio,
 };

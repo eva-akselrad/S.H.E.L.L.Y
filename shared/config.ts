@@ -1,7 +1,7 @@
 import type { SegmentId } from "./scheduler";
 import type { Bbox, Place } from "./types";
 
-export const SEGMENT_IDS: SegmentId[] = ["now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note"];
+export const SEGMENT_IDS: SegmentId[] = ["now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio"];
 export const MODES = ["auto", "kiosk", "web", "phone"] as const;
 export const THEMES = ["auto", "light", "dark"] as const;
 

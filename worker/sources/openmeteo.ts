@@ -179,3 +179,30 @@ export async function fetchCitiesNow(points: { lat: number; lon: number }[]): Pr
     isDay: num(x.current?.is_day, 1) === 1,
   }));
 }
+
+export interface CityDaily {
+  high: number[];
+  low: number[];
+  feelsHigh: number[];
+}
+
+/** Daily highs/lows for many points in one request. Index 0 = today. */
+export async function fetchCitiesDaily(points: { lat: number; lon: number }[]): Promise<CityDaily[]> {
+  if (!points.length) return [];
+  const params = new URLSearchParams({
+    latitude: points.map((p) => p.lat.toFixed(3)).join(","),
+    longitude: points.map((p) => p.lon.toFixed(3)).join(","),
+    daily: "temperature_2m_max,temperature_2m_min,apparent_temperature_max",
+    temperature_unit: "fahrenheit",
+    timezone: "auto",
+    forecast_days: "4",
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const d = (await res.json()) as { daily?: Record<string, number[]> } | { daily?: Record<string, number[]> }[];
+  return (Array.isArray(d) ? d : [d]).map((x) => ({
+    high: x.daily?.temperature_2m_max ?? [],
+    low: x.daily?.temperature_2m_min ?? [],
+    feelsHigh: x.daily?.apparent_temperature_max ?? [],
+  }));
+}

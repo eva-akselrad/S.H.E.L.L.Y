@@ -18,6 +18,7 @@ import {
   writeConfig,
   writeSim,
 } from "./store";
+import { handleStudioAdmin } from "./studio";
 import { handleTtsPreview, ttsUsage } from "./tts";
 
 const json = (data: unknown, status = 200): Response =>
@@ -137,6 +138,9 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const speaker = (SPEAKERS as readonly unknown[]).includes(b.speaker) ? (b.speaker as Speaker) : "athena";
     return handleTtsPreview(env, speaker, (await readConfig(env)).voice.dailyCharCap);
   }
+
+  const studio = await handleStudioAdmin(request, env, url);
+  if (studio) return studio;
 
   // ── SHELLY Live ──
   if (path === "/api/admin/live" && method === "GET") {

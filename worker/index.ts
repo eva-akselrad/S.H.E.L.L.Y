@@ -4,6 +4,7 @@ import { handleAdmin } from "./admin";
 import { cached, round } from "./cache";
 import { handleLiveTts, produceRundown } from "./live";
 import { pollAlerts } from "./poll";
+import { publicProducts } from "./studio";
 import { fetchForecastText, fetchPoint } from "./sources/nws";
 import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
 import { fetchRadarFrames } from "./sources/rainviewer";
@@ -49,6 +50,8 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     // the viewer token must never be served publicly
     return json({ ...c, live: { ...c.live, viewerToken: "" } }, 200, 15);
   }
+
+  if (path === "/api/studio") return json(await publicProducts(env), 200, 30);
 
   if (path === "/api/live/tts" && request.method === "GET") return handleLiveTts(env, url);
 

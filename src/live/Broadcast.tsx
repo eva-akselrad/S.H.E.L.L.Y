@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { DEFAULT_LIVE, type SiteConfig } from "../../shared/config";
 import { applyThreatToMusic, configureMusic, setDucked, startMusic } from "../music";
 import { AlertCounters, Crawl, HeadlineBar, IntensityGauge, LowerThird, MainPanel, RightRail } from "./Panels";
-import { advance, clock, current, epoch, pollRadar, pollRundown, rundown, status } from "./state";
+import { advance, clock, current, epoch, pollProducts, pollRadar, pollRundown, rundown, status } from "./state";
 import { speakItem, stopVoice } from "./voice";
 import "../styles/live.css";
 
@@ -28,9 +28,11 @@ export function Broadcast() {
       .catch(() => undefined);
     void pollRundown();
     void pollRadar();
+    void pollProducts();
     const timers = [
       setInterval(() => void pollRundown(), 15_000),
       setInterval(() => void pollRadar(), 120_000),
+      setInterval(() => void pollProducts(), 60_000),
       setInterval(() => (clock.value = Date.now()), 1000),
     ];
     return () => {
@@ -76,7 +78,7 @@ export function Broadcast() {
               <IntensityGauge r={r} />
             </header>
             <main class="bc-main">
-              <section class={`bc-panel kind-${current.value?.kind ?? "none"}`}><MainPanel r={r} region={region} /></section>
+              <section class={`bc-panel kind-${current.value?.kind ?? "none"}`}><MainPanel r={r} region={region} forecaster={cfg?.studio.forecasterName ?? ""} /></section>
               <RightRail r={r} region={region} />
             </main>
             <LowerThird r={r} />

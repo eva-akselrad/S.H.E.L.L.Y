@@ -18,6 +18,7 @@ const TITLES: Record<SegmentId, string> = {
   air: "Air quality and pollen",
   almanac: "Sun and moon",
   note: "Forecaster note",
+  studio: "Forecaster Studio graphics",
 };
 const DEFAULT_SECONDS = Object.fromEntries(SEGMENTS.map((s) => [s.id, s.seconds])) as Record<SegmentId, number>;
 
