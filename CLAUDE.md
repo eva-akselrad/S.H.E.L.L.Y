@@ -1,14 +1,50 @@
 # CLAUDE.md
 
 ## Current state (read first)
-This repo is mid-**teardown and rebuild**. The full plan, decisions and salvage
-list are in **[docs/REBUILD_PLAN.md](docs/REBUILD_PLAN.md)**. Follow it.
+- **SHELLY v2 core is built** on branch **`rebuild`**: Worker + Preact app,
+  threat engine, scheduler, segments, admin with password login, TTS, music and
+  weather scenes. Architecture and the original decisions are in
+  **[docs/REBUILD_PLAN.md](docs/REBUILD_PLAN.md)**. `main` and tag **`legacy-v1`**
+  hold the old app (`git show legacy-v1:<path>`). Cutover (REBUILD_PLAN phase 8)
+  needs the user's go-ahead.
+- **Next up: SHELLY Live + Forecaster Studio.** The full plan is in
+  **[docs/LIVE_PLAN.md](docs/LIVE_PLAN.md)**. Start at phase **L0** and go in order.
 
-- Work on branch **`rebuild`**. `main` and tag **`legacy-v1`** hold the old app.
-- Everything at the repo root right now (`index.html`, `js/`, `css/`, `server.js`,
-  `worker.js`, `functions/`, `admin.html`, …) is **legacy**. Phase 1 deletes it.
-  To read old code later, use `git show legacy-v1:<path>`.
-- **Nothing has been built yet.** Next step is Phase 1 (scaffold).
+## Next work: SHELLY Live + Forecaster Studio (summary of docs/LIVE_PLAN.md)
+- **SHELLY Live:** a 24/7 auto-produced YouTube weather stream with an AI host.
+  It's in the spirit of Ryan Hall's Y'allBot, but **SHELLY's own look and
+  mascot. Never copy Y'allBot's or RHY's branding.** It runs as a `/live`
+  page (`?mode=broadcast`, fixed 1920×1080) captured by OBS.
+- **Brain:** pure, tested `shared/live/intensity.ts` (0..1 score over a
+  *region*) → `shared/live/rundown.ts` (timeline). A producer on the existing
+  cron writes the rundown to KV; the page just plays it.
+- **LLM:** OpenRouter `:free` models first, through a plain OpenAI-compatible
+  `fetch` (`worker/llm.ts`), so a local LLM later only changes `baseUrl`/`model`.
+  Daily request cap (default 45), cache, JSON guard, output filter, and template
+  fallback for everything.
+- **Hard safety rule:** the LLM **never** writes alert or warning content.
+  Alerts, areas, expiry times and instructions always come from deterministic
+  templates built from NWS data. The LLM only writes calm-period headlines,
+  intros, talk breaks, chat replies and discussion *drafts*. Discussion drafts
+  are never auto-published.
+- **Forecaster Studio:** the user's own graphics, authored in the admin:
+  forecaster 7-day overrides, city-temps maps, hand-drawn risk maps, snow/rain
+  totals (drawn or contoured from Open-Meteo), storm timeline, LLM-drafted
+  discussion from the NWS AFD, and an automatic storm tracker (towns + ETAs from
+  `eventMotionDescription`). They show in the loop, on `/live`, and as PNG export.
+  Use an SVG US basemap, not raster tiles.
+- **Phases:** L0 config/types → L1 intensity+rundown (templates only) → L2 LLM →
+  L3 broadcast shell + mascot → L4 Studio core → L5 cams/totals/timeline →
+  L6 storm tracker + discussion → L8 extras. (L7, YouTube chat, was dropped.)
+- **User answers (2026-11-16, details in LIVE_PLAN §2):**
+  - Region: **the Philly area, using the NWS Mount Holly (PHI) office area**.
+  - Cams: **PA + NJ DOT**. Report each feed's terms to the user before wiring it in.
+  - OpenRouter: the user handles the key and credit.
+  - YouTube chat: **no chat replies**.
+  - Cloudflare: **Workers Paid**.
+  - Mascot: no preference, so the default is **SHELLY the sea turtle**, an
+    original SVG that's easy to swap. Don't depict the grandmother; the name is
+    the tribute.
 
 ## Name: always SHELLY
 The product is **SHELLY**, named after the user's grandmother. Never rename it
@@ -32,6 +68,8 @@ Never add Claude/AI attribution:
 
 ## Ask the user before
 - Deploying anything, or touching the live Pages site.
+- Creating API keys or cloud projects (OpenRouter, Google/YouTube), adding a
+  traffic-camera feed, or going live on YouTube.
 
 ## Conventions
 - Platform: Windows; Bash tool is Git Bash. Repo lives in OneDrive. If
