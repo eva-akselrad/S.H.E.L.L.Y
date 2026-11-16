@@ -152,3 +152,30 @@ export async function fetchAirQuality(lat: number, lon: number): Promise<AirQual
     return normalizeAirQuality(null);
   }
 }
+
+export interface CityNow {
+  temp: number;
+  code: number;
+  isDay: boolean;
+}
+
+/** Current temp + weather code for many points in ONE request (Open-Meteo multi-location). */
+export async function fetchCitiesNow(points: { lat: number; lon: number }[]): Promise<CityNow[]> {
+  if (!points.length) return [];
+  const params = new URLSearchParams({
+    latitude: points.map((p) => p.lat.toFixed(3)).join(","),
+    longitude: points.map((p) => p.lon.toFixed(3)).join(","),
+    current: "temperature_2m,weather_code,is_day",
+    temperature_unit: "fahrenheit",
+    timezone: "auto",
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const d = (await res.json()) as { current?: Record<string, number> } | { current?: Record<string, number> }[];
+  const list = Array.isArray(d) ? d : [d];
+  return list.map((x) => ({
+    temp: num(x.current?.temperature_2m),
+    code: num(x.current?.weather_code),
+    isDay: num(x.current?.is_day, 1) === 1,
+  }));
+}

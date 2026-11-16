@@ -2,12 +2,13 @@ import { buildSimAlert } from "../shared/simulate";
 import type { Forecast, Place } from "../shared/types";
 import { handleAdmin } from "./admin";
 import { cached, round } from "./cache";
+import { produceRundown } from "./live";
 import { pollAlerts } from "./poll";
 import { fetchForecastText, fetchPoint } from "./sources/nws";
 import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
 import { fetchRadarFrames } from "./sources/rainviewer";
 import { fetchOutlook } from "./sources/spc";
-import { readAlerts, readAnnouncements, readConfig, readSim } from "./store";
+import { readAlerts, readAnnouncements, readConfig, readRundown, readSim } from "./store";
 import { handleTts } from "./tts";
 
 const json = (data: unknown, status = 200, maxAge = 0): Response =>
@@ -43,7 +44,19 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
   const admin = await handleAdmin(request, env, url);
   if (admin) return admin;
 
-  if (path === "/api/config") return json(await readConfig(env), 200, 15);
+  if (path === "/api/config") {
+    const c = await readConfig(env);
+    // the viewer token must never be served publicly
+    return json({ ...c, live: { ...c.live, viewerToken: "" } }, 200, 15);
+  }
+
+  if (path === "/api/live/rundown") {
+    const c = await readConfig(env);
+    if (!c.live.enabled) return json({ error: "live_disabled" }, 404);
+    if (c.live.viewerToken && url.searchParams.get("key") !== c.live.viewerToken) return json({ error: "forbidden" }, 403);
+    const r = await readRundown(env);
+    return r ? json(r, 200, 15) : json({ error: "no_rundown_yet" }, 503);
+  }
   if (path === "/api/tts" && request.method === "GET") return handleTts(env, url);
 
   if (path === "/api/location") {
@@ -147,6 +160,10 @@ export default {
   },
 
   async scheduled(_event, env, ctx): Promise<void> {
-    ctx.waitUntil(pollAlerts(env));
+    ctx.waitUntil(
+      pollAlerts(env)
+        .then(() => produceRundown(env))
+        .catch((err) => console.error(JSON.stringify({ msg: "producer_failed", err: String(err) }))),
+    );
   },
 } satisfies ExportedHandler<Env>;

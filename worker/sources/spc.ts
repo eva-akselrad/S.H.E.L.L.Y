@@ -46,3 +46,12 @@ export async function fetchOutlook(lat: number, lon: number): Promise<Outlook> {
     }),
   };
 }
+
+/** Highest SPC day-1 category over several points (one download, many point tests). */
+export async function fetchRegionSpc(points: { lat: number; lon: number }[]): Promise<SpcCategory> {
+  const fc = await fetchDay(1);
+  if (!fc) throw new Error("SPC unavailable");
+  let max = 0;
+  for (const p of points) max = Math.max(max, ORDER.indexOf(riskAtPoint(fc, p.lat, p.lon)));
+  return ORDER[max]!;
+}

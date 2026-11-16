@@ -1,5 +1,7 @@
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../shared/config";
 import type { SimEntry } from "../shared/simulate";
+import type { Rundown } from "../shared/live/rundown";
+import { normalizeProducts, type StudioProduct } from "../shared/studio";
 import type { Alert, Announcement } from "../shared/types";
 
 export const ALERTS_KEY = "alerts:active";
@@ -7,6 +9,9 @@ const ANN_KEY = "announcements";
 const CONFIG_KEY = "config";
 const SIM_KEY = "sim-alerts";
 const AUDIT_KEY = "audit";
+const RUNDOWN_KEY = "live:rundown";
+const LIVE_STATE_KEY = "live:state";
+const STUDIO_KEY = "studio:products";
 
 export interface AuditEntry {
   t: string;
@@ -58,4 +63,29 @@ export async function audit(env: Env, action: string, detail = ""): Promise<void
   const list = await readAudit(env);
   list.unshift({ t: new Date().toISOString(), action, detail: detail.slice(0, 200) });
   await env.STATE.put(AUDIT_KEY, JSON.stringify(list.slice(0, 100)));
+}
+
+export interface LiveState {
+  lastWarningEndedAt: string | null;
+  hadWarning: boolean;
+}
+
+export async function readRundown(env: Env): Promise<Rundown | null> {
+  return env.STATE.get<Rundown>(RUNDOWN_KEY, "json");
+}
+export async function writeRundown(env: Env, r: Rundown): Promise<void> {
+  await env.STATE.put(RUNDOWN_KEY, JSON.stringify(r));
+}
+export async function readLiveState(env: Env): Promise<LiveState> {
+  return (await env.STATE.get<LiveState>(LIVE_STATE_KEY, "json")) ?? { lastWarningEndedAt: null, hadWarning: false };
+}
+export async function writeLiveState(env: Env, s: LiveState): Promise<void> {
+  await env.STATE.put(LIVE_STATE_KEY, JSON.stringify(s));
+}
+
+export async function readProducts(env: Env): Promise<StudioProduct[]> {
+  return normalizeProducts(await env.STATE.get(STUDIO_KEY, "json"));
+}
+export async function writeProducts(env: Env, list: StudioProduct[]): Promise<void> {
+  await env.STATE.put(STUDIO_KEY, JSON.stringify(list.slice(0, 50)));
 }

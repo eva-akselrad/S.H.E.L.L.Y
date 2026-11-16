@@ -38,6 +38,8 @@ export interface LiveCity {
 export interface LiveRegion {
   /** NWS office whose alerts count as "in region" */
   office: string;
+  /** text matched against an alert's senderName, e.g. "Mount Holly" for PHI */
+  senderMatch: string;
   /** on-air name, e.g. "Philadelphia region" */
   name: string;
   tz: string;
@@ -90,6 +92,7 @@ export const DEFAULT_LIVE: LiveConfig = {
   enabled: false,
   region: {
     office: "PHI",
+    senderMatch: "Mount Holly",
     name: "Philadelphia region",
     tz: "America/New_York",
     bbox: { south: 38.4, west: -76.4, north: 41.4, east: -73.8 },
@@ -201,6 +204,7 @@ function normalizeLive(v: unknown): LiveConfig {
     enabled: r.enabled === true,
     region: {
       office: /^[A-Z]{3,4}$/.test(String(reg.office)) ? String(reg.office) : D.region.office,
+      senderMatch: str(reg.senderMatch, 40) || D.region.senderMatch,
       name: str(reg.name, 60) || D.region.name,
       tz: str(reg.tz, 60) || D.region.tz,
       bbox: normalizeBbox(reg.bbox, D.region.bbox),
