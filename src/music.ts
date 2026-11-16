@@ -19,6 +19,7 @@ let pos = 0;
 let baseVolume = 0.35;
 let disabled = new Set<string>();
 let level: ThreatLevel = "CALM";
+let ducked = false;
 
 export function titleFromFile(file: string): string {
   return file.replace(/\.mp3$/i, "").replace(/_/g, "/");
@@ -38,7 +39,7 @@ const FACTOR: Record<ThreatLevel, number> = { CALM: 1, ELEVATED: 0.57, WARNING: 
 function apply(): void {
   if (!audio) return;
   const silent = !musicAllowed.value || !musicOn.value || level === "EMERGENCY";
-  audio.volume = silent ? 0 : Math.min(1, baseVolume * FACTOR[level]);
+  audio.volume = silent ? 0 : Math.min(1, baseVolume * FACTOR[level] * (ducked ? 0.35 : 1));
   if (silent) audio.pause();
   else if (audio.paused && audio.src) void audio.play().catch(() => undefined);
 }
@@ -108,5 +109,11 @@ export function applyThreatToMusic(next: ThreatLevel): void {
 
 /** Re-evaluate after the visitor toggles music. */
 export function refreshMusic(): void {
+  apply();
+}
+
+/** Lower the music while the host talks. */
+export function setDucked(on: boolean): void {
+  ducked = on;
   apply();
 }

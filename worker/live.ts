@@ -3,6 +3,7 @@ import { computeIntensity } from "../shared/live/intensity";
 import { buildPackPrompt, type LlmPack } from "../shared/live/llm";
 import { SPC_PHRASE } from "../shared/live/templates";
 import { getPack } from "./llm";
+import { ttsAudio } from "./tts";
 import { regionAlerts } from "../shared/live/region";
 import { buildRundown, isWarning, type CityWx, type Rundown } from "../shared/live/rundown";
 import { buildSimAlert } from "../shared/simulate";
@@ -104,4 +105,22 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
 
   if (!sameContent(await readRundown(env), rundown)) await writeRundown(env, rundown);
   return rundown;
+}
+
+/**
+ * GET /api/live/tts?key=<viewer token>&item=<rundown item key>
+ * Like /api/tts, callers never supply text: the server speaks only what the current rundown says.
+ */
+export async function handleLiveTts(env: Env, url: URL): Promise<Response> {
+  const err = (error: string, status: number): Response => Response.json({ error }, { status, headers: { "cache-control": "no-store" } });
+  const cfg = await readConfig(env);
+  if (!cfg.live.enabled) return err("live_disabled", 404);
+  if (cfg.live.viewerToken && url.searchParams.get("key") !== cfg.live.viewerToken) return err("forbidden", 403);
+  if (cfg.voice.engine !== "ai" || !cfg.tts) return err("tts_disabled", 404);
+  const r = await readRundown(env);
+  const item = r?.items.find((i) => i.key === url.searchParams.get("item"));
+  if (!item?.speak) return err("not_found", 404);
+  const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap);
+  if (!out.ok) return err(`tts_${out.reason}`, out.reason === "cap" ? 429 : 502);
+  return new Response(out.audio, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=3600" } });
 }

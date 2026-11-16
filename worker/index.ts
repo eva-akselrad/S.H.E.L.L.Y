@@ -2,7 +2,7 @@ import { buildSimAlert } from "../shared/simulate";
 import type { Forecast, Place } from "../shared/types";
 import { handleAdmin } from "./admin";
 import { cached, round } from "./cache";
-import { produceRundown } from "./live";
+import { handleLiveTts, produceRundown } from "./live";
 import { pollAlerts } from "./poll";
 import { fetchForecastText, fetchPoint } from "./sources/nws";
 import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
@@ -49,6 +49,8 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     // the viewer token must never be served publicly
     return json({ ...c, live: { ...c.live, viewerToken: "" } }, 200, 15);
   }
+
+  if (path === "/api/live/tts" && request.method === "GET") return handleLiveTts(env, url);
 
   if (path === "/api/live/rundown") {
     const c = await readConfig(env);

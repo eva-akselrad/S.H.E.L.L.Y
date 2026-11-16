@@ -23,7 +23,7 @@ export type RundownItem = Base &
     | { kind: "radar"; view: "region" | "warning"; alertId?: string }
     | { kind: "cam"; camId: string }
     | { kind: "map"; product: string }
-    | { kind: "segment"; id: SegmentId; city: LiveCity }
+    | { kind: "segment"; id: SegmentId; city: LiveCity; temp: number; desc: string }
     | { kind: "outlook"; spc: SpcCategory }
     | { kind: "host"; text: string; source: "llm" | "template" }
   );
@@ -108,7 +108,7 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
     rotate(data.cities, bucket * 3)
       .slice(0, count)
       .map((c) => ({
-        key: key(`city:${c.name}`), kind: "segment", id: "now", city: c, headline: cityHeadline(c.name, c.temp, c.desc),
+        key: key(`city:${c.name}`), kind: "segment", id: "now", city: c, temp: c.temp, desc: c.desc, headline: cityHeadline(c.name, c.temp, c.desc),
         speak: citySpeak(c.name, c.temp, c.desc), durationSec: secs("segment"),
       }));
   const mapItems = (): RundownItem[] =>
