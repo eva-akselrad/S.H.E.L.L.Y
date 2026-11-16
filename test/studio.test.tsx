@@ -46,6 +46,8 @@ const host = document.createElement("div");
 test.each([
   ["sevenDay", { place: "Philadelphia", days: [{ date: "2026-11-17", hi: 52, lo: 38, pop: 20, code: 61, edited: true, note: "Wet start" }] }, ["Philadelphia", "52°", "SHELLY FORECAST", "Wet start"]],
   ["cityTemps", { metric: "high", cities: [{ name: "Trenton", lat: 40.2, lon: -74.7, value: 61 }] }, ["Trenton", "61°", "Forecast by Eva"]],
+  ["totalsMap", { kind: "snow", mode: "model", bands: [{ min: 3, max: 6, geometry: sq }] }, ["Snowfall", '3 to 6"']],
+  ["timeline", { rows: [{ city: "Trenton", blocks: [{ hour: "2026-11-17T15:00", hazard: "flood", intensity: 2 }] }] }, ["Trenton", "3p", "Flooding"]],
   ["riskMap", { areas: [{ level: "moderate", hazard: "tornado", geometry: sq }] }, ["Moderate", "Tornadoes", "Risk level"]],
 ])("%s renders a self-contained SVG in both sizes", (kind, body, texts) => {
   const p = { ...base, kind, title: "Test graphic", body } as unknown as StudioProduct;

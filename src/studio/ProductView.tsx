@@ -3,6 +3,8 @@ import { C, Frame, SERIF, SIZE, validLine, type Format } from "./Frame";
 import { CityTempsView } from "./views/CityTemps";
 import { RiskMapView } from "./views/RiskMap";
 import { SevenDayView } from "./views/SevenDay";
+import { TimelineView } from "./views/Timeline";
+import { TotalsMapView } from "./views/Totals";
 
 export interface ViewProps {
   product: StudioProduct;
@@ -19,6 +21,10 @@ export function ProductView({ product, fmt = "wide", forecaster = "" }: ViewProp
       return <CityTempsView product={product} fmt={fmt} forecaster={forecaster} />;
     case "riskMap":
       return <RiskMapView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "totalsMap":
+      return <TotalsMapView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "timeline":
+      return <TimelineView product={product} fmt={fmt} forecaster={forecaster} />;
     default: {
       const { w, h } = SIZE[fmt];
       return (

@@ -206,3 +206,46 @@ export async function fetchCitiesDaily(points: { lat: number; lon: number }[]): 
     feelsHigh: x.daily?.apparent_temperature_max ?? [],
   }));
 }
+
+/** Total snow or rain (inches) over the next `days` days at many points, one request. */
+export async function fetchTotals(points: { lat: number; lon: number }[], kind: "snow" | "rain", days: number): Promise<number[]> {
+  const params = new URLSearchParams({
+    latitude: points.map((p) => p.lat.toFixed(3)).join(","),
+    longitude: points.map((p) => p.lon.toFixed(3)).join(","),
+    daily: kind === "snow" ? "snowfall_sum" : "precipitation_sum",
+    precipitation_unit: "inch",
+    timezone: "auto",
+    forecast_days: String(Math.min(7, Math.max(1, days))),
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const d = (await res.json()) as { daily?: Record<string, (number | null)[]> } | { daily?: Record<string, (number | null)[]> }[];
+  const key = kind === "snow" ? "snowfall_sum" : "precipitation_sum";
+  return (Array.isArray(d) ? d : [d]).map((x) => Math.round((x.daily?.[key] ?? []).reduce<number>((s, v) => s + (v ?? 0), 0) * 10) / 10);
+}
+
+export interface HourlyRaw {
+  time: string[];
+  code: number[];
+  precip: number[];
+}
+
+/** Next ~36 hours of weather code and precipitation for several points. */
+export async function fetchCitiesHourly(points: { lat: number; lon: number }[]): Promise<HourlyRaw[]> {
+  const params = new URLSearchParams({
+    latitude: points.map((p) => p.lat.toFixed(3)).join(","),
+    longitude: points.map((p) => p.lon.toFixed(3)).join(","),
+    hourly: "weather_code,precipitation",
+    precipitation_unit: "inch",
+    timezone: "auto",
+    forecast_days: "3",
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const d = (await res.json()) as { hourly?: Record<string, (number | string)[]> } | { hourly?: Record<string, (number | string)[]> }[];
+  return (Array.isArray(d) ? d : [d]).map((x) => ({
+    time: (x.hourly?.time ?? []) as string[],
+    code: (x.hourly?.weather_code ?? []) as number[],
+    precip: (x.hourly?.precipitation ?? []) as number[],
+  }));
+}

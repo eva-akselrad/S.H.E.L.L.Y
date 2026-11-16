@@ -1,7 +1,9 @@
 import { geomBbox, bboxOverlap } from "../shared/live/region";
 import { normalizeProducts, productActive, type RiskArea, type RiskLevel, type SevenDayDay, type StudioProduct } from "../shared/studio";
 import type { Bbox, PolygonGeom } from "../shared/types";
-import { fetchCitiesDaily, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
+import { gridPoints } from "../shared/contour";
+import { buildTimeline } from "../shared/timeline";
+import { fetchCitiesDaily, fetchCitiesHourly, fetchOpenMeteo, fetchTotals, normalizeForecast } from "./sources/openmeteo";
 import { fetchDay } from "./sources/spc";
 import { readConfig, readProducts, writeProducts } from "./store";
 
@@ -69,6 +71,24 @@ export async function handleStudioAdmin(request: Request, env: Env, url: URL): P
     return json({ metric, cities });
   }
 
+  // model snow/rain totals on a grid; the browser contours it so the forecaster can nudge it
+  if (path === "/api/admin/studio/totals" && method === "GET") {
+    const kind = url.searchParams.get("kind") === "rain" ? "rain" : "snow";
+    const days = Math.min(5, Math.max(1, Number(url.searchParams.get("days")) || 2));
+    const w = 15;
+    const h = 15;
+    const values = await fetchTotals(gridPoints(region.bbox, w, h), kind, days);
+    return json({ grid: { w, h, values, bbox: region.bbox } });
+  }
+
+  // storm timeline across the first cities, from the hourly model
+  if (path === "/api/admin/studio/timeline" && method === "GET") {
+    const cs = region.cities.slice(0, 8);
+    const hourly = await fetchCitiesHourly(cs);
+    const now = localHour(region.tz);
+    return json(buildTimeline(cs.map((c, i) => ({ name: c.name, ...(hourly[i] ?? { time: [], code: [], precip: [] }) })), now));
+  }
+
   // SPC day-1/2/3 categories as editable starting polygons
   if (path === "/api/admin/studio/spc" && method === "GET") {
     const d = Number(url.searchParams.get("day"));
@@ -90,4 +110,10 @@ export function spcAreas(fc: { features?: { properties?: { LABEL?: string }; geo
     if (gb && bboxOverlap(gb, bbox)) out.push({ level, hazard: "wind", geometry: f.geometry });
   }
   return out;
+}
+
+/** "YYYY-MM-DDTHH:00" for the current hour in `tz`, to compare with Open-Meteo local times. */
+export function localHour(tz: string, at = new Date()): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(at).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
 }

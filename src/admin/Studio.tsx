@@ -1,9 +1,10 @@
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { bandLabel, contourBands, TOTAL_SCALES, type Grid } from "../../shared/contour";
 import { geomPath } from "../../shared/projection";
 import {
   HAZARDS, RISK_LEVELS, STUDIO_KINDS, type CityTemps, type Hazard, type RiskArea, type RiskLevel, type RiskMap, type SevenDay,
-  type SevenDayDay, type StudioBody, type StudioKind, type StudioProduct,
+  type SevenDayDay, type StudioBody, type StudioKind, type StudioProduct, type Timeline, type TotalsMap,
 } from "../../shared/studio";
 import { call, config } from "./api";
 import { toast } from "./toast";
@@ -12,12 +13,14 @@ import { Basemap, layout, mapProjector, MapClip, SIZE, type Format } from "../st
 import { download, fileName, svgToPng } from "../studio/export";
 import { ProductView } from "../studio/ProductView";
 import { HAZARD_LABEL, RISK } from "../studio/views/RiskMap";
+import { HAZARD_COLOR } from "../studio/views/Timeline";
+import type { ComponentChildren } from "preact";
 
 const KIND_LABEL: Record<StudioKind, string> = {
   sevenDay: "7-day forecast", cityTemps: "City temperatures map", riskMap: "Risk map", totalsMap: "Snow / rain totals",
   timeline: "Storm timeline", discussion: "Forecast discussion", stormTrack: "Storm tracker",
 };
-const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "riskMap"];
+const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "riskMap", "totalsMap", "timeline"];
 
 const ICONS: [number, string][] = [[0, "Sunny"], [2, "Partly cloudy"], [3, "Cloudy"], [45, "Fog"], [61, "Rain"], [80, "Showers"], [71, "Snow"], [95, "Thunderstorms"]];
 
@@ -35,9 +38,11 @@ function blank(kind: StudioKind): StudioProduct {
     sevenDay: { place: "", days: [] },
     cityTemps: { metric: "high", cities: [] },
     riskMap: { areas: [] },
+    totalsMap: { kind: "snow", mode: "model", bands: [] },
+    timeline: { rows: [] },
   };
   return {
-    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook" }[kind as string] ?? KIND_LABEL[kind],
+    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline" }[kind as string] ?? KIND_LABEL[kind],
     validFrom: now.toISOString(), validTo: to.toISOString(), region: config.value.live.region.bbox, published: false, author: "forecaster",
     body: body[kind] ?? ({ text: "", draft: true } as StudioBody), updated: now.toISOString(),
   };
@@ -56,7 +61,6 @@ export function Studio() {
         <div class="adm-row">
           {BUILT.map((k) => <button key={k} type="button" class="adm-btn" onClick={() => setEdit(blank(k))}>{KIND_LABEL[k]}</button>)}
         </div>
-        <p class="adm-hint">Snow and rain totals, the storm timeline, discussions and the storm tracker arrive in the next releases.</p>
       </Card>
       <Card title="Your graphics">
         {list.length === 0 && <p class="adm-hint">Nothing yet. Create one above.</p>}
@@ -136,6 +140,8 @@ function Editor({ product, onClose }: { product: StudioProduct; onClose: () => v
 
       {p.kind === "sevenDay" && <SevenDayEditor body={p.body as SevenDay} onChange={setBody} />}
       {p.kind === "cityTemps" && <CityTempsEditor body={p.body as CityTemps} onChange={setBody} />}
+      {p.kind === "totalsMap" && <TotalsEditor product={p} body={p.body as TotalsMap} onChange={setBody} />}
+      {p.kind === "timeline" && <TimelineEditor body={p.body as Timeline} onChange={setBody} />}
       {p.kind === "riskMap" && <RiskEditor product={p} body={p.body as RiskMap} onChange={setBody} />}
 
       <Card title="Preview and download">
@@ -231,21 +237,7 @@ function RiskEditor({ product, body, onChange }: { product: StudioProduct; body:
   const [hazard, setHazard] = useState<Hazard>("wind");
   const [points, setPoints] = useState<[number, number][]>([]);
   const [spcDay, setSpcDay] = useState<"1" | "2" | "3">("1");
-  const svg = useRef<SVGSVGElement>(null);
   const proj = mapProjector("wide", product.region);
-  const M = layout("wide").map;
-
-  const click = (e: MouseEvent) => {
-    const el = svg.current;
-    const m = el?.getScreenCTM();
-    if (!el || !m) return;
-    const pt = el.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const q = pt.matrixTransform(m.inverse());
-    const [lon, lat] = proj.lonlat(q.x, q.y);
-    setPoints((x) => [...x, [Math.round(lon * 1000) / 1000, Math.round(lat * 1000) / 1000]]);
-  };
   const finish = () => {
     if (points.length < 3) return toast("Click at least three points.", "error");
     const ring = [...points, points[0]!];
@@ -276,22 +268,140 @@ function RiskEditor({ product, body, onChange }: { product: StudioProduct; body:
         <Segmented label="SPC day" value={spcDay} onChange={setSpcDay} options={[{ value: "1", label: "Day 1" }, { value: "2", label: "Day 2" }, { value: "3", label: "Day 3" }]} />
         <button type="button" class="adm-btn" onClick={() => void fromSpc()}>Start from SPC outlook</button>
       </div>
-      <svg ref={svg} class="studio-draw" viewBox={`${M.x} ${M.y} ${M.w} ${M.h}`} onClick={click} role="img" aria-label="Click to draw a risk area">
-        <Basemap proj={proj} bbox={product.region} />
-        <MapClip proj={proj} id="draw-clip">
-          {body.areas.map((a, i) => <path key={i} d={geomPath(a.geometry, proj)} fill={RISK[a.level].color} fill-opacity="0.45" stroke={RISK[a.level].color} stroke-width="4" />)}
-          {points.length > 0 && (
-            <g>
-              <polyline points={points.map(([lo, la]) => proj.xy(lo, la).join(",")).join(" ")} fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="10 8" />
-              {points.map(([lo, la], i) => { const [x, y] = proj.xy(lo, la); return <circle key={i} cx={x} cy={y} r="9" fill="#fff" stroke="#ff8a65" stroke-width="4" />; })}
-            </g>
-          )}
-        </MapClip>
-      </svg>
+      <DrawCanvas product={product} points={points} setPoints={setPoints}>
+        {body.areas.map((a, i) => <path key={i} d={geomPath(a.geometry, proj)} fill={RISK[a.level].color} fill-opacity="0.45" stroke={RISK[a.level].color} stroke-width="4" />)}
+      </DrawCanvas>
       {body.areas.map((a, i) => (
         <div key={i} class="adm-row" style={{ justifyContent: "space-between" }}>
           <span><span style={{ color: RISK[a.level].color }}>●</span> {RISK[a.level].label} · {HAZARD_LABEL[a.hazard]}</span>
           <button type="button" class="adm-btn small" onClick={() => onChange({ areas: body.areas.filter((_, n) => n !== i) })}>Remove</button>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+/** Click-to-draw map shared by the risk and totals editors. Overlays go in as children. */
+function DrawCanvas({ product, points, setPoints, children }: { product: StudioProduct; points: [number, number][]; setPoints: (f: (p: [number, number][]) => [number, number][]) => void; children?: ComponentChildren }) {
+  const svg = useRef<SVGSVGElement>(null);
+  const proj = mapProjector("wide", product.region);
+  const M = layout("wide").map;
+  const click = (e: MouseEvent) => {
+    const el = svg.current;
+    const m = el?.getScreenCTM();
+    if (!el || !m) return;
+    const pt = el.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const q = pt.matrixTransform(m.inverse());
+    const [lon, lat] = proj.lonlat(q.x, q.y);
+    setPoints((x) => [...x, [Math.round(lon * 1000) / 1000, Math.round(lat * 1000) / 1000]]);
+  };
+  return (
+    <svg ref={svg} class="studio-draw" viewBox={`${M.x} ${M.y} ${M.w} ${M.h}`} onClick={click} role="img" aria-label="Click to draw an area">
+      <Basemap proj={proj} bbox={product.region} />
+      <MapClip proj={proj} id="draw-clip">
+        {children}
+        {points.length > 0 && (
+          <g>
+            <polyline points={points.map(([lo, la]) => proj.xy(lo, la).join(",")).join(" ")} fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="10 8" />
+            {points.map(([lo, la], i) => { const [x, y] = proj.xy(lo, la); return <circle key={i} cx={x} cy={y} r="9" fill="#fff" stroke="#ff8a65" stroke-width="4" />; })}
+          </g>
+        )}
+      </MapClip>
+    </svg>
+  );
+}
+
+function TotalsEditor({ product, body, onChange }: { product: StudioProduct; body: TotalsMap; onChange: (b: TotalsMap) => void }) {
+  const scale = TOTAL_SCALES[body.kind];
+  const [grid, setGrid] = useState<Grid | null>(null);
+  const [mult, setMult] = useState(1);
+  const [days, setDays] = useState(2);
+  const [min, setMin] = useState<number>(scale.thresholds[1]!);
+  const [points, setPoints] = useState<[number, number][]>([]);
+  const proj = mapProjector("wide", product.region);
+
+  const contour = (g: Grid, m: number, kind = body.kind) =>
+    contourBands({ ...g, values: g.values.map((v) => Math.round(v * m * 10) / 10) }, [...TOTAL_SCALES[kind].thresholds]);
+
+  const load = async (kind = body.kind) => {
+    const r = await call<{ grid: Grid }>("GET", `/api/admin/studio/totals?kind=${kind}&days=${days}`);
+    if (!r.ok) return toast("Couldn't load model totals.", "error");
+    setGrid(r.data.grid);
+    setMult(1);
+    onChange({ kind, mode: "model", bands: contour(r.data.grid, 1, kind) });
+  };
+  const nudge = (m: number) => {
+    setMult(m);
+    if (grid) onChange({ ...body, mode: "model", bands: contour(grid, m) });
+  };
+  const finish = () => {
+    if (points.length < 3) return toast("Click at least three points.", "error");
+    const t: readonly number[] = scale.thresholds;
+    onChange({ ...body, mode: "draw", bands: [...body.bands, { min, max: t[t.indexOf(min) + 1] ?? null, geometry: { type: "Polygon", coordinates: [[...points, points[0]!]] } }] });
+    setPoints([]);
+  };
+
+  return (
+    <Card title="Totals" hint="Let the model draw the bands, then scale them up or down, or draw your own areas by hand.">
+      <div class="adm-row">
+        <Segmented label="Type" value={body.kind} onChange={(k) => { setMin(TOTAL_SCALES[k].thresholds[1]!); onChange({ kind: k, mode: body.mode, bands: [] }); setGrid(null); }} options={[{ value: "snow", label: "Snow" }, { value: "rain", label: "Rain" }]} />
+        <select class="adm-input" style={{ width: "9rem" }} value={days} onChange={(e) => setDays(Number((e.target as HTMLSelectElement).value))} aria-label="Days">
+          {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>Next {d} day{d > 1 ? "s" : ""}</option>)}
+        </select>
+        <button type="button" class="adm-btn" onClick={() => void load()}>Load from model</button>
+        <button type="button" class="adm-btn" onClick={() => onChange({ ...body, mode: "draw", bands: [] })}>Clear</button>
+      </div>
+      {grid && (
+        <label class="adm-field">
+          <span class="adm-label">Adjust the model: {Math.round(mult * 100)}%</span>
+          <input class="adm-range" type="range" min={0.3} max={2} step={0.05} value={mult} onInput={(e) => nudge(Number((e.target as HTMLInputElement).value))} />
+        </label>
+      )}
+      <div class="adm-row">
+        <select class="adm-input" style={{ width: "12rem" }} value={min} onChange={(e) => setMin(Number((e.target as HTMLSelectElement).value))} aria-label="Band to draw">
+          {scale.thresholds.map((t, i) => <option key={t} value={t}>{bandLabel({ min: t, max: scale.thresholds[i + 1] ?? null })}</option>)}
+        </select>
+        <button type="button" class="adm-btn primary" onClick={finish} disabled={points.length < 3}>Finish area</button>
+        <button type="button" class="adm-btn" onClick={() => setPoints((x) => x.slice(0, -1))} disabled={!points.length}>Undo point</button>
+      </div>
+      <DrawCanvas product={product} points={points} setPoints={setPoints}>
+        {[...body.bands].sort((a, b) => a.min - b.min).map((b, i) => <path key={i} d={geomPath(b.geometry, proj)} fill={scale.colors[Math.max(0, scale.thresholds.findIndex((t) => Math.abs(t - b.min) < 1e-6))]} fill-opacity="0.7" />)}
+      </DrawCanvas>
+    </Card>
+  );
+}
+
+const CELL_NEXT = [0, 1, 2, 3] as const;
+
+function TimelineEditor({ body, onChange }: { body: Timeline; onChange: (b: Timeline) => void }) {
+  const [hazard, setHazard] = useState<Hazard>("flood");
+  const load = async () => {
+    const r = await call<Timeline>("GET", "/api/admin/studio/timeline");
+    if (r.ok) onChange(r.data);
+    else toast("Couldn't load the hourly model.", "error");
+  };
+  const cycle = (ri: number, bi: number) =>
+    onChange({
+      rows: body.rows.map((row, r) =>
+        r !== ri ? row : { ...row, blocks: row.blocks.map((b, i) => (i !== bi ? b : { ...b, hazard, intensity: CELL_NEXT[(b.intensity + 1) % 4]! })) },
+      ),
+    });
+  return (
+    <Card title="Timeline" hint="Loaded from the hourly model in 3-hour blocks. Click a block to raise its strength (it cycles back to none); it takes the threat chosen here.">
+      <div class="adm-row">
+        <button type="button" class="adm-btn" onClick={() => void load()}>Load from model</button>
+        <select class="adm-input" style={{ width: "12rem" }} value={hazard} onChange={(e) => setHazard((e.target as HTMLSelectElement).value as Hazard)} aria-label="Threat for clicked blocks">
+          {HAZARDS.map((h) => <option key={h} value={h}>{HAZARD_LABEL[h]}</option>)}
+        </select>
+      </div>
+      {body.rows.map((r, ri) => (
+        <div key={r.city} class="adm-row">
+          <b style={{ width: "8rem" }}>{r.city}</b>
+          {r.blocks.map((b, bi) => (
+            <button key={bi} type="button" class="adm-btn small" aria-label={`${r.city} ${b.hour} ${b.hazard} ${b.intensity}`} onClick={() => cycle(ri, bi)} style={{ background: HAZARD_COLOR[b.hazard], opacity: b.intensity === 0 ? 0.55 : 0.35 + b.intensity * 0.22, minWidth: "2.4rem" }}>{b.intensity || ""}</button>
+          ))}
         </div>
       ))}
     </Card>
