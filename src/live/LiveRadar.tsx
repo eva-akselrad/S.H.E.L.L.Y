@@ -3,7 +3,13 @@ import type { Bbox, PolygonGeom } from "../../shared/types";
 import { radar } from "./state";
 
 /** Animated RainViewer radar framed on the region, or locked onto a warning polygon. */
-export function LiveRadar({ bbox, polygon }: { bbox: Bbox; polygon?: PolygonGeom | null }) {
+export interface RadarTrack {
+  origin: [number, number];
+  end: [number, number];
+  towns: { name: string; lat: number; lon: number; etaMin: number }[];
+}
+
+export function LiveRadar({ bbox, polygon, track }: { bbox: Bbox; polygon?: PolygonGeom | null; track?: RadarTrack | null }) {
   const el = useRef<HTMLDivElement>(null);
   const frames = radar.value;
 
@@ -24,7 +30,15 @@ export function LiveRadar({ bbox, polygon }: { bbox: Bbox; polygon?: PolygonGeom
 
       if (polygon) {
         const poly = L.geoJSON(polygon as never, { style: { color: "#ff4d4d", weight: 4, fillColor: "#ff4d4d", fillOpacity: 0.14 } }).addTo(map);
-        map.fitBounds(poly.getBounds().pad(0.8));
+        map.fitBounds(poly.getBounds().extend(track ? [[track.end[1], track.end[0]]] : []).pad(0.4));
+        if (track) {
+          L.polyline([[track.origin[1], track.origin[0]], [track.end[1], track.end[0]]], { color: "#ffd54f", weight: 5, dashArray: "12 10" }).addTo(map);
+          for (const t of track.towns) {
+            L.circleMarker([t.lat, t.lon], { radius: 7, color: "#fff", weight: 3, fillColor: "#ffd54f", fillOpacity: 1 })
+              .bindTooltip(`${t.name} ${t.etaMin <= 1 ? "now" : `${t.etaMin} min`}`, { permanent: true, direction: "right", className: "bc-eta" })
+              .addTo(map);
+          }
+        }
       } else {
         map.fitBounds([[bbox.south, bbox.west], [bbox.north, bbox.east]]);
       }
@@ -49,7 +63,7 @@ export function LiveRadar({ bbox, polygon }: { bbox: Bbox; polygon?: PolygonGeom
       if (timer) clearInterval(timer);
       cleanup();
     };
-  }, [bbox.south, bbox.west, bbox.north, bbox.east, frames, polygon]);
+  }, [bbox.south, bbox.west, bbox.north, bbox.east, frames, polygon, track?.origin.join(), track?.towns.length]);
 
   return <div class="bc-radar" ref={el} role="img" aria-label="Animated weather radar" />;
 }

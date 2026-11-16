@@ -1,6 +1,7 @@
 import type { StudioProduct } from "../../shared/studio";
 import { C, Frame, SERIF, SIZE, validLine, type Format } from "./Frame";
 import { CityTempsView } from "./views/CityTemps";
+import { DiscussionView, StormTrackView } from "./views/Discussion";
 import { RiskMapView } from "./views/RiskMap";
 import { SevenDayView } from "./views/SevenDay";
 import { TimelineView } from "./views/Timeline";
@@ -25,6 +26,10 @@ export function ProductView({ product, fmt = "wide", forecaster = "" }: ViewProp
       return <TotalsMapView product={product} fmt={fmt} forecaster={forecaster} />;
     case "timeline":
       return <TimelineView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "discussion":
+      return <DiscussionView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "stormTrack":
+      return <StormTrackView product={product} fmt={fmt} forecaster={forecaster} />;
     default: {
       const { w, h } = SIZE[fmt];
       return (

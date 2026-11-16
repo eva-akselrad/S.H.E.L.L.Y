@@ -128,6 +128,17 @@ describe("buildRundown", () => {
     expect(r.topAlert).toContain("TORNADO WARNING");
     expect(r.counters.tor).toBe(1);
   });
+  test("warning radar carries a storm track with town ETAs from NWS motion data", () => {
+    const motion = `${iso(0).replace("Z", "-00:00")}...storm...250DEG...35KT...40.0,-75.9`;
+    const r = run([mk("Severe Thunderstorm Warning", { params: { eventMotionDescription: motion } })]);
+    const radar = r.items.find((i) => i.kind === "radar" && i.view === "warning");
+    expect(radar && radar.kind === "radar" && radar.track?.towns.length).toBeGreaterThan(0);
+    expect(radar?.speak).toMatch(/moving (east|northeast)/);
+    expect(radar?.headline).toMatch(/^STORM MOVING/);
+    // without motion data it stays a plain radar item
+    const plain = run([mk("Severe Thunderstorm Warning")]).items.find((i) => i.kind === "radar" && i.view === "warning");
+    expect(plain?.speak).toBeUndefined();
+  });
   test("emergency: only alerts and warning radar", () => {
     const r = run([mk("Tornado Warning", { headline: "PARTICULARLY DANGEROUS SITUATION" })]);
     expect(r.level).toBe("EMERGENCY");

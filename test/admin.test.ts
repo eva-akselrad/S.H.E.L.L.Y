@@ -182,6 +182,12 @@ describe("Forecaster Studio API", () => {
     await authed("DELETE", `/api/admin/studio?id=${saved.id}`);
     expect(((await (await call("/api/studio")).json()) as unknown[]).length).toBe(0);
   });
+  test("an unreviewed LLM discussion draft can never be published", async () => {
+    const d = (draft: boolean) => product({ kind: "discussion", title: "Disc", published: true, body: { text: "Calm week ahead.", draft } });
+    expect(((await (await authed("PUT", "/api/admin/studio", d(true))).json()) as { published: boolean }).published).toBe(false);
+    expect(((await (await authed("PUT", "/api/admin/studio", d(false))).json()) as { published: boolean }).published).toBe(true);
+    expect(((await (await call("/api/studio")).json()) as { title: string }[]).map((p) => p.title)).toEqual(["Disc"]);
+  });
   test("rejects an unusable product", async () => {
     expect((await authed("PUT", "/api/admin/studio", product({ kind: "bogus" }))).status).toBe(400);
     expect((await authed("PUT", "/api/admin/studio", product({ validFrom: "nope" }))).status).toBe(400);

@@ -5,6 +5,8 @@ import { isEmergency } from "../threat";
 import type { Alert, SpcCategory, ThreatLevel } from "../types";
 import { productActive, type StudioProduct } from "../studio";
 import { isTor, type Counters, type Intensity } from "./intensity";
+import { parseMotion, trackHeadline, trackScript, trackStorm, type TrackTown } from "./track";
+import { TOWNS } from "./towns";
 import { alertHeadline, cityHeadline, citySpeak, SPC_PHRASE, statusLine, talkBreak, topAlertLine } from "./templates";
 
 export type RundownKind = "alert" | "radar" | "cam" | "map" | "segment" | "outlook" | "host";
@@ -20,7 +22,7 @@ interface Base {
 export type RundownItem = Base &
   (
     | { kind: "alert"; alertId: string }
-    | { kind: "radar"; view: "region" | "warning"; alertId?: string }
+    | { kind: "radar"; view: "region" | "warning"; alertId?: string; track?: { origin: [number, number]; end: [number, number]; bearingDeg: number; towns: TrackTown[] } }
     | { kind: "cam"; camId: string }
     | { kind: "map"; product: string }
     | { kind: "segment"; id: SegmentId; city: LiveCity; temp: number; desc: string }
@@ -98,9 +100,21 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
       ...(speak ? { speak } : {}),
     };
   };
-  const warnRadar = (a: Alert): RundownItem => ({
-    key: key("radar:w"), kind: "radar", view: "warning", alertId: a.id, headline: `RADAR: ${a.event.toUpperCase()}`, durationSec: secs("radar"),
-  });
+  const warnRadar = (a: Alert): RundownItem => {
+    const base = { key: key("radar:w"), kind: "radar" as const, view: "warning" as const, alertId: a.id, headline: `RADAR: ${a.event.toUpperCase()}`, durationSec: secs("radar") };
+    const m = parseMotion(a.params.eventMotionDescription);
+    // the track is pure NWS motion data + geometry; no LLM involved
+    if (!m) return base;
+    const info = trackStorm(m, TOWNS, now, a.expires);
+    if (!info.towns.length) return base;
+    return {
+      ...base,
+      headline: trackHeadline(info),
+      speak: trackScript(info),
+      durationSec: Math.max(base.durationSec, Math.ceil(trackScript(info).length / 13) + 4),
+      track: { origin: info.origin, end: info.end, bearingDeg: info.bearingDeg, towns: info.towns },
+    };
+  };
   const regionRadar = (): RundownItem => ({
     key: key("radar:r"), kind: "radar", view: "region", headline: `${region.name.toUpperCase()} RADAR`, durationSec: secs("radar"),
   });

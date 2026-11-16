@@ -78,7 +78,7 @@ export function MainPanel({ r, region, forecaster = "" }: { r: Rundown; region: 
       return <AlertCard alert={r.alerts.find((a) => a.id === it.alertId)} item={it} />;
     case "radar": {
       const a = it.alertId ? r.alerts.find((x) => x.id === it.alertId) : undefined;
-      return <LiveRadar bbox={region.bbox} polygon={it.view === "warning" ? (a?.geometry ?? null) : null} />;
+      return <LiveRadar bbox={region.bbox} polygon={it.view === "warning" ? (a?.geometry ?? null) : null} track={it.view === "warning" ? (it.track ?? null) : null} />;
     }
     case "segment":
       return (

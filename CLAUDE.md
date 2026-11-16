@@ -7,8 +7,9 @@
   **[docs/REBUILD_PLAN.md](docs/REBUILD_PLAN.md)**. `main` and tag **`legacy-v1`**
   hold the old app (`git show legacy-v1:<path>`). Cutover (REBUILD_PLAN phase 8)
   needs the user's go-ahead.
-- **Next up: SHELLY Live + Forecaster Studio.** The full plan is in
-  **[docs/LIVE_PLAN.md](docs/LIVE_PLAN.md)**. Start at phase **L0** and go in order.
+- **SHELLY Live + Forecaster Studio: L0 to L6 are built and committed** (plan:
+  **[docs/LIVE_PLAN.md](docs/LIVE_PLAN.md)**, how to run it: **[docs/LIVE_STREAMING.md](docs/LIVE_STREAMING.md)**).
+  Held for the user: traffic cams, the OpenRouter key, deploy, going live. Optional L8 extras remain.
 
 ## Next work: SHELLY Live + Forecaster Studio (summary of docs/LIVE_PLAN.md)
 - **SHELLY Live:** a 24/7 auto-produced YouTube weather stream with an AI host.

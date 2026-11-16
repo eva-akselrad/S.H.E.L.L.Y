@@ -48,6 +48,8 @@ test.each([
   ["cityTemps", { metric: "high", cities: [{ name: "Trenton", lat: 40.2, lon: -74.7, value: 61 }] }, ["Trenton", "61°", "Forecast by Eva"]],
   ["totalsMap", { kind: "snow", mode: "model", bands: [{ min: 3, max: 6, geometry: sq }] }, ["Snowfall", '3 to 6"']],
   ["timeline", { rows: [{ city: "Trenton", blocks: [{ hour: "2026-11-17T15:00", hazard: "flood", intensity: 2 }] }] }, ["Trenton", "3p", "Flooding"]],
+  ["discussion", { text: "A calm week with a few passing showers.", draft: false }, ["calm week"]],
+  ["stormTrack", { alertId: "a", origin: [-75, 40], bearingDeg: 90, speedKt: 30, at: "", towns: [{ name: "Media", etaMin: 12 }] }, ["Media: 12 min"]],
   ["riskMap", { areas: [{ level: "moderate", hazard: "tornado", geometry: sq }] }, ["Moderate", "Tornadoes", "Risk level"]],
 ])("%s renders a self-contained SVG in both sizes", (kind, body, texts) => {
   const p = { ...base, kind, title: "Test graphic", body } as unknown as StudioProduct;

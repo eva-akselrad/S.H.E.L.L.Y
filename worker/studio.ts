@@ -4,6 +4,8 @@ import type { Bbox, PolygonGeom } from "../shared/types";
 import { gridPoints } from "../shared/contour";
 import { buildTimeline } from "../shared/timeline";
 import { fetchCitiesDaily, fetchCitiesHourly, fetchOpenMeteo, fetchTotals, normalizeForecast } from "./sources/openmeteo";
+import { callLlm } from "./llm";
+import { filterText } from "../shared/live/llm";
 import { fetchDay } from "./sources/spc";
 import { readConfig, readProducts, writeProducts } from "./store";
 
@@ -34,6 +36,8 @@ export async function handleStudioAdmin(request: Request, env: Env, url: URL): P
     const id = typeof raw.id === "string" && raw.id ? raw.id : crypto.randomUUID();
     const [product] = normalizeProducts([{ ...raw, id, updated: new Date().toISOString() }]);
     if (!product) return json({ error: "invalid_product" }, 400);
+    // safety rule: an LLM draft is never published until the forecaster has reviewed it (draft=false)
+    if (product.kind === "discussion" && (product.body as { draft: boolean }).draft) product.published = false;
     const now = Date.now();
     const list = (await readProducts(env)).filter((p) => p.id !== id && Date.parse(p.validTo) > now - WEEK);
     await writeProducts(env, [product, ...list]);
@@ -96,6 +100,26 @@ export async function handleStudioAdmin(request: Request, env: Env, url: URL): P
     const fc = await fetchDay(day);
     if (!fc) return json({ error: "spc_unavailable" }, 502);
     return json({ areas: spcAreas(fc, region.bbox) });
+  }
+
+  // LLM draft of the forecast discussion from the NWS Area Forecast Discussion. Draft only, never auto-published.
+  if (path === "/api/admin/studio/discussion-draft" && method === "POST") {
+    const office = encodeURIComponent(cfg.live.region.office);
+    const headers = { "User-Agent": env.NWS_USER_AGENT, Accept: "application/ld+json" };
+    const idx = await fetch(`https://api.weather.gov/products/types/AFD/locations/${office}`, { headers }).catch(() => null);
+    const first = idx?.ok ? ((await idx.json().catch(() => null)) as { "@graph"?: { id?: string }[] } | null)?.["@graph"]?.[0]?.id : null;
+    const prod = first ? await fetch(`https://api.weather.gov/products/${encodeURIComponent(first)}`, { headers }).catch(() => null) : null;
+    const afd = prod?.ok ? ((await prod.json().catch(() => null)) as { productText?: string; issuanceTime?: string } | null) : null;
+    if (!afd?.productText) return json({ error: "afd_unavailable" }, 502);
+    const r = await callLlm(env, cfg.live.llm, [
+      { role: "system", content: `You write a short, calm, plain-English forecast discussion for a weather broadcast in ${cfg.live.region.name}. Use ONLY facts from the source text. 90 to 140 words, no lists, no markdown, no emoji. Never write warnings, safety instructions or alert wording, and never mention official products by name. Do not invent numbers.` },
+      { role: "user", content: `Source (NWS Area Forecast Discussion):
+${afd.productText.slice(0, 6000)}` },
+    ]);
+    if (!r.ok || !r.text) return json({ error: r.error ?? "llm_failed" }, 502);
+    const text = filterText(r.text, 1200);
+    if (!text) return json({ error: "draft_rejected_by_filter" }, 502);
+    return json({ text, draft: true, issued: afd.issuanceTime ?? "" });
   }
 
   return json({ error: "not_found" }, 404);

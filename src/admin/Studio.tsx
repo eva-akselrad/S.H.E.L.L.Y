@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { bandLabel, contourBands, TOTAL_SCALES, type Grid } from "../../shared/contour";
 import { geomPath } from "../../shared/projection";
 import {
-  HAZARDS, RISK_LEVELS, STUDIO_KINDS, type CityTemps, type Hazard, type RiskArea, type RiskLevel, type RiskMap, type SevenDay,
+  HAZARDS, RISK_LEVELS, STUDIO_KINDS, type CityTemps, type Discussion, type Hazard, type RiskArea, type RiskLevel, type RiskMap, type SevenDay,
   type SevenDayDay, type StudioBody, type StudioKind, type StudioProduct, type Timeline, type TotalsMap,
 } from "../../shared/studio";
 import { call, config } from "./api";
@@ -20,7 +20,7 @@ const KIND_LABEL: Record<StudioKind, string> = {
   sevenDay: "7-day forecast", cityTemps: "City temperatures map", riskMap: "Risk map", totalsMap: "Snow / rain totals",
   timeline: "Storm timeline", discussion: "Forecast discussion", stormTrack: "Storm tracker",
 };
-const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "riskMap", "totalsMap", "timeline"];
+const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "riskMap", "totalsMap", "timeline", "discussion"];
 
 const ICONS: [number, string][] = [[0, "Sunny"], [2, "Partly cloudy"], [3, "Cloudy"], [45, "Fog"], [61, "Rain"], [80, "Showers"], [71, "Snow"], [95, "Thunderstorms"]];
 
@@ -42,7 +42,7 @@ function blank(kind: StudioKind): StudioProduct {
     timeline: { rows: [] },
   };
   return {
-    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline" }[kind as string] ?? KIND_LABEL[kind],
+    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline", discussion: "Forecast Discussion" }[kind as string] ?? KIND_LABEL[kind],
     validFrom: now.toISOString(), validTo: to.toISOString(), region: config.value.live.region.bbox, published: false, author: "forecaster",
     body: body[kind] ?? ({ text: "", draft: true } as StudioBody), updated: now.toISOString(),
   };
@@ -142,6 +142,7 @@ function Editor({ product, onClose }: { product: StudioProduct; onClose: () => v
       {p.kind === "cityTemps" && <CityTempsEditor body={p.body as CityTemps} onChange={setBody} />}
       {p.kind === "totalsMap" && <TotalsEditor product={p} body={p.body as TotalsMap} onChange={setBody} />}
       {p.kind === "timeline" && <TimelineEditor body={p.body as Timeline} onChange={setBody} />}
+      {p.kind === "discussion" && <DiscussionEditor body={p.body as Discussion} onChange={setBody} />}
       {p.kind === "riskMap" && <RiskEditor product={p} body={p.body as RiskMap} onChange={setBody} />}
 
       <Card title="Preview and download">
@@ -404,6 +405,26 @@ function TimelineEditor({ body, onChange }: { body: Timeline; onChange: (b: Time
           ))}
         </div>
       ))}
+    </Card>
+  );
+}
+
+function DiscussionEditor({ body, onChange }: { body: Discussion; onChange: (b: Discussion) => void }) {
+  const [busy, setBusy] = useState(false);
+  const draft = async () => {
+    setBusy(true);
+    const r = await call<Discussion>("POST", "/api/admin/studio/discussion-draft");
+    setBusy(false);
+    if (r.ok) onChange({ text: r.data.text, draft: true });
+    else toast("Couldn't draft one. The forecast discussion or the LLM isn't available.", "error");
+  };
+  return (
+    <Card title="Discussion" hint="Write it yourself, or have SHELLY draft one from the NWS forecast discussion. A draft can't be published until you've read it and ticked the box below.">
+      <div class="adm-row">
+        <button type="button" class="adm-btn" disabled={busy} onClick={() => void draft()}>{busy ? "Drafting…" : "Draft from the NWS discussion"}</button>
+      </div>
+      <textarea class="adm-input" rows={9} maxLength={1200} value={body.text} onInput={(e) => onChange({ text: (e.target as HTMLTextAreaElement).value, draft: body.draft })} aria-label="Discussion text" />
+      <Toggle checked={!body.draft} onChange={(v) => onChange({ ...body, draft: !v })} label="I've read and edited this" hint="Required before it can be published. An unreviewed draft is saved but never shown." />
     </Card>
   );
 }
