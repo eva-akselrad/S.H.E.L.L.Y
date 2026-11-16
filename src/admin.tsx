@@ -5,6 +5,7 @@ import { Activity } from "./admin/Activity";
 import { Announcements } from "./admin/Announcements";
 import { authed, call, loadConfig } from "./admin/api";
 import { Display } from "./admin/Display";
+import { Live } from "./admin/Live";
 import { Login } from "./admin/Login";
 import { Music } from "./admin/Music";
 import { Note } from "./admin/Note";
@@ -20,6 +21,7 @@ const PAGES = [
   { id: "note", label: "Forecaster note", view: Note },
   { id: "simulate", label: "Alert simulator", view: Simulator },
   { id: "display", label: "Display", view: Display },
+  { id: "live", label: "SHELLY Live", view: Live },
   { id: "music", label: "Music", view: Music },
   { id: "activity", label: "Activity", view: Activity },
 ] as const;

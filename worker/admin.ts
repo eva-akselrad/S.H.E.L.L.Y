@@ -1,4 +1,7 @@
 import { normalizeConfig, SPEAKERS, type Speaker } from "../shared/config";
+import { filterText } from "../shared/live/llm";
+import { callLlm, llmUsed } from "./llm";
+import { produceRundown } from "./live";
 import { isSimPreset, SIM_PRESETS, type SimEntry } from "../shared/simulate";
 import type { Announcement } from "../shared/types";
 import { isAuthed, login, logout } from "./auth";
@@ -9,6 +12,7 @@ import {
   readAnnouncements,
   readAudit,
   readConfig,
+  readRundown,
   readSim,
   writeAnnouncements,
   writeConfig,
@@ -132,6 +136,39 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const b = await body();
     const speaker = (SPEAKERS as readonly unknown[]).includes(b.speaker) ? (b.speaker as Speaker) : "athena";
     return handleTtsPreview(env, speaker, (await readConfig(env)).voice.dailyCharCap);
+  }
+
+  // ── SHELLY Live ──
+  if (path === "/api/admin/live" && method === "GET") {
+    const c = await readConfig(env);
+    return json({ keySet: !!env.LLM_API_KEY, used: await llmUsed(env), cap: c.live.llm.dailyRequestCap, rundown: await readRundown(env) });
+  }
+  if (path === "/api/admin/live/refresh" && method === "POST") {
+    const r = await produceRundown(env);
+    return json({ ok: !!r, rundown: r }, r ? 200 : 409);
+  }
+  if (path === "/api/admin/live/token" && method === "POST") {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const c = await readConfig(env);
+    const next = { ...c, live: { ...c.live, viewerToken: token } };
+    await writeConfig(env, next);
+    await audit(env, "live.token", "new viewer token");
+    return json({ viewerToken: token });
+  }
+  if (path === "/api/admin/live/llm-test" && method === "POST") {
+    const c = await readConfig(env);
+    const r = await callLlm(
+      env,
+      c.live.llm,
+      [
+        { role: "system", content: `You are ${c.live.host.name}, a friendly weather host. Reply with one short, friendly sentence.` },
+        { role: "user", content: "Say hello to the viewers of the stream." },
+      ],
+      { timeoutMs: 20_000 },
+    );
+    await audit(env, "live.llm-test", r.ok ? `ok ${r.ms}ms ${r.model ?? ""}` : `failed: ${r.error}`);
+    return json({ ...r, filtered: r.text ? filterText(r.text, 240) : null, used: await llmUsed(env), cap: c.live.llm.dailyRequestCap });
   }
 
   // ── tools ──

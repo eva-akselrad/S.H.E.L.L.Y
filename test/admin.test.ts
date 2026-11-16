@@ -141,3 +141,21 @@ describe("status", () => {
     expect(s.poller).toMatchObject({ updated: null, count: 0 });
   });
 });
+
+describe("SHELLY Live admin", () => {
+  test("requires a session", async () => {
+    expect((await call("/api/admin/live")).status).toBe(401);
+  });
+  test("creates a viewer token and saves it", async () => {
+    const r = await authed("POST", "/api/admin/live/token");
+    const { viewerToken } = (await r.json()) as { viewerToken: string };
+    expect(viewerToken).toMatch(/^[A-Za-z0-9_-]{24,}$/);
+    const cfg = (await (await authed("GET", "/api/admin/config")).json()) as { live: { viewerToken: string } };
+    expect(cfg.live.viewerToken).toBe(viewerToken);
+  });
+  test("the LLM test reports a missing key without calling out", async () => {
+    const r = await authed("POST", "/api/admin/live/llm-test");
+    expect(await r.json()).toMatchObject({ ok: false, error: "no_api_key" });
+    expect(((await (await authed("GET", "/api/admin/live")).json()) as { keySet: boolean }).keySet).toBe(false);
+  });
+});

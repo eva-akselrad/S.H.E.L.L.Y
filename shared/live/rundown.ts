@@ -40,8 +40,9 @@ export interface RundownData {
   cities: CityWx[];
   studio: StudioProduct[];
   cams: { id: string; title: string }[];
-  /** optional LLM-written talk break; falls back to templates */
+  /** optional LLM colour (calm periods only); falls back to templates */
   talkBreak?: string;
+  headlines?: string[];
 }
 
 export interface Rundown {
@@ -55,6 +56,8 @@ export interface Rundown {
   counters: Counters;
   topAlert: string;
   status: string;
+  /** rotating headline-bar text for calm periods (LLM or empty); WARNING+ always uses item headlines */
+  headlines: string[];
   alerts: Alert[];
   items: RundownItem[];
 }
@@ -181,6 +184,7 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
     counters: intensity.counters,
     topAlert: topAlertLine(top, region.name, region.tz),
     status: statusLine(warnings.length, watches.length),
+    headlines: level === "CALM" || level === "ELEVATED" ? (data.headlines ?? []) : [],
     alerts: [...warnings, ...watches].slice(0, 10),
     items,
   };

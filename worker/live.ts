@@ -1,5 +1,8 @@
 import type { SiteConfig } from "../shared/config";
 import { computeIntensity } from "../shared/live/intensity";
+import { buildPackPrompt, type LlmPack } from "../shared/live/llm";
+import { SPC_PHRASE } from "../shared/live/templates";
+import { getPack } from "./llm";
 import { regionAlerts } from "../shared/live/region";
 import { buildRundown, isWarning, type CityWx, type Rundown } from "../shared/live/rundown";
 import { buildSimAlert } from "../shared/simulate";
@@ -65,9 +68,36 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
   if (warningNow !== state.hadWarning) await writeLiveState(env, { hadWarning: warningNow, lastWarningEndedAt });
 
   const intensity = computeIntensity({ alerts: inRegion, spc, lastWarningEndedAt, now });
+  // LLM colour for calm/elevated periods only; any failure means templates
+  let pack: LlmPack | null = null;
+  if (live.llm.enabled && (intensity.level === "CALM" || intensity.level === "ELEVATED")) {
+    try {
+      const prompt = buildPackPrompt({
+        now: new Date(now),
+        region: region.name,
+        tone: live.host.tone,
+        hostName: live.host.name,
+        bannedTopics: live.host.bannedTopics,
+        conditions: cities.slice(0, 8).map((c) => `${c.name}: ${Math.round(c.temp)}F, ${c.desc.toLowerCase()}`),
+        spcPhrase: SPC_PHRASE[spc],
+        activeEvents: [...new Set(inRegion.map((a) => a.event))],
+        level: intensity.level,
+      });
+      pack = await getPack(env, live.llm, prompt, intensity.level, live.host.bannedTopics, now);
+    } catch (err) {
+      console.error(JSON.stringify({ msg: "llm_failed", err: String(err) }));
+    }
+  }
   const rundown = buildRundown(
     intensity,
-    { alerts: inRegion, spc, cities, studio: products.filter((p) => productActive(p, now)), cams: [] },
+    {
+      alerts: inRegion,
+      spc,
+      cities,
+      studio: products.filter((p) => productActive(p, now)),
+      cams: [],
+      ...(pack ? { talkBreak: pack.talkBreak, headlines: pack.headlines } : {}),
+    },
     live,
     now,
   );
