@@ -11,6 +11,7 @@ const q = (p: Place) => `lat=${p.lat}&lon=${p.lon}`;
 
 export const api = {
   locate: (lat: number, lon: number) => get<Place>(`/api/location?lat=${lat}&lon=${lon}`),
+  whereami: () => get<Place>("/api/location?ip=1"),
   search: (query: string) => get<Place>(`/api/location?q=${encodeURIComponent(query)}`),
   forecast: (p: Place) =>
     get<Forecast>(`/api/forecast?${q(p)}${p.office ? `&office=${p.office}&x=${p.gridX}&y=${p.gridY}` : ""}`),

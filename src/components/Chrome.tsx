@@ -27,8 +27,13 @@ export function AnnouncementBar() {
   const list = announcements.value;
   if (list.length === 0) return null;
   return (
-    <div class={`ann ${list.some((a) => a.level === "warn") ? "warn" : ""}`} role="status">
-      {list.map((a) => a.text).join("   •   ")}
+    <div class="notices" role="status">
+      {list.map((a) => (
+        <div class={`notice ${a.level === "warn" ? "warn" : "info"}`} key={a.id}>
+          <span class="notice-tag">{a.level === "warn" ? "Attention" : "Notice"}</span>
+          <span class="notice-text">{a.text}</span>
+        </div>
+      ))}
     </div>
   );
 }

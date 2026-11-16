@@ -49,6 +49,17 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
   if (path === "/api/location") {
     let c = coords(url);
     let label: string | undefined;
+    if (!c && url.searchParams.has("ip")) {
+      // Approximate position from the visitor's IP (Cloudflare edge data). Never leaves Cloudflare.
+      const cf = request.cf;
+      const lat = Number(cf?.latitude);
+      const lon = Number(cf?.longitude);
+      if (cf?.country !== "US" || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return json({ error: "ip_location_unavailable" }, 404);
+      }
+      c = { lat: round(lat, 4), lon: round(lon, 4) };
+      label = typeof cf.city === "string" ? cf.city : undefined;
+    }
     const q = url.searchParams.get("q");
     if (!c && q) {
       const g = await geocode(q.slice(0, 100));

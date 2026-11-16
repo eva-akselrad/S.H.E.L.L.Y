@@ -30,7 +30,7 @@ async function mount() {
   const { App } = await import("../src/app");
   store.place.value = place;
   store.forecast.value = forecast;
-  store.started.value = true;
+  
   store.mode.value = "web";
   const root = document.createElement("div");
   document.body.append(root);

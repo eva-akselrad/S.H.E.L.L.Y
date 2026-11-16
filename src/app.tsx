@@ -5,7 +5,7 @@ import { applyThreatToMusic, musicOn, refreshMusic, startMusic } from "./music";
 import { KioskShell } from "./shells/Kiosk";
 import { PhoneShell } from "./shells/Phone";
 import { WebShell } from "./shells/Web";
-import { config, locateByCoords, mode, place, started, startCycling, startPollers, threat } from "./state/store";
+import { config, locateByCoords, mode, place, startCycling, startPollers, threat } from "./state/store";
 import { Takeover } from "./takeover/Takeover";
 import { announce } from "./tts";
 
@@ -18,7 +18,7 @@ function wire(): void {
   effect(() => {
     const t = threat.value;
     applyThreatToMusic(t.level);
-    announce(t.level, t.active, t.primary, started.value && config.value.tts, {
+    announce(t.level, t.active, t.primary, config.value.tts, {
       ai: config.value.voice.engine === "ai",
       lat: place.value?.lat ?? 0,
       lon: place.value?.lon ?? 0,
@@ -31,9 +31,13 @@ function wire(): void {
 }
 
 export function App() {
-  useEffect(wire, []);
+  useEffect(() => {
+    wire();
+    // No Start screen: begin right away. Audio the browser blocks is retried on the first
+    // touch/key, or plays as-is with --autoplay-policy=no-user-gesture-required (kiosks).
+    void startMusic();
+  }, []);
 
-  if (!started.value) return <Splash />;
   if (!place.value) return <PickLocation />;
 
   const m = mode.value;
@@ -41,26 +45,6 @@ export function App() {
     <div class={`app mode-${m} lvl-${threat.value.level.toLowerCase()}`}>
       {m === "kiosk" ? <KioskShell /> : m === "phone" ? <PhoneShell /> : <WebShell />}
       <Takeover />
-    </div>
-  );
-}
-
-/** One tap: unlocks audio + speech (browsers block both until a gesture). */
-function Splash() {
-  return (
-    <div class="splash">
-      <Logo />
-      <p>Live weather that gets louder when the weather does.</p>
-      <button
-        type="button"
-        class="primary"
-        onClick={() => {
-          started.value = true;
-          void startMusic();
-        }}
-      >
-        Start
-      </button>
     </div>
   );
 }

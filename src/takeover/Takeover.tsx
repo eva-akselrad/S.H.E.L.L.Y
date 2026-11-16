@@ -24,9 +24,15 @@ export function Takeover() {
         <h1>{a.event}</h1>
         {left && <div class="tk-count" aria-label="Time remaining">{left}</div>}
       </header>
-      {!emergency && <div class="tk-map"><Radar /></div>}
-      <p class="tk-area">{a.areaDesc}</p>
-      <p class="tk-text">{emergency ? instruction.slice(0, 600) : instruction.slice(0, 280)}</p>
+      <div class="tk-body">
+        {!emergency && <div class="tk-map"><Radar /></div>}
+        <div class="tk-info">
+          <p class="tk-label">{emergency ? "Take action now" : "What to do"}</p>
+          <p class="tk-text">{emergency ? instruction.slice(0, 600) : instruction.slice(0, 320)}</p>
+          <p class="tk-label">Affected area</p>
+          <p class="tk-area">{a.areaDesc.split(";").map((s) => s.trim()).filter(Boolean).slice(0, 6).join(" · ")}</p>
+        </div>
+      </div>
       <div class="crawl" aria-hidden="true">
         <span>{t.active.map((x) => `${x.event} — ${x.headline}`).join("   •   ")}</span>
       </div>

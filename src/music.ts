@@ -73,12 +73,16 @@ export async function startMusic(): Promise<void> {
   if (audio || !musicAllowed.value) return;
   try {
     const res = await fetch("/music/playlist.json");
-    tracks = ((await res.json()) as { tracks: Track[] }).tracks;
+    tracks = ((await res.json()) as { tracks?: Track[] }).tracks ?? [];
   } catch {
     return;
   }
   if (tracks.length === 0) return;
   audio = new Audio();
+  // If autoplay was blocked (no gesture yet), the first interaction unlocks it.
+  const unlock = (): void => apply();
+  addEventListener("pointerdown", unlock, { once: true });
+  addEventListener("keydown", unlock, { once: true });
   audio.addEventListener("ended", () => {
     pos += 1;
     playCurrent();

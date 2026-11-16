@@ -41,7 +41,9 @@ export const config = signal<SiteConfig>(load<SiteConfig>("config") ?? DEFAULT_C
 export const mode = signal<Mode>(detectMode());
 export const paused = signal(false);
 export const segIndex = signal(0);
-export const started = signal(false);
+/** There is no Start screen any more; kept so audio/speech can still be gated in tests. */
+export const started = signal(true);
+let ipTried = false;
 export const now = signal(Date.now());
 
 export const threat = computed(() => {
@@ -173,7 +175,13 @@ export const refresh = {
         applyDefaultTheme(c.defaultTheme);
         configureMusic(c.music);
         if (c.defaultMode !== "auto" && !new URLSearchParams(location.search).get("mode")) mode.value = c.defaultMode;
-        if (!place.peek() && c.defaultLocation) void setPlace(c.defaultLocation);
+        if (!place.peek()) {
+          if (c.defaultLocation) void setPlace(c.defaultLocation);
+          else if (!ipTried) {
+            ipTried = true;
+            void api.whereami().then(setPlace).catch(() => undefined); // non-US/unknown: the picker stays up
+          }
+        }
       },
     ),
   announcements: () =>
