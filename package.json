@@ -1,24 +1,34 @@
 {
   "name": "shelly",
-  "version": "1.0.0",
-  "description": "S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook",
-  "main": "server.js",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SHELLY – Severe Hydrology & Environmental Live Logging Yearbook",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test": "node --test",
-    "deploy": "wrangler deploy",
-    "preview": "wrangler dev"
+    "dev": "vite",
+    "prebuild": "node scripts/gen-playlist.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "wrangler types && tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json",
+    "test": "vitest run",
+    "types": "wrangler types",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "express-rate-limit": "^7.5.0",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "web-push": "^3.6.7",
-    "xss": "^1.0.15"
+    "@preact/signals": "^2.11.4",
+    "leaflet": "^1.9.4",
+    "preact": "^11.2.0"
   },
   "devDependencies": {
-    "wrangler": "^4.83.0"
+    "@cloudflare/vite-plugin": "^1.69.1",
+    "@cloudflare/workers-types": "^5.20261116.1",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^26.6.6",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.162.0"
   }
 }

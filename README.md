@@ -1,55 +1,56 @@
-# S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook
+# SHELLY
 
-S.H.E.L.L.Y. is a high-availability, edge-optimized weather communication platform designed for kiosks, dashboards, and critical alert systems.
+**S**evere **H**ydrology & **E**nvironmental **L**ive **L**ogging **Y**earbook — a US-only live weather
+display that gets louder when the weather does. Named after the author's grandmother.
 
----
+SHELLY v2 is one Cloudflare Worker serving a Preact app and a small JSON API. The old v1 app is
+tagged `legacy-v1`.
 
-## 📖 Extensive Documentation
+## What it does
 
-We have moved our detailed documentation to the `docs/` folder for better organization:
+- Computes a **threat level** (CALM / ELEVATED / WARNING / EMERGENCY) from NWS alerts, the SPC
+  outlook and a 15-minute nowcast (`shared/threat.ts`).
+- The threat level changes the screen: a relaxed loop when calm, a shorter loop with radar and the
+  SPC outlook when elevated, a radar-locked warning takeover with countdown and spoken read-out for
+  warnings, and a full-screen takeover for emergencies (observed tornado, destructive storm, PDS,
+  flash flood emergency).
+- Three layouts: **kiosk/TV** (16:9 stage, auto-cycling), **desktop** (drive it yourself) and
+  **phone** (scrollable cards, threat pinned). Force one with `?mode=kiosk|web|phone`.
 
-- **[Architecture Overview](docs/ARCHITECTURE.md)** – Deep dive into how S.H.E.L.L.Y. works.
-- **[Security Hardening](docs/SECURITY.md)** – Detailed information on our multi-layered security approach.
-- **[API Reference](docs/API.md)** – Complete guide to the system's endpoints.
-- **[Cloudflare Workers Setup](docs/CLOUDFLARE_WORKERS.md)** – How to deploy S.H.E.L.L.Y. as a standalone Worker.
-- **[Implementation Plan](docs/PLAN.md)** – The historical roadmap and current status.
+## Develop
 
----
-
-## 🚀 Quick Start
-
-### 1. Local Development
 ```bash
 npm install
-npm start
+npm run dev        # http://localhost:5173
+npm run typecheck
+npm test
+npm run build
 ```
-The server will be running at `http://localhost:3000`.
-- **Admin Panel**: `http://localhost:3000/admin.html` (Password: `weathernow`)
 
-### 2. Deployment Options
+Trigger the alert poller locally: `curl http://localhost:5173/cdn-cgi/handler/scheduled`.
 
-#### **Option A: Cloudflare Pages (Recommended)**
-1. Connect your GitHub repository to Cloudflare Pages.
-2. Set the build command to `npm install` (or leave empty if no build is needed).
-3. Set the output directory to `.` (root).
-4. Add your Environment Variables in the Pages dashboard.
+## Deploy
 
-#### **Option B: Cloudflare Workers**
-1. Ensure `wrangler` is installed.
-2. Update `wrangler.toml` with your KV namespace ID.
-3. Run `npx wrangler deploy`.
-4. See the **[Workers Guide](docs/CLOUDFLARE_WORKERS.md)** for details.
+```bash
+npm run deploy     # builds, then wrangler deploy
+```
 
----
+One `wrangler.jsonc` defines the Worker, static assets, the `STATE` KV namespace (auto-provisioned
+on first deploy) and the every-minute alert-poller cron.
 
-## 🛡 Security Features
-S.H.E.L.L.Y. includes built-in platform security controls, including:
-- **Brute Force Mitigation**
-- **Honeypot Triggers**
-- **XSS Sanitization**
-- **Admin Audit Trails**
+### Admin (announcements)
 
----
+`/admin/` posts announcements to `/api/announcements`. Writes are **fail-closed**: the Worker
+verifies a Cloudflare Access JWT, so until you configure Access they return 401.
 
-## 📄 License
-This project is licensed under the MIT License.
+1. In Cloudflare Zero Trust, create a self-hosted Access application covering `<your-host>/admin*`
+   and `<your-host>/api/announcements`.
+2. Put the team domain and the application AUD tag in `wrangler.jsonc` `vars`
+   (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`) and redeploy.
+
+## Data sources
+
+NWS (alerts, points, forecast text), Open-Meteo (forecast, nowcast, air quality, pollen, geocoding),
+NOAA SPC (convective outlook), RainViewer (radar tiles), Esri (basemap). Clients never call these
+directly except map and radar tiles. NWS requests carry
+`SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)`.

@@ -1,0 +1,75 @@
+import { useState } from "preact/hooks";
+import { musicOn, nextTrack, nowPlaying, toggleMusic } from "../music";
+import { alertsUpdated, announcements, locateByQuery, online, place, threat } from "../state/store";
+
+export function Logo() {
+  return (
+    <span class="logo">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <path d="M16 28c-6.6 0-12-4.7-12-10.5S9.4 6 16 6s10 3.8 10 8.5-3.6 7.5-8 7.5-6.5-2.4-6.5-5S13 11.5 15 11.5" />
+      </svg>
+      <b>SHELLY</b>
+    </span>
+  );
+}
+
+export function ThreatBadge() {
+  const t = threat.value;
+  return (
+    <span class={`badge lvl-${t.level.toLowerCase()}`} title={t.reasons.join(", ")}>
+      {t.level}
+    </span>
+  );
+}
+
+export function AnnouncementBar() {
+  const list = announcements.value;
+  if (list.length === 0) return null;
+  return (
+    <div class={`ann ${list.some((a) => a.level === "warn") ? "warn" : ""}`} role="status">
+      {list.map((a) => a.text).join("   •   ")}
+    </div>
+  );
+}
+
+export function StatusLine() {
+  if (!online.value) return <span class="offline">Offline — showing last data</span>;
+  const u = alertsUpdated.value;
+  return <span class="muted">{u ? `Alerts checked ${new Date(u).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}</span>;
+}
+
+export function MusicControl() {
+  return (
+    <span class="music">
+      <button type="button" onClick={toggleMusic} aria-pressed={musicOn.value}>
+        {musicOn.value ? "Music on" : "Music off"}
+      </button>
+      {musicOn.value && nowPlaying.value && (
+        <button type="button" onClick={nextTrack} title={nowPlaying.value}>Next</button>
+      )}
+    </span>
+  );
+}
+
+export function SearchBox() {
+  const [q, setQ] = useState("");
+  const [err, setErr] = useState("");
+  const go = async (e: Event) => {
+    e.preventDefault();
+    if (!q.trim()) return;
+    try {
+      setErr("");
+      await locateByQuery(q.trim());
+      setQ("");
+    } catch {
+      setErr("US locations only — try a city name or ZIP");
+    }
+  };
+  return (
+    <form class="search" onSubmit={go}>
+      <input value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} placeholder={place.value?.name ?? "City or ZIP"} aria-label="Search for a US location" />
+      <button type="submit">Go</button>
+      {err && <span class="err">{err}</span>}
+    </form>
+  );
+}

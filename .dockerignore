@@ -1,6 +1,0 @@
-.git
-.gitattributes
-*.md
-node_modules
-nginx.conf
-"radar examples"

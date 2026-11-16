@@ -1,0 +1,61 @@
+{
+  "name": "SHELLY background music",
+  "tracks": [
+    {
+      "title": "Ashtray On The Windowsill (v2)",
+      "file": "Ashtray On The Windowsill (v2).mp3"
+    },
+    {
+      "title": "Ashtray On The Windowsill",
+      "file": "Ashtray On The Windowsill.mp3"
+    },
+    {
+      "title": "Catch the Sun",
+      "file": "Catch the Sun.mp3"
+    },
+    {
+      "title": "Clouds in 3/4 Time (v2)",
+      "file": "Clouds in 3_4 Time (v2).mp3"
+    },
+    {
+      "title": "Clouds in 3/4 Time (v3)",
+      "file": "Clouds in 3_4 Time (v3).mp3"
+    },
+    {
+      "title": "Crisp day",
+      "file": "Crisp day.mp3"
+    },
+    {
+      "title": "Cumulus Commute (v2)",
+      "file": "Cumulus Commute (v2).mp3"
+    },
+    {
+      "title": "Cumulus Commute (v3)",
+      "file": "Cumulus Commute (v3).mp3"
+    },
+    {
+      "title": "Cumulus Commute (v4)",
+      "file": "Cumulus Commute (v4).mp3"
+    },
+    {
+      "title": "Cumulus Commute",
+      "file": "Cumulus Commute.mp3"
+    },
+    {
+      "title": "Midnight Reverie (v2)",
+      "file": "Midnight Reverie (v2).mp3"
+    },
+    {
+      "title": "Midnight Reverie",
+      "file": "Midnight Reverie.mp3"
+    },
+    {
+      "title": "Rolling Clouds",
+      "file": "Rolling Clouds.mp3"
+    },
+    {
+      "title": "Strong Breeze",
+      "file": "Strong Breeze.mp3"
+    }
+  ]
+}

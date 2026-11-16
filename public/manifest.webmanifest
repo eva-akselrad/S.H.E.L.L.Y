@@ -1,0 +1,10 @@
+{
+  "name": "SHELLY",
+  "short_name": "SHELLY",
+  "description": "Live weather that escalates with the threat level.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [{ "src": "/favicon.png", "sizes": "any", "type": "image/png" }]
+}

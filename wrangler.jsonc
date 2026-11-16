@@ -1,14 +1,19 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "shelly",
-  "compatibility_date": "2026-04-15",
-  "observability": {
-    "enabled": true
-  },
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "."
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
   },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
+  "kv_namespaces": [{ "binding": "STATE" }],
+  "vars": {
+    "NWS_USER_AGENT": "SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true }
 }
