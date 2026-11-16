@@ -32,7 +32,7 @@ const enable = async (token = "") =>
   env.STATE.put("config", JSON.stringify({ ...DEFAULT_CONFIG, live: { ...DEFAULT_CONFIG.live, enabled: true, viewerToken: token } }));
 
 beforeEach(() => {
-  env = { STATE: fakeKv() } as Env;
+  env = { STATE: fakeKv() } as unknown as Env;
 });
 
 describe("live producer and API", () => {
