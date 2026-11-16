@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { DEFAULT_CONFIG } from "../shared/config";
 import worker from "../worker/index";
 
 type Req = Parameters<typeof worker.fetch>[0];
@@ -157,5 +158,39 @@ describe("SHELLY Live admin", () => {
     const r = await authed("POST", "/api/admin/live/llm-test");
     expect(await r.json()).toMatchObject({ ok: false, error: "no_api_key" });
     expect(((await (await authed("GET", "/api/admin/live")).json()) as { keySet: boolean }).keySet).toBe(false);
+  });
+});
+
+describe("Forecaster Studio API", () => {
+  const product = (over: Record<string, unknown> = {}) => ({
+    kind: "riskMap", title: "Risk", validFrom: new Date(Date.now() - 3600_000).toISOString(), validTo: new Date(Date.now() + 3600_000).toISOString(),
+    published: true, body: { areas: [] }, ...over,
+  });
+  test("needs a session", async () => {
+    expect((await call("/api/admin/studio")).status).toBe(401);
+  });
+  test("create, publish, appear publicly, expire, delete", async () => {
+    const r = await authed("PUT", "/api/admin/studio", product());
+    expect(r.status).toBe(200);
+    const saved = (await r.json()) as { id: string };
+    expect(saved.id).toBeTruthy();
+    await authed("PUT", "/api/admin/studio", product({ title: "Draft", published: false }));
+    await authed("PUT", "/api/admin/studio", product({ title: "Old", validTo: new Date(Date.now() - 60_000).toISOString() }));
+    const pub = (await (await call("/api/studio")).json()) as { title: string }[];
+    expect(pub.map((p) => p.title)).toEqual(["Risk"]);
+    expect(((await (await authed("GET", "/api/admin/studio")).json()) as unknown[]).length).toBe(3);
+    await authed("DELETE", `/api/admin/studio?id=${saved.id}`);
+    expect(((await (await call("/api/studio")).json()) as unknown[]).length).toBe(0);
+  });
+  test("rejects an unusable product", async () => {
+    expect((await authed("PUT", "/api/admin/studio", product({ kind: "bogus" }))).status).toBe(400);
+    expect((await authed("PUT", "/api/admin/studio", product({ validFrom: "nope" }))).status).toBe(400);
+  });
+  test("a published product shows up as a map item in the live rundown", async () => {
+    const { produceRundown } = await import("../worker/live");
+    await authed("PUT", "/api/admin/studio", product({ title: "Tomorrow's Risk" }));
+    const live = { ...DEFAULT_CONFIG.live, enabled: true };
+    const r = await produceRundown(env, { ...DEFAULT_CONFIG, live });
+    expect(r?.items.some((i) => i.kind === "map" && i.headline === "TOMORROW'S RISK")).toBe(true);
   });
 });

@@ -11,6 +11,22 @@ export function tempColor(f: number): string {
   return STOPS[STOPS.length - 1]![1];
 }
 
+const OFFSETS: [number, number][] = [[0, -50], [0, 56], [-96, -10], [96, -10], [-86, -62], [86, -62], [-86, 62], [86, 62], [0, -110], [0, 116], [-150, -10], [150, -10]];
+
+/** Greedy label placement so the busy Philadelphia cluster stays readable. */
+export function placeLabels(items: { c: CityTemps["cities"][number]; xy: [number, number] }[]): { c: CityTemps["cities"][number]; xy: [number, number]; bx: number; by: number }[] {
+  const placed: { x: number; y: number }[] = [];
+  const hit = (x: number, y: number) => placed.some((p) => Math.abs(p.x - x) < 108 && Math.abs(p.y - y) < 70);
+  return items.map((it) => {
+    const [x, y] = it.xy;
+    const off = OFFSETS.find(([dx, dy]) => !hit(x + dx, y + dy)) ?? OFFSETS[0]!;
+    const bx = x + off[0];
+    const by = y + off[1];
+    placed.push({ x: bx, y: by });
+    return { ...it, bx, by };
+  });
+}
+
 const TITLES = { high: "Highs", low: "Lows", feelsLike: "Feels Like" } as const;
 
 export function CityTempsView({ product, fmt, forecaster }: { product: StudioProduct; fmt: Format; forecaster: string }) {
@@ -27,15 +43,15 @@ export function CityTempsView({ product, fmt, forecaster }: { product: StudioPro
     <Frame fmt={fmt} title={product.title || TITLES[body.metric]} sub={validLine(product.validFrom, product.validTo)} credit={forecaster ? `Forecast by ${forecaster}` : "SHELLY forecast"}>
       <Basemap proj={proj} bbox={product.region} />
       <MapClip proj={proj} id="ct-clip">
-        {body.cities.map((c) => {
-          const [x, y] = proj.xy(c.lon, c.lat);
+        {placeLabels(body.cities.map((c) => ({ c, xy: proj.xy(c.lon, c.lat) }))).map(({ c, xy: [x, y], bx, by }) => {
           const col = tempColor(c.value);
           return (
             <g key={c.name}>
-              <circle cx={x} cy={y} r="8" fill={col} stroke="#0b1220" stroke-width="3" />
-              <rect x={x - 46} y={y - 62} width="92" height="46" rx="12" fill={C.bg} stroke={col} stroke-width="3" />
-              <text x={x} y={y - 28} text-anchor="middle" font-family={SERIF} font-size="34" font-weight="700" fill={C.text}>{Math.round(c.value)}°</text>
-              <text x={x} y={y + 34} text-anchor="middle" font-family={SANS} font-size="22" font-weight="600" fill={C.text} stroke={C.bg} stroke-width="5" paint-order="stroke">{c.name}</text>
+              <line x1={x} y1={y} x2={bx} y2={by} stroke={col} stroke-width="2" opacity=".7" />
+              <circle cx={x} cy={y} r="7" fill={col} stroke="#0b1220" stroke-width="3" />
+              <rect x={bx - 44} y={by - 24} width="88" height="42" rx="11" fill={C.bg} stroke={col} stroke-width="3" />
+              <text x={bx} y={by + 9} text-anchor="middle" font-family={SERIF} font-size="32" font-weight="700" fill={C.text}>{Math.round(c.value)}°</text>
+              <text x={bx} y={by + 40} text-anchor="middle" font-family={SANS} font-size="20" font-weight="600" fill={C.text} stroke={C.bg} stroke-width="5" paint-order="stroke">{c.name}</text>
             </g>
           );
         })}

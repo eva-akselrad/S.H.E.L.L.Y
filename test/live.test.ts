@@ -143,3 +143,19 @@ describe("buildRundown", () => {
     expect(r.items.find((i) => i.kind === "radar")?.durationSec).toBe(33);
   });
 });
+
+describe("SPC to risk areas", () => {
+  const box = (w: number, s: number, e: number, n: number) => ({ type: "Polygon" as const, coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] });
+  test("maps categories to SHELLY levels and drops areas outside the region", async () => {
+    const { spcAreas } = await import("../worker/studio");
+    const fc = {
+      features: [
+        { properties: { LABEL: "SLGT" }, geometry: box(-75.5, 39.5, -74.5, 40.5) },
+        { properties: { LABEL: "ENH" }, geometry: box(-75.2, 39.8, -74.9, 40.1) },
+        { properties: { LABEL: "MRGL" }, geometry: box(-100, 35, -99, 36) },
+        { properties: { LABEL: "TSTM" }, geometry: box(-75.5, 39.5, -74.5, 40.5) },
+      ],
+    };
+    expect(spcAreas(fc, DEFAULT_LIVE.region.bbox).map((a) => a.level)).toEqual(["some", "moderate"]);
+  });
+});

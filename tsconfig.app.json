@@ -13,5 +13,5 @@
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "shared", "test/app.test.tsx", "test/tts.test.ts", "test/broadcast.test.tsx"]
+  "include": ["src", "shared", "test/app.test.tsx", "test/tts.test.ts", "test/broadcast.test.tsx", "test/studio.test.tsx"]
 }
