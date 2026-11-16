@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { MODES, SEGMENT_IDS, SPEAKERS, THEMES, type SiteConfig, type Speaker } from "../../shared/config";
+import { SCENES } from "../../shared/scene";
 import type { SegmentId } from "../../shared/scheduler";
 import { SEGMENTS } from "../../shared/scheduler";
 import type { Place } from "../../shared/types";
@@ -115,6 +116,16 @@ export function Display() {
             <button type="button" class="adm-btn small primary" onClick={() => { set("defaultLocation", found); setFound(null); setQuery(""); }}>Use as default</button>
           </div>
         )}
+      </Card>
+
+      <Card title="Weather scenes" hint="The whole display takes on the mood of the weather outside: sunny sky, rain, snow, fog, thunderstorms with lightning, starry nights. Warnings and emergencies still take over the screen.">
+        <Toggle checked={draft.scenes} onChange={(v) => set("scenes", v)} label="Change the look with the weather" hint="When on, the theme toggle is hidden because the sky decides the colors." />
+        <span class="adm-label">Preview a scene</span>
+        <div class="adm-row">
+          {SCENES.map((s) => (
+            <a key={s.id} class="adm-btn small" href={`/?scene=${s.id}`} target="_blank" rel="noreferrer">{s.label}</a>
+          ))}
+        </div>
       </Card>
 
       <div class="adm-cols">

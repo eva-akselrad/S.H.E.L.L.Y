@@ -35,6 +35,8 @@ export interface SiteConfig {
   hiddenSegments: SegmentId[];
   segmentSeconds: Partial<Record<SegmentId, number>>;
   tts: boolean;
+  /** weather-driven backgrounds and mood */
+  scenes: boolean;
   voice: VoiceConfig;
   music: { enabled: boolean; volume: number; disabledTracks: string[] };
   note: ForecasterNote;
@@ -47,6 +49,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
   hiddenSegments: [],
   segmentSeconds: {},
   tts: true,
+  scenes: true,
   voice: { engine: "ai", speaker: "athena", dailyCharCap: 20000 },
   music: { enabled: true, volume: 0.35, disabledTracks: [] },
   note: { enabled: false, title: "", body: "", expires: null },
@@ -108,6 +111,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       : [],
     segmentSeconds: secs,
     tts: r.tts !== false,
+    scenes: r.scenes !== false,
     voice: {
       engine: voice.engine === "browser" ? "browser" : "ai",
       speaker: (SPEAKERS as readonly unknown[]).includes(voice.speaker) ? (voice.speaker as Speaker) : "athena",

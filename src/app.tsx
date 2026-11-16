@@ -2,6 +2,7 @@ import { effect } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { Logo, SearchBox } from "./components/Chrome";
 import { applyThreatToMusic, musicOn, refreshMusic, startMusic } from "./music";
+import { Scene } from "./scene/Scene";
 import { KioskShell } from "./shells/Kiosk";
 import { PhoneShell } from "./shells/Phone";
 import { WebShell } from "./shells/Web";
@@ -42,10 +43,13 @@ export function App() {
 
   const m = mode.value;
   return (
-    <div class={`app mode-${m} lvl-${threat.value.level.toLowerCase()}`}>
+    <>
+      <Scene />
+      <div class={`app mode-${m} lvl-${threat.value.level.toLowerCase()}`}>
       {m === "kiosk" ? <KioskShell /> : m === "phone" ? <PhoneShell /> : <WebShell />}
       <Takeover />
-    </div>
+      </div>
+    </>
   );
 }
 
