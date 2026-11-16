@@ -11,25 +11,31 @@
   --elevated: #ffb020;
   --warning: #ff4d4d;
   --emergency: #e5006e;
+  --line: #ffffff1f;
   --radius: 14px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f6f1e8; --panel: #fffdf8; --panel-2: #efe7d8; --text: #1b2233; --muted: #5d6579;
+  :root:not([data-theme]) {
+    --bg: #f6f1e8; --panel: #fffdf8; --panel-2: #efe7d8; --text: #1b2233; --muted: #5d6579; --line: #1b223318;
     color-scheme: light;
   }
 }
+:root[data-theme="light"] {
+  --bg: #f6f1e8; --panel: #fffdf8; --panel-2: #efe7d8; --text: #1b2233; --muted: #5d6579; --line: #1b223318;
+  color-scheme: light;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body, #app { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--text); font-family: var(--font); -webkit-text-size-adjust: 100%; }
 button, input { font: inherit; color: inherit; }
-button { background: var(--panel-2); border: 1px solid #ffffff1f; border-radius: 10px; padding: 8px 14px; cursor: pointer; min-height: 44px; }
-button:hover { background: #ffffff14; }
+button { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; cursor: pointer; min-height: 44px; }
+button:hover { filter: brightness(1.08); }
 button.primary { background: var(--accent); color: #1b1006; border: 0; font-weight: 700; padding: 14px 28px; font-size: 1.1rem; }
-input { background: var(--panel); border: 1px solid #ffffff24; border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+input { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
 :focus-visible { outline: 3px solid var(--info); outline-offset: 2px; }
 .muted { color: var(--muted); }
 .err, .offline { color: var(--warn); }
@@ -154,3 +160,10 @@ input { background: var(--panel); border: 1px solid #ffffff24; border-radius: 10
   .takeover.emergency, .crawl span, .stage-main, .web-card { animation: none; }
   .crawl span { padding-left: 0; }
 }
+
+.theme-toggle { min-width: 64px; }
+.head-right { display: inline-flex; align-items: center; gap: 8px; }
+.seg-note { max-width: 70ch; }
+.seg-note h3 { margin: 0 0 8px; font-family: var(--display); font-size: 1.5em; color: var(--accent); }
+.seg-note p { margin: 0; font-size: 1.25em; line-height: 1.5; white-space: pre-wrap; }
+.stage .seg-note p { font-size: 1.6em; }

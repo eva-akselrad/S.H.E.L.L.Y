@@ -1,3 +1,4 @@
+import type { SiteConfig } from "../shared/config";
 import type { AirQuality, Alert, Announcement, Forecast, Outlook, Place, RadarFrames } from "../shared/types";
 
 async function get<T>(path: string): Promise<T> {
@@ -15,10 +16,11 @@ export const api = {
     get<Forecast>(`/api/forecast?${q(p)}${p.office ? `&office=${p.office}&x=${p.gridX}&y=${p.gridY}` : ""}`),
   alerts: (p: Place) => {
     const zones = [p.forecastZone, p.countyZone, p.fireZone].filter(Boolean).join(",");
-    return get<{ updated: string | null; alerts: Alert[] }>(`/api/alerts?zones=${zones}`);
+    return get<{ updated: string | null; alerts: Alert[] }>(`/api/alerts?zones=${zones}&${q(p)}`);
   },
   outlook: (p: Place) => get<Outlook>(`/api/outlook?${q(p)}`),
   air: (p: Place) => get<AirQuality>(`/api/airquality?${q(p)}`),
   radar: () => get<RadarFrames>("/api/radar"),
+  config: () => get<SiteConfig>("/api/config"),
   announcements: () => get<Announcement[]>("/api/announcements"),
 };

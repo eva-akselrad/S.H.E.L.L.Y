@@ -1,9 +1,12 @@
 import { computed, effect, signal } from "@preact/signals";
+import { DEFAULT_CONFIG, noteActive, type SiteConfig } from "../../shared/config";
 import { buildLoop } from "../../shared/scheduler";
 import { computeThreat } from "../../shared/threat";
 import type { AirQuality, Alert, Announcement, Forecast, Outlook, Place, RadarFrames } from "../../shared/types";
 import { api } from "../api";
+import { configureMusic } from "../music";
 import { detectMode, type Mode } from "../mode";
+import { applyDefaultTheme } from "../theme";
 
 // ── persistence (last-good cache so the display survives a network blip) ──
 const LS = "shelly.v2.";
@@ -34,6 +37,7 @@ export const announcements = signal<Announcement[]>([]);
 export const online = signal(true);
 export const lastError = signal<string | null>(null);
 
+export const config = signal<SiteConfig>(load<SiteConfig>("config") ?? DEFAULT_CONFIG);
 export const mode = signal<Mode>(detectMode());
 export const paused = signal(false);
 export const segIndex = signal(0);
@@ -55,8 +59,19 @@ export const threat = computed(() => {
   });
 });
 
+/** Separate computed so the per-second clock doesn't rebuild the loop: it only changes when the note flips. */
+export const noteOn = computed(() => noteActive(config.value, now.value));
+
 export const loop = computed(() =>
-  buildLoop({ forecast: forecast.value, aq: air.value, outlook: outlook.value, level: threat.value.level }),
+  buildLoop({
+    forecast: forecast.value,
+    aq: air.value,
+    outlook: outlook.value,
+    level: threat.value.level,
+    note: noteOn.value,
+    hidden: config.value.hiddenSegments,
+    seconds: config.value.segmentSeconds,
+  }),
 );
 
 export const currentSegment = computed(() => {
@@ -149,6 +164,18 @@ export const refresh = {
         radar.value = r;
       },
     ),
+  config: () =>
+    guarded(
+      () => api.config(),
+      (c) => {
+        config.value = c;
+        save("config", c);
+        applyDefaultTheme(c.defaultTheme);
+        configureMusic(c.music);
+        if (c.defaultMode !== "auto" && !new URLSearchParams(location.search).get("mode")) mode.value = c.defaultMode;
+        if (!place.peek() && c.defaultLocation) void setPlace(c.defaultLocation);
+      },
+    ),
   announcements: () =>
     guarded(
       () => api.announcements(),
@@ -174,6 +201,7 @@ export function startPollers(): void {
   every(30 * 60_000, refresh.air);
   every(2 * 60_000, refresh.radar);
   every(60_000, refresh.announcements);
+  every(60_000, refresh.config);
   every(1_000, () => {
     now.value = Date.now();
   });

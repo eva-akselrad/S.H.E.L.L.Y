@@ -40,13 +40,17 @@ on first deploy) and the every-minute alert-poller cron.
 
 ### Admin (announcements)
 
-`/admin/` posts announcements to `/api/announcements`. Writes are **fail-closed**: the Worker
-verifies a Cloudflare Access JWT, so until you configure Access they return 401.
+`/admin/` has a password login that sets a signed, HttpOnly session cookie (12 hours). Five bad
+passwords from one IP locks that IP out for 15 minutes. It is **fail-closed**: with no password
+configured, nobody can log in.
 
-1. In Cloudflare Zero Trust, create a self-hosted Access application covering `<your-host>/admin*`
-   and `<your-host>/api/announcements`.
-2. Put the team domain and the application AUD tag in `wrangler.jsonc` `vars`
-   (`ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`) and redeploy.
+Set the password once as a Worker secret (it is never stored in the repo):
+
+```bash
+npx wrangler secret put ADMIN_PASSWORD
+```
+
+Changing the secret logs everyone out. For local dev, put `ADMIN_PASSWORD=...` in `.dev.vars`.
 
 ## Data sources
 

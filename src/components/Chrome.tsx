@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
-import { musicOn, nextTrack, nowPlaying, toggleMusic } from "../music";
+import { musicAllowed, musicOn, nextTrack, nowPlaying, toggleMusic } from "../music";
+import { cycleTheme, theme } from "../theme";
 import { alertsUpdated, announcements, locateByQuery, online, place, threat } from "../state/store";
 
 export function Logo() {
@@ -38,7 +39,18 @@ export function StatusLine() {
   return <span class="muted">{u ? `Alerts checked ${new Date(u).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}</span>;
 }
 
+export function ThemeToggle() {
+  const t = theme.value;
+  const label = t === "auto" ? "Theme: auto" : t === "light" ? "Theme: light" : "Theme: dark";
+  return (
+    <button type="button" class="theme-toggle" onClick={cycleTheme} title="Switch between auto, light and dark" aria-label={label}>
+      {t === "auto" ? "Auto" : t === "light" ? "Light" : "Dark"}
+    </button>
+  );
+}
+
 export function MusicControl() {
+  if (!musicAllowed.value) return null;
   return (
     <span class="music">
       <button type="button" onClick={toggleMusic} aria-pressed={musicOn.value}>

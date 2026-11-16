@@ -124,6 +124,8 @@ export interface Announcement {
   text: string;
   level: "info" | "warn";
   created: string;
+  /** hidden from displays until this time (scheduled announcements) */
+  starts: string | null;
   expires: string | null;
 }
 

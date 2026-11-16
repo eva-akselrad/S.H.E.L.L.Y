@@ -18,7 +18,7 @@ The product is **SHELLY**, named after the user's grandmother. Never rename it
 - US-only (NWS is the authority for alerts and forecasts).
 - One Cloudflare Worker + static assets. No Pages Functions, no Express.
 - Preact + @preact/signals + TypeScript + Vite + Vitest.
-- Admin auth via Cloudflare Access, not a homemade password.
+- Admin auth is a simple password login (Worker secret `ADMIN_PASSWORD`, signed session cookie, lockout). The user chose this over Cloudflare Access on 2026-11-16.
 - Screens: TV/kiosk, desktop browsers, AND phones, each a first-class layout.
 - No live-site hotfix needed (the old site uses a different password).
 - Music: keep every version; rename "(1)/(2)/(3)" copies to "(v2)/(v3)/…".

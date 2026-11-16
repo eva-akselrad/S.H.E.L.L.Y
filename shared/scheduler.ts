@@ -1,13 +1,19 @@
 import { heatIndex, windChill } from "./wx";
 import type { AirQuality, Forecast, Outlook, ThreatLevel } from "./types";
 
-export type SegmentId = "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text";
+export type SegmentId = "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note";
 
 export interface SegmentCtx {
   forecast: Forecast | null;
   aq: AirQuality | null;
   outlook: Outlook | null;
   level: ThreatLevel;
+  /** an active forecaster's note exists */
+  note?: boolean;
+  /** segments the admin has turned off ("now" can't be hidden) */
+  hidden?: SegmentId[];
+  /** per-segment duration overrides in seconds (before threat scaling) */
+  seconds?: Partial<Record<SegmentId, number>>;
 }
 
 interface SegmentDef {
@@ -19,6 +25,7 @@ interface SegmentDef {
 
 export const SEGMENTS: SegmentDef[] = [
   { id: "now", title: "Right now", seconds: 12, relevance: () => 1 },
+  { id: "note", title: "From the forecaster", seconds: 14, relevance: (c) => (c.note ? 1 : 0) },
   {
     id: "radar",
     title: "Radar",
@@ -83,23 +90,30 @@ export function buildLoop(ctx: SegmentCtx): LoopItem[] {
   const threshold = { CALM: 0.2, ELEVATED: 0.45, WARNING: 0.9, EMERGENCY: 0.9 }[ctx.level];
   const scale = { CALM: 1, ELEVATED: 0.7, WARNING: 0.6, EMERGENCY: 0.6 }[ctx.level];
 
-  let items = SEGMENTS.filter((s) => s.relevance(ctx) >= threshold).map((s) => ({
-    id: s.id,
-    title: s.title,
-    seconds: Math.max(5, Math.round(s.seconds * scale)),
-  }));
+  const hidden = new Set(ctx.hidden ?? []);
+  const base = (id: SegmentId, fallback: number): number => ctx.seconds?.[id] ?? fallback;
+
+  let items = SEGMENTS.filter((s) => s.id === "now" || !hidden.has(s.id))
+    .filter((s) => s.relevance(ctx) >= threshold)
+    .map((s) => ({
+      id: s.id,
+      title: s.title,
+      seconds: Math.max(5, Math.round(base(s.id, s.seconds) * scale)),
+    }));
 
   if (ctx.level !== "CALM") {
     const radar = SEGMENTS.find((s) => s.id === "radar")!;
-    if (!items.some((i) => i.id === "outlook") && ctx.outlook) {
+    if (!items.some((i) => i.id === "outlook") && ctx.outlook && !hidden.has("outlook")) {
       const o = SEGMENTS.find((s) => s.id === "outlook")!;
-      items.push({ id: o.id, title: o.title, seconds: Math.round(o.seconds * scale) });
+      items.push({ id: o.id, title: o.title, seconds: Math.round(base(o.id, o.seconds) * scale) });
     }
     // radar every other segment while elevated
     const withRadar: LoopItem[] = [];
     items.filter((i) => i.id !== "radar").forEach((i, n) => {
       withRadar.push(i);
-      if (n % 2 === 0) withRadar.push({ id: radar.id, title: radar.title, seconds: Math.round(radar.seconds * scale) });
+      if (n % 2 === 0 && !hidden.has("radar")) {
+        withRadar.push({ id: radar.id, title: radar.title, seconds: Math.round(base(radar.id, radar.seconds) * scale) });
+      }
     });
     items = withRadar;
   }

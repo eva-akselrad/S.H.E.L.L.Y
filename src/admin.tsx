@@ -1,74 +1,79 @@
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import type { Announcement } from "../shared/types";
-import { Logo } from "./components/Chrome";
+import { Logo, ThemeToggle } from "./components/Chrome";
+import { Activity } from "./admin/Activity";
+import { Announcements } from "./admin/Announcements";
+import { authed, call, loadConfig } from "./admin/api";
+import { Display } from "./admin/Display";
+import { Login } from "./admin/Login";
+import { Music } from "./admin/Music";
+import { Note } from "./admin/Note";
+import { Overview } from "./admin/Overview";
+import { Simulator } from "./admin/Simulator";
+import { Toasts } from "./admin/ui";
 import "./styles/main.css";
+import "./styles/admin.css";
 
-/** Protected by Cloudflare Access (the Worker verifies the Access JWT on writes). */
-function Admin() {
-  const [list, setList] = useState<Announcement[]>([]);
-  const [text, setText] = useState("");
-  const [level, setLevel] = useState<"info" | "warn">("info");
-  const [hours, setHours] = useState("12");
-  const [msg, setMsg] = useState("");
+const PAGES = [
+  { id: "overview", label: "Overview", view: Overview },
+  { id: "announcements", label: "Announcements", view: Announcements },
+  { id: "note", label: "Forecaster note", view: Note },
+  { id: "simulate", label: "Alert simulator", view: Simulator },
+  { id: "display", label: "Display", view: Display },
+  { id: "music", label: "Music", view: Music },
+  { id: "activity", label: "Activity", view: Activity },
+] as const;
+type PageId = (typeof PAGES)[number]["id"];
 
-  const load = async () => {
-    const r = await fetch("/api/announcements");
-    if (r.ok) setList((await r.json()) as Announcement[]);
-  };
-  useEffect(() => void load(), []);
+const fromHash = (): PageId => PAGES.find((p) => `#${p.id}` === location.hash)?.id ?? "overview";
 
-  const post = async (e: Event) => {
-    e.preventDefault();
-    const expires = Number(hours) > 0 ? new Date(Date.now() + Number(hours) * 3600_000).toISOString() : null;
-    const r = await fetch("/api/announcements", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, level, expires }),
-    });
-    setMsg(r.ok ? "Posted." : r.status === 401 ? "Not authorized (Cloudflare Access not configured or signed out)." : "Failed.");
-    if (r.ok) {
-      setText("");
-      void load();
-    }
-  };
-  const del = async (id: string) => {
-    const r = await fetch(`/api/announcements?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    setMsg(r.ok ? "Removed." : "Not authorized.");
-    void load();
+function Shell() {
+  const [page, setPage] = useState<PageId>(fromHash());
+  useEffect(() => {
+    const on = () => setPage(fromHash());
+    addEventListener("hashchange", on);
+    void loadConfig();
+    return () => removeEventListener("hashchange", on);
+  }, []);
+
+  const View = PAGES.find((p) => p.id === page)!.view;
+  const out = async () => {
+    await call("POST", "/api/admin/logout");
+    authed.value = false;
   };
 
   return (
-    <div class="web">
-      <header class="web-head"><Logo /><span class="muted">Admin · announcements</span></header>
-      <main class="web-main">
-        <form onSubmit={post} class="card" style={{ display: "grid", gap: "12px" }}>
-          <label>Message (shown on every screen)
-            <input style={{ width: "100%" }} maxLength={500} required value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-          </label>
-          <label>Style
-            <select value={level} onChange={(e) => setLevel((e.target as HTMLSelectElement).value as "info" | "warn")}>
-              <option value="info">Info</option><option value="warn">Warning</option>
-            </select>
-          </label>
-          <label>Expires after (hours, 0 = never)
-            <input type="number" min="0" value={hours} onInput={(e) => setHours((e.target as HTMLInputElement).value)} />
-          </label>
-          <button class="primary" type="submit">Post announcement</button>
-          {msg && <p role="status">{msg}</p>}
-        </form>
-        <h3>Active</h3>
-        <ul class="days">
-          {list.map((a) => (
-            <li key={a.id} style={{ gridTemplateColumns: "1fr auto" }}>
-              <span>{a.text}</span>
-              <button type="button" onClick={() => void del(a.id)}>Remove</button>
-            </li>
+    <div class="adm-shell">
+      <aside class="adm-side">
+        <a class="adm-brand" href="#overview"><Logo /><span>admin</span></a>
+        <nav aria-label="Admin sections">
+          {PAGES.map((p) => (
+            <a key={p.id} href={`#${p.id}`} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
           ))}
-          {list.length === 0 && <li class="muted" style={{ gridTemplateColumns: "1fr" }}>None</li>}
-        </ul>
-      </main>
+        </nav>
+        <div class="adm-side-foot">
+          <a href="/" target="_blank" rel="noopener">View site</a>
+          <ThemeToggle />
+          <button type="button" class="adm-btn small" onClick={() => void out()}>Log out</button>
+        </div>
+      </aside>
+      <main class="adm-main"><View /></main>
     </div>
+  );
+}
+
+function Admin() {
+  useEffect(() => {
+    void call<{ authed: boolean }>("GET", "/api/admin/session").then((r) => {
+      authed.value = r.ok ? r.data.authed : false;
+    });
+  }, []);
+  if (authed.value === null) return null;
+  return (
+    <>
+      {authed.value ? <Shell /> : <Login />}
+      <Toasts />
+    </>
   );
 }
 

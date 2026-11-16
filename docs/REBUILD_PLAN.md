@@ -25,7 +25,7 @@ Channel's look, logos or music.
 | Hosting | Was Cloudflare **Pages**. Move to **one Cloudflare Worker with static assets** (see §3 for why). |
 | Frontend | **Preact + @preact/signals + TypeScript + Vite.** User asked for "any framework that is efficient". Preact is about 4 KB, and signals give fine-grained updates for a display that is always on. |
 | Repo strategy | Rebuild on the `rebuild` branch in this repo. Merge to `main` once it does at least what the old app did. |
-| Admin auth | **Cloudflare Access** in front of `/admin*` and the admin API routes. No homemade password or JWT code. |
+| Admin auth | **Simple password login.** Secret `ADMIN_PASSWORD` on the Worker, HMAC-signed HttpOnly session cookie, 5-failure lockout, fail-closed when unset. (Originally Cloudflare Access; the user switched to this on 2026-11-16 to avoid the Zero Trust setup.) |
 
 | Target screens | **All of them: TV/kiosk, desktop browsers, and phones.** These are three first-class layouts, not one scaled canvas (see §5a). |
 | Live-site hotfix | **Not needed.** The old Pages site uses a different password. Skip Phase 0. |
@@ -60,7 +60,7 @@ Cloudflare Worker  ── static assets: dist/client (SPA fallback)
    ├─ /api/outlook?lat=&lon=          → SPC Day 1-3 categorical, risk at point
    ├─ /api/airquality?lat=&lon=       → Open-Meteo AQ + pollen
    ├─ /api/radar                      → RainViewer frame index (tiles load direct)
-   ├─ /api/announcements (GET public, POST/DELETE behind Access)
+   ├─ /api/announcements (GET public, POST/DELETE need the admin session)
    └─ scheduled() every 1 min         → fetch NWS active alerts → KV, keyed by zone
 ```
 
@@ -197,7 +197,7 @@ Read it with `git show legacy-v1:<path>`. Port it into typed modules **with test
    AQ/pollen, almanac, SPC outlook.
 5. **Severe mode.** Warning polygon on radar, expiry countdown, TTS queue, audio
    ducking, emergency takeover.
-6. **Admin.** Announcements + custom forecast + (optional) web push, behind Cloudflare Access.
+6. **Admin.** Announcements + custom forecast + (optional) web push, behind the admin login.
 7. **Polish.** Offline last-good cache (service worker, versioned), visual identity
    pass, accessibility, Lighthouse.
 8. **Cutover.** Point the domain at the Worker, retire the Pages project, merge `rebuild` → `main`.
@@ -206,5 +206,5 @@ Read it with `git show legacy-v1:<path>`. Port it into typed modules **with test
 - One `npm run deploy` publishes the whole app, and only `dist/` + the Worker go out.
 - A test can feed a Tornado Warning fixture and assert the WARNING takeover appears.
 - Alert latency, from NWS issuing to the screen changing, is ≤ ~90 s.
-- No secrets or default passwords in the repo. Admin is behind Access.
+- No secrets or default passwords in the repo. Admin is behind the password login (secret, not in repo).
 - Typecheck, tests and build all pass in CI.

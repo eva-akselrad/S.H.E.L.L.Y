@@ -1,4 +1,4 @@
-import { AnnouncementBar, Logo, SearchBox, StatusLine, ThreatBadge } from "../components/Chrome";
+import { AnnouncementBar, Logo, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { SEGMENT_VIEWS } from "../segments";
 import { loop, threat } from "../state/store";
 
@@ -11,7 +11,7 @@ export function PhoneShell() {
     <div class="phone">
       <header class="phone-head">
         <Logo />
-        <ThreatBadge />
+        <span class="head-right"><ThreatBadge /><ThemeToggle /></span>
       </header>
       {t.level !== "CALM" && t.reasons.length > 0 && (
         <div class={`pin lvl-${t.level.toLowerCase()}`} role="status">{t.reasons.join(" • ")}</div>

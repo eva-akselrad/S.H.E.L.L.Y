@@ -1,13 +1,14 @@
-import type { Alert, Announcement, Forecast, Place } from "../shared/types";
-import { verifyAccess } from "./access";
+import { buildSimAlert } from "../shared/simulate";
+import type { Forecast, Place } from "../shared/types";
+import { handleAdmin } from "./admin";
 import { cached, round } from "./cache";
-import { fetchActiveAlerts, fetchForecastText, fetchPoint } from "./sources/nws";
+import { pollAlerts } from "./poll";
+import { fetchForecastText, fetchPoint } from "./sources/nws";
 import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
 import { fetchRadarFrames } from "./sources/rainviewer";
 import { fetchOutlook } from "./sources/spc";
-
-const ALERTS_KEY = "alerts:active";
-const ANN_KEY = "announcements";
+import { readAlerts, readAnnouncements, readConfig, readSim } from "./store";
+import { handleTts } from "./tts";
 
 const json = (data: unknown, status = 200, maxAge = 0): Response =>
   Response.json(data, {
@@ -33,31 +34,17 @@ async function geocode(q: string): Promise<{ lat: number; lon: number; name: str
   return r ? { lat: r.latitude, lon: r.longitude, name: r.name } : null;
 }
 
-async function readAlerts(env: Env): Promise<{ updated: string | null; alerts: Alert[] }> {
-  const stored = await env.STATE.get<{ updated: string; alerts: Alert[] }>(ALERTS_KEY, "json");
-  return stored ?? { updated: null, alerts: [] };
-}
-
-async function pollAlerts(env: Env): Promise<void> {
-  try {
-    const alerts = await fetchActiveAlerts(env);
-    await env.STATE.put(ALERTS_KEY, JSON.stringify({ updated: new Date().toISOString(), alerts }));
-  } catch (err) {
-    console.error(JSON.stringify({ msg: "alert_poll_failed", err: String(err) }));
-  }
-}
-
-async function readAnnouncements(env: Env): Promise<Announcement[]> {
-  const list = (await env.STATE.get<Announcement[]>(ANN_KEY, "json")) ?? [];
-  const now = Date.now();
-  return list.filter((a) => !a.expires || new Date(a.expires).getTime() > now);
-}
-
 async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
 
   if (path === "/api/health") return json({ ok: true, app: "SHELLY", version: "2.0.0" });
+
+  const admin = await handleAdmin(request, env, url);
+  if (admin) return admin;
+
+  if (path === "/api/config") return json(await readConfig(env), 200, 15);
+  if (path === "/api/tts" && request.method === "GET") return handleTts(env, url);
 
   if (path === "/api/location") {
     let c = coords(url);
@@ -104,7 +91,10 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     if (!updated || Date.now() - new Date(updated).getTime() > 180_000) ctx.waitUntil(pollAlerts(env));
     // Return alerts that name one of the zones, or that carry a polygon (client does the exact test).
     const relevant = alerts.filter((a) => a.geometry || a.zones.some((z) => zones.includes(z)));
-    return json({ updated, alerts: relevant }, 200, 15);
+    // Admin-started test alerts, built around this viewer's location.
+    const c = coords(url);
+    const sim = c ? (await readSim(env)).map((s) => buildSimAlert(s, { ...c, zones })) : [];
+    return json({ updated, alerts: [...sim, ...relevant] }, 200, 15);
   }
 
   if (path === "/api/outlook") {
@@ -130,32 +120,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     return json(data, 200, 60);
   }
 
-  if (path === "/api/announcements") {
-    if (request.method === "GET") return json(await readAnnouncements(env), 200, 15);
-    // Writes are protected by Cloudflare Access in front of this route.
-    if (!(await verifyAccess(request, env))) return json({ error: "unauthorized" }, 401);
-    if (request.method === "POST") {
-      const body = (await request.json().catch(() => null)) as Partial<Announcement> | null;
-      const text = typeof body?.text === "string" ? body.text.trim().slice(0, 500) : "";
-      if (!text) return json({ error: "text_required" }, 400);
-      const list = await readAnnouncements(env);
-      const item: Announcement = {
-        id: crypto.randomUUID(),
-        text,
-        level: body?.level === "warn" ? "warn" : "info",
-        created: new Date().toISOString(),
-        expires: typeof body?.expires === "string" ? body.expires : null,
-      };
-      await env.STATE.put(ANN_KEY, JSON.stringify([item, ...list].slice(0, 20)));
-      return json(item, 201);
-    }
-    if (request.method === "DELETE") {
-      const id = url.searchParams.get("id");
-      const list = await readAnnouncements(env);
-      await env.STATE.put(ANN_KEY, JSON.stringify(list.filter((a) => a.id !== id)));
-      return json({ ok: true });
-    }
-  }
+  if (path === "/api/announcements" && request.method === "GET") return json(await readAnnouncements(env), 200, 15);
 
   return json({ error: "not_found" }, 404);
 }

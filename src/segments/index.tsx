@@ -4,6 +4,7 @@ import { Air } from "./Air";
 import { Almanac } from "./Almanac";
 import { Daily } from "./Daily";
 import { Hourly } from "./Hourly";
+import { Note } from "./Note";
 import { Now } from "./Now";
 import { Outlook } from "./Outlook";
 import { Radar } from "./Radar";
@@ -18,4 +19,5 @@ export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
   outlook: Outlook,
   air: Air,
   almanac: Almanac,
+  note: Note,
 };

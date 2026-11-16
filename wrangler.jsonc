@@ -9,10 +9,9 @@
     "run_worker_first": ["/api/*"]
   },
   "kv_namespaces": [{ "binding": "STATE" }],
+  "ai": { "binding": "AI" },
   "vars": {
-    "NWS_USER_AGENT": "SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)",
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "NWS_USER_AGENT": "SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)"
   },
   "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }

@@ -1,11 +1,11 @@
 import { effect } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { Logo, SearchBox } from "./components/Chrome";
-import { applyThreatToMusic, musicOn, startMusic } from "./music";
+import { applyThreatToMusic, musicOn, refreshMusic, startMusic } from "./music";
 import { KioskShell } from "./shells/Kiosk";
 import { PhoneShell } from "./shells/Phone";
 import { WebShell } from "./shells/Web";
-import { locateByCoords, mode, place, started, startCycling, startPollers, threat } from "./state/store";
+import { config, locateByCoords, mode, place, started, startCycling, startPollers, threat } from "./state/store";
 import { Takeover } from "./takeover/Takeover";
 import { announce } from "./tts";
 
@@ -18,11 +18,15 @@ function wire(): void {
   effect(() => {
     const t = threat.value;
     applyThreatToMusic(t.level);
-    announce(t.level, t.active, t.primary, started.value);
+    announce(t.level, t.active, t.primary, started.value && config.value.tts, {
+      ai: config.value.voice.engine === "ai",
+      lat: place.value?.lat ?? 0,
+      lon: place.value?.lon ?? 0,
+    });
   });
   effect(() => {
     void musicOn.value;
-    applyThreatToMusic(threat.peek().level);
+    refreshMusic();
   });
 }
 

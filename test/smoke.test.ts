@@ -12,8 +12,8 @@ test("unknown api route is 404", async () => {
   expect(res.status).toBe(404);
 });
 
-test("announcement writes are rejected without Access", async () => {
+test("announcement writes are rejected without a session", async () => {
   const req = new Request("https://x/api/announcements", { method: "POST", body: JSON.stringify({ text: "hi" }) }) as Parameters<typeof worker.fetch>[0];
-  const res = await worker.fetch(req, { ACCESS_TEAM_DOMAIN: "", ACCESS_AUD: "" } as Env, {} as ExecutionContext);
+  const res = await worker.fetch(req, {} as Env, {} as ExecutionContext);
   expect(res.status).toBe(401);
 });

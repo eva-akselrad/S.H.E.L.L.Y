@@ -6,6 +6,12 @@
     <meta name="robots" content="noindex" />
     <link rel="icon" href="/favicon.png" />
     <title>SHELLY admin</title>
+    <script>
+      try {
+        var t = localStorage.getItem("shelly.v2.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

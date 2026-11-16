@@ -1,4 +1,4 @@
-import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThreatBadge } from "../components/Chrome";
+import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, loop, paused, segIndex } from "../state/store";
 
@@ -13,6 +13,7 @@ export function WebShell() {
         <SearchBox />
         <ThreatBadge />
         <MusicControl />
+        <ThemeToggle />
       </header>
       <AnnouncementBar />
       <nav class="web-nav" aria-label="Segments">
