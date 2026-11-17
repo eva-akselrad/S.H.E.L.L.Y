@@ -200,6 +200,19 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
     }
 
+    override fun requestLocation() {
+        fun deliver(json: String) {
+            runOnUiThread {
+                web.evaluateJavascript("window.dispatchEvent(new CustomEvent('shelly-location',{detail:$json}))", null)
+            }
+        }
+        if (!hasLocation()) return deliver("""{"error":"permission"}""")
+        Thread {
+            val fix = try { LocationHelper.current(applicationContext) } catch (_: Exception) { null }
+            deliver(if (fix == null) """{"error":"unavailable"}""" else """{"lat":${fix.lat},"lon":${fix.lon}}""")
+        }.start()
+    }
+
     override fun checkForUpdate() = UpdateWorker.checkNow(this, force = true)
 
     override fun openNotificationSettings() {

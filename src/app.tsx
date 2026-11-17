@@ -10,6 +10,7 @@ import { config, locateByCoords, mode, place, startCycling, startPollers, threat
 import { Takeover } from "./takeover/Takeover";
 import { initAudioOut } from "./audioOut";
 import { initPush, syncPush } from "./push";
+import { getDeviceLocation } from "./deviceLocation";
 import { inApp } from "./native";
 import { announce } from "./tts";
 
@@ -50,12 +51,10 @@ export function App() {
     // touch/key, or plays as-is with --autoplay-policy=no-user-gesture-required (kiosks).
     void startMusic();
     // The app follows the phone's GPS. If GPS fails, the last place stays.
-    if (inApp && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => void locateByCoords(p.coords.latitude, p.coords.longitude).catch(() => undefined),
-        () => undefined,
-        { maximumAge: 5 * 60_000, timeout: 15_000 },
-      );
+    if (inApp) {
+      getDeviceLocation()
+        .then((f) => locateByCoords(f.lat, f.lon))
+        .catch(() => undefined);
     }
   }, []);
 

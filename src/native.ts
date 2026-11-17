@@ -10,6 +10,8 @@ export interface ShellyAppBridge {
   /** JSON: {"notifications":bool,"location":bool,"background":bool} */
   permissionStatus(): string;
   /** JSON: {"watches":bool,"quietStart":number|null,"quietEnd":number|null} */
+  /** Newer app builds only: answers with a "shelly-location" window event. */
+  requestLocation?(): void;
   getAlertPrefs(): string;
   setAlertPrefs(json: string): boolean;
 }

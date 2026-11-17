@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { getDeviceLocation } from "../deviceLocation";
 import { musicAllowed, musicOn, nextTrack, nowPlaying, toggleMusic } from "../music";
 import { cycleTheme, theme } from "../theme";
 import { alertsUpdated, announcements, locateByCoords, locateByQuery, online, place, threat } from "../state/store";
@@ -84,14 +85,12 @@ export function SearchBox() {
   };
   const useMyLocation = () => {
     setErr("");
-    if (!navigator.geolocation) return setErr("Location isn't available here");
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        locateByCoords(p.coords.latitude, p.coords.longitude).then(() => setQ("")).catch(() => setErr("SHELLY covers the United States only"));
-      },
-      () => setErr("Couldn't get your location. Check that Location is allowed."),
-      { maximumAge: 60_000, timeout: 15_000 },
-    );
+    getDeviceLocation()
+      .then((f) => locateByCoords(f.lat, f.lon))
+      .then(() => setQ(""))
+      .catch((e: Error) =>
+        setErr(e.message === "permission" || e.message === "denied" ? "Allow Location for SHELLY to use this." : e.message === "timeout" || e.message === "unavailable" ? "Couldn't get your location yet. Try again outside or with GPS on." : "SHELLY covers the United States only"),
+      );
   };
   return (
     <form class="search" onSubmit={go}>

@@ -12,6 +12,7 @@ interface BridgeHost {
     fun canInstallUpdates(): Boolean
     fun openInstallSettings()
     fun checkForUpdate()
+    fun requestLocation()
 }
 
 /**
@@ -49,6 +50,13 @@ class Bridge(private val prefs: Prefs, private val host: BridgeHost, private val
     /** Looks for a newer SHELLY app right now. */
     @JavascriptInterface
     fun checkForUpdate() = post { host.checkForUpdate() }
+
+    /**
+     * Asks the phone for its position. The answer comes back as a "shelly-location" event on window
+     * with detail {"lat":..,"lon":..} or {"error":".."}. Nothing is sent anywhere by the app itself.
+     */
+    @JavascriptInterface
+    fun requestLocation() = post { host.requestLocation() }
 
     @JavascriptInterface
     fun getAlertPrefs(): String = prefs.alertPrefs.toJson()
