@@ -3,7 +3,8 @@
 Kept in case you ever want to go back.
 
 - **Tag:** `legacy-v1` (the last commit of the old app, before the v2 rebuild)
-- **Branch:** `legacy` (same commit, easier to browse and deploy from)
+- **Branch:** `legacy` (the same code plus a README note saying it is unmaintained; easier to browse and deploy from)
+- **Old live site:** https://weathernow-7uq.pages.dev/ (unmaintained, features may not work)
 
 Look at it: `git show legacy-v1:<path>`, or browse the `legacy` branch on GitHub.
 
