@@ -107,6 +107,14 @@ export function cleanPack(p: LlmPack, bannedTopics: string[] = []): LlmPack | nu
   return { headlines, talkBreak };
 }
 
+/** Reasoning models (Qwen3, DeepSeek-R1 style) can put their thinking in <think> tags first. Drop it. */
+export function stripThinking(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^[\s\S]*<\/think>/i, "").trim();
+}
+
+/** Qwen3 turns thinking off when the prompt ends with this switch. */
+export const needsNoThink = (model: string): boolean => /qwen3/i.test(model);
+
 export const utcDay = (d = new Date()): string => d.toISOString().slice(0, 10);
 
 /** Small stable hash for cache keys. */

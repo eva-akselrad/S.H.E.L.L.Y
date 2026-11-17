@@ -115,3 +115,16 @@ describe("LLM client and producer fallbacks", () => {
     expect(JSON.parse(init!.body as string)).toMatchObject({ model: "a:free", models: ["a:free", "b:free"], response_format: { type: "json_object" } });
   });
 });
+
+import { needsNoThink, stripThinking } from "../shared/live/llm";
+describe("reasoning-model output", () => {
+  test("strips <think> blocks", () => {
+    expect(stripThinking('<think>let me see\nthe weather</think>{"a":1}')).toBe('{"a":1}');
+    expect(stripThinking('{"a":1}')).toBe('{"a":1}');
+    expect(stripThinking("thinking aloud</think> done")).toBe("done");
+  });
+  test("only Qwen3 gets the no-think switch", () => {
+    expect(needsNoThink("qwen3:8b")).toBe(true);
+    expect(needsNoThink("meta-llama/llama-3.3-70b:free")).toBe(false);
+  });
+});

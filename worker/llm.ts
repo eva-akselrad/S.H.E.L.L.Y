@@ -1,4 +1,4 @@
-import { cleanPack, hashKey, parsePack, utcDay, type LlmPack, type LlmSettings } from "../shared/live/llm";
+import { cleanPack, hashKey, needsNoThink, parsePack, stripThinking, utcDay, type LlmPack, type LlmSettings } from "../shared/live/llm";
 
 export interface LlmResult {
   ok: boolean;
@@ -35,9 +35,12 @@ export async function callLlm(
   if (!cfg.models.length) return fail("no_models");
   if (!(await reserve(env, cfg.dailyRequestCap))) return fail("daily_cap_reached");
 
+  // a local Qwen3 would otherwise spend the token budget "thinking" before it answers
+  const sent = needsNoThink(cfg.models[0] ?? "") ? messages.map((m, i) => (i === messages.length - 1 ? { ...m, content: `${m.content}
+/no_think` } : m)) : messages;
   const body: Record<string, unknown> = {
     model: cfg.models[0],
-    messages,
+    messages: sent,
     temperature: cfg.temperature,
     max_tokens: 700,
   };
@@ -62,8 +65,9 @@ export async function callLlm(
     });
     if (!res.ok) return fail(res.status === 429 ? "rate_limited" : `http_${res.status}`);
     const d = (await res.json()) as { model?: string; choices?: { message?: { content?: string } }[] };
-    const text = d.choices?.[0]?.message?.content;
-    if (typeof text !== "string" || !text.trim()) return fail("empty_response");
+    const raw = d.choices?.[0]?.message?.content;
+    const text = typeof raw === "string" ? stripThinking(raw) : "";
+    if (!text) return fail("empty_response");
     return { ok: true, text, model: d.model, ms: Date.now() - t0 };
   } catch (err) {
     return fail(ctl.signal.aborted ? "timeout" : `network:${String(err).slice(0, 80)}`);
