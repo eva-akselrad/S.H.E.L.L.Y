@@ -79,7 +79,8 @@ html[data-scene="clear-night"], html[data-scene="partly-night"] { --accent: #ffd
 }
 
 /* ── on-the-sky palette: glass panels, light text, everything above the scene ── */
-html.scenes-on { color-scheme: dark; --bg: rgba(6, 12, 24, .55); --panel: rgba(8, 14, 28, .48); --panel-2: rgba(255, 255, 255, .13); --text: #fff; --muted: rgba(255, 255, 255, .76); --line: rgba(255, 255, 255, .2); }
+/* html:root.scenes-on outranks the light-theme rules (:root:not([data-theme]), :root[data-theme="light"]) */
+html:root.scenes-on { color-scheme: dark; --bg: rgba(6, 12, 24, .55); --panel: rgba(8, 14, 28, .48); --panel-2: rgba(255, 255, 255, .13); --text: #fff; --muted: rgba(255, 255, 255, .76); --line: rgba(255, 255, 255, .2); }
 html.scenes-on body { background: #05080f; }
 html.scenes-on .app { position: relative; z-index: 1; text-shadow: 0 1px 10px rgba(0, 0, 0, .35); }
 html.scenes-on .kiosk-frame, html.scenes-on .takeover { --bg: rgba(6, 12, 24, .55); --panel: rgba(8, 14, 28, .48); --panel-2: rgba(255, 255, 255, .13); --text: #fff; --muted: rgba(255, 255, 255, .76); }
@@ -93,3 +94,8 @@ html.scenes-on .pollen li, html.scenes-on .seg-text article, html.scenes-on .not
 html.scenes-on .stats div, html.scenes-on .hours li, html.scenes-on .days li { box-shadow: 0 6px 24px #0003; }
 html.scenes-on .big-temp { text-shadow: 0 4px 30px rgba(0, 0, 0, .35); }
 html.scenes-on .theme-toggle { display: none; } /* the sky decides; set a default theme in admin for when scenes are off */
+
+/* bright skies: a dimming layer so white text sitting straight on the sky stays readable (~4.5:1) */
+.scene::after { content: ""; position: absolute; inset: 0; background: transparent; }
+.scene[data-s="clear-day"]::after, .scene[data-s="partly-day"]::after, .scene[data-s="cloudy"]::after { background: rgba(4, 10, 24, .35); }
+.scene[data-s="fog"]::after, .scene[data-s="snow"]::after, .scene[data-s="heat"]::after { background: rgba(4, 10, 24, .42); }
