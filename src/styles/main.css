@@ -334,3 +334,13 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 
 .app-alerts-chip { justify-self: start; min-height: 36px; padding: 4px 12px; font-size: .9em; }
 .web > .app-alerts-chip, .phone-tools > .app-alerts-chip { margin: 0 16px 8px; }
+
+/* Phone: search + Go on the first row, the small helpers (My location, app alerts) share the second. */
+.phone-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; }
+.phone-tools .search { display: contents; }
+.phone-tools .search input { flex: 1 1 calc(100% - 80px); min-width: 0; }
+.phone-tools .search button[type="submit"] { flex: 0 0 72px; padding: 8px 0; }
+.phone-tools .search button[type="button"], .phone-tools .app-alerts-chip, .phone-tools .push button { min-height: 36px; padding: 4px 12px; font-size: .9em; background: transparent; }
+.phone-tools .search .err { flex: 1 1 100%; }
+.phone-tools > .app-alerts-chip { margin: 0; }
+.phone-tools > .app-alerts { flex: 1 1 100%; margin: 0; }
