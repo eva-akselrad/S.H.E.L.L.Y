@@ -31,7 +31,7 @@ export function AppAlerts() {
   if (allSet && !open) {
     return (
       <button type="button" class="app-alerts-chip" onClick={() => setOpen(true)} aria-expanded={false}>
-        App alerts: on · Settings
+        App alerts: on Â· Settings
       </button>
     );
   }
