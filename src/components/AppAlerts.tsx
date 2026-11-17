@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { updateMessage } from "../installApp";
 import { appBridge, parseAppPermissions, parseAppPrefs } from "../native";
 
 /** "App alerts" controls. Only shows inside the SHELLY Android app (native alerts replace web push there). */
@@ -6,6 +7,8 @@ export function AppAlerts() {
   const app = appBridge();
   const [prefs, setPrefs] = useState(() => parseAppPrefs(app?.getAlertPrefs()));
   const [open, setOpen] = useState(false);
+  const [upd, setUpd] = useState<{ text: string; needsPermission: boolean } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [perm, setPerm] = useState(() => parseAppPermissions(app?.permissionStatus()));
   // coming back from a Settings screen: re-read what the user granted
   useEffect(() => {
@@ -19,6 +22,24 @@ export function AppAlerts() {
     };
   }, [app]);
   if (!app) return null;
+
+  const checkUpdate = () => {
+    setChecking(true);
+    setUpd(null);
+    const done = (e: Event) => {
+      window.removeEventListener("shelly-update", done);
+      clearTimeout(timer);
+      setChecking(false);
+      setUpd(updateMessage((e as CustomEvent<{ outcome?: string }>).detail?.outcome, app.version()));
+    };
+    const timer = setTimeout(() => {
+      window.removeEventListener("shelly-update", done);
+      setChecking(false);
+      setUpd({ text: "Checking in the background. If there is an update, it installs by itself.", needsPermission: false });
+    }, 20_000);
+    window.addEventListener("shelly-update", done);
+    app.checkForUpdate?.();
+  };
 
   const save = (next: typeof prefs) => {
     setPrefs(next);
@@ -65,6 +86,11 @@ export function AppAlerts() {
         <button type="button" onClick={() => app.openNotificationSettings()}>Warning sound settings</button>
         {allSet && <button type="button" onClick={() => setOpen(false)}>Done</button>}
       </span>
+      <span class="app-alerts-buttons">
+        <button type="button" onClick={checkUpdate} disabled={checking}>{checking ? "Checking..." : "Check for updates"}</button>
+        {upd?.needsPermission && <button type="button" onClick={() => app.openInstallSettings?.()}>Open settings</button>}
+      </span>
+      <p class="muted app-alerts-note" role="status">{upd ? upd.text : `SHELLY app version ${app.version()}`}</p>
     </section>
   );
 }

@@ -10,6 +10,9 @@ export interface ShellyAppBridge {
   /** JSON: {"notifications":bool,"location":bool,"background":bool} */
   permissionStatus(): string;
   /** JSON: {"watches":bool,"quietStart":number|null,"quietEnd":number|null} */
+  /** Looks for a newer app now. Answers with a "shelly-update" window event, detail {outcome}. Newer builds answer; older ones only start a background check. */
+  checkForUpdate?(): void;
+  openInstallSettings?(): void;
   /** Newer app builds only: answers with a "shelly-location" window event. */
   requestLocation?(): void;
   getAlertPrefs(): string;

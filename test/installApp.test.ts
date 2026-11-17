@@ -24,3 +24,13 @@ describe("install banner", () => {
     expect(formatMB(5242880)).toBe("5.0 MB");
   });
 });
+
+import { updateMessage } from "../src/installApp";
+describe("update messages", () => {
+  it("says what happened", () => {
+    expect(updateMessage("UP_TO_DATE", "1.0.1").text).toContain("1.0.1");
+    expect(updateMessage("NEEDS_PERMISSION", "1.0.1").needsPermission).toBe(true);
+    expect(updateMessage("INSTALL_STARTED", "1.0.1").needsPermission).toBe(false);
+    expect(updateMessage(undefined, "1.0.1").text).toContain("Couldn't reach");
+  });
+});

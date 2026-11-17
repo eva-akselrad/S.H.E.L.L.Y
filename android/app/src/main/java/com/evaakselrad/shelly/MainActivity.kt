@@ -213,7 +213,16 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }.start()
     }
 
-    override fun checkForUpdate() = UpdateWorker.checkNow(this, force = true)
+    /** Checks right now and answers with a "shelly-update" window event: {"outcome":"UP_TO_DATE", ...}. */
+    override fun checkForUpdate() {
+        val app = applicationContext
+        Thread {
+            val outcome = try { Updater.check(app, force = true).name } catch (_: Exception) { "NO_RELEASE" }
+            runOnUiThread {
+                web.evaluateJavascript("window.dispatchEvent(new CustomEvent('shelly-update',{detail:{outcome:'$outcome'}}))", null)
+            }
+        }.start()
+    }
 
     override fun openNotificationSettings() {
         startActivity(
