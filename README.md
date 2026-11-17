@@ -3,6 +3,8 @@
 > The old site can still be found at https://weathernow-7uq.pages.dev/
 > The current SHELLY lives on the `main` branch.
 
+![The old SHELLY (v1)](docs/screenshots/legacy.png)
+
 # S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook
 
 S.H.E.L.L.Y. is a high-availability, edge-optimized weather communication platform designed for kiosks, dashboards, and critical alert systems.
