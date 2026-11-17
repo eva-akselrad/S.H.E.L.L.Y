@@ -10,6 +10,10 @@
 - **SHELLY Live + Forecaster Studio: L0 to L6 are built and committed** (plan:
   **[docs/LIVE_PLAN.md](docs/LIVE_PLAN.md)**, how to run it: **[docs/LIVE_STREAMING.md](docs/LIVE_STREAMING.md)**).
   Held for the user: traffic cams, the OpenRouter key, deploy, going live. Optional L8 extras remain.
+- **Feature batch 1 is built** (plan: **[docs/FEATURE_IDEAS.md](docs/FEATURE_IDEAS.md)**): action
+  card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
+  confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
+  `VAPID_*` secrets; self-grading needs a default location set in admin.
 
 ## Next work: SHELLY Live + Forecaster Studio (summary of docs/LIVE_PLAN.md)
 - **SHELLY Live:** a 24/7 auto-produced YouTube weather stream with an AI host.

@@ -1,7 +1,9 @@
 import { heatIndex, windChill } from "./wx";
 import type { AirQuality, Forecast, Outlook, ThreatLevel } from "./types";
 
-export type SegmentId = "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note" | "studio";
+export type SegmentId =
+  | "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note" | "studio"
+  | "reports" | "local" | "grade";
 
 export interface SegmentCtx {
   forecast: Forecast | null;
@@ -16,6 +18,12 @@ export interface SegmentCtx {
   hidden?: SegmentId[];
   /** per-segment duration overrides in seconds (before threat scaling) */
   seconds?: Partial<Record<SegmentId, number>>;
+  /** storm reports within 100 mi in the last 12 h */
+  reportsNearby?: number;
+  /** local hazards worth showing: 0 none, 0.3 routine (rivers/tides), 1 something's happening */
+  hazards?: number;
+  /** SHELLY has graded at least one of its own forecasts */
+  graded?: boolean;
 }
 
 interface SegmentDef {
@@ -69,6 +77,14 @@ export const SEGMENTS: SegmentDef[] = [
       return (a.aqi ?? 0) > 50 ? 0.5 : 0.25;
     },
   },
+  {
+    id: "reports",
+    title: "Storm reports",
+    seconds: 12,
+    relevance: (c) => ((c.reportsNearby ?? 0) > 0 ? 0.95 : 0),
+  },
+  { id: "local", title: "Local hazards", seconds: 12, relevance: (c) => c.hazards ?? 0 },
+  { id: "grade", title: "How SHELLY did", seconds: 10, relevance: (c) => (c.graded ? 0.3 : 0) },
   {
     id: "almanac",
     title: "Sun & moon",

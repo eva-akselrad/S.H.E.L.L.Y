@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "preact/hooks";
-import { place, radar, threat } from "../state/store";
+import { reportTitle } from "../../shared/reports";
+import { nearby, place, radar, reportsNearby, threat } from "../state/store";
+
+const REPORT_COLOR = { tornado: "#ff3b3b", wind: "#5ec2ff", hail: "#3ecf9a" } as const;
 
 /** Animated RainViewer radar. When a warning covers the user, the map locks on its polygon. */
 export function Radar() {
@@ -7,6 +10,10 @@ export function Radar() {
   const p = place.value;
   const frames = radar.value;
   const primary = threat.value.rank >= 2 ? threat.value.primary : null;
+  const reps = reportsNearby.value;
+  const near = nearby.value;
+  const repKey = reps.map((r) => r.time).join("|");
+  const nearKey = near.map((n) => n.alert.id).join("|");
 
   useEffect(() => {
     if (!el.current || !p) return;
@@ -34,6 +41,21 @@ export function Radar() {
       }).addTo(map);
 
       L.circleMarker([p.lat, p.lon], { radius: 6, color: "#fff", fillColor: "#ff7a59", fillOpacity: 1, weight: 2 }).addTo(map);
+
+      // warnings close by that don't cover you: dashed outline
+      for (const n of near) {
+        if (!n.alert.geometry) continue;
+        L.geoJSON(n.alert.geometry as never, { style: { color: "#ffb020", weight: 2, dashArray: "6 6", fillOpacity: 0.05 } })
+          .bindTooltip(n.alert.event)
+          .addTo(map);
+      }
+
+      // storm reports (NOAA SPC): small coloured dots
+      for (const r of reps) {
+        L.circleMarker([r.lat, r.lon], { radius: 5, color: "#0b1220", weight: 1, fillColor: REPORT_COLOR[r.kind], fillOpacity: 0.95, pane: "markerPane" })
+          .bindTooltip(`${reportTitle(r)}: ${r.location}, ${r.state}`)
+          .addTo(map);
+      }
 
       if (primary?.geometry) {
         const poly = L.geoJSON(primary.geometry as never, {
@@ -66,7 +88,7 @@ export function Radar() {
       if (timer) clearInterval(timer);
       cleanup();
     };
-  }, [p?.lat, p?.lon, frames, primary?.id]);
+  }, [p?.lat, p?.lon, frames, primary?.id, repKey, nearKey]);
 
   return <div class="radar" ref={el} role="img" aria-label="Animated weather radar map" />;
 }

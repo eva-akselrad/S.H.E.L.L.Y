@@ -1,5 +1,14 @@
 import { computed, effect, signal } from "@preact/signals";
+import { actionFor, urgencyRank } from "../../shared/actions";
+import type { Confidence } from "../../shared/confidence";
 import { DEFAULT_CONFIG, noteActive, type SiteConfig } from "../../shared/config";
+import { etaToPoint, nearbyWarnings } from "../../shared/eta";
+import type { GradedDay, GradeSummary } from "../../shared/grade";
+import { hazardScore, snowDayOdds, type Hazards } from "../../shared/hazards";
+import { alertHealth } from "../../shared/health";
+import { localHour, localNow, rainNowcast } from "../../shared/nowcast";
+import type { StormReport } from "../../shared/reports";
+import { whatToWear } from "../../shared/wear";
 import { buildLoop } from "../../shared/scheduler";
 import type { StudioProduct } from "../../shared/studio";
 import { computeThreat } from "../../shared/threat";
@@ -36,6 +45,12 @@ export const air = signal<AirQuality | null>(load<AirQuality>("air"));
 export const radar = signal<RadarFrames | null>(null);
 export const announcements = signal<Announcement[]>([]);
 export const studioProducts = signal<StudioProduct[]>([]);
+export const confidence = signal<Confidence | null>(load<Confidence>("confidence"));
+export const reports = signal<{ fetchedAt: string; reports: (StormReport & { distanceMi: number })[] } | null>(null);
+export const hazards = signal<Hazards | null>(load<Hazards>("hazards"));
+export const grade = signal<(GradeSummary & { history: GradedDay[] }) | null>(null);
+/** when this screen last got an answer from /api/alerts (ms epoch) */
+export const alertsOkAt = signal<number | null>(null);
 export const online = signal(true);
 export const lastError = signal<string | null>(null);
 
@@ -66,6 +81,75 @@ export const threat = computed(() => {
 /** Separate computed so the per-second clock doesn't rebuild the loop: it only changes when the note flips. */
 export const noteOn = computed(() => noteActive(config.value, now.value));
 
+// -- derived: safety, nowcast and comfort --
+const tzNow = () => place.value?.tz ?? "America/New_York";
+/** minute-resolution clock, so per-second ticks don't recompute everything */
+const minute = computed(() => Math.floor(now.value / 60_000));
+
+export const health = computed(() => alertHealth(alertsUpdated.value, alertsOkAt.value, now.value));
+
+/** "What do I do right now" cards for the alerts covering the user, most urgent first. */
+export const actionCards = computed(() => {
+  void minute.value;
+  const hr = localHour(tzNow());
+  return threat.value.active
+    .flatMap((a) => {
+      const card = actionFor(a, hr, config.value.safety);
+      return card ? [{ alert: a, card }] : [];
+    })
+    .sort((a, b) => urgencyRank(b.card.urgency) - urgencyRank(a.card.urgency));
+});
+
+/** Storm arrival at the user's location for the primary warning, when NWS gives storm motion. */
+export const primaryEta = computed(() => {
+  void minute.value;
+  const p = place.value;
+  const a = threat.value.primary;
+  return p && a ? etaToPoint(a, p.lat, p.lon, Date.now()) : null;
+});
+
+/** Warnings close by that do NOT cover the user. */
+export const nearby = computed(() => {
+  void minute.value;
+  const p = place.value;
+  return p ? nearbyWarnings(alerts.value, p.lat, p.lon, Date.now()) : [];
+});
+
+export const rain = computed(() => {
+  void minute.value;
+  const f = forecast.value;
+  return f ? rainNowcast(f.nowcast, localNow(tzNow()), f.hourly) : null;
+});
+
+export const wear = computed(() => {
+  void minute.value;
+  const f = forecast.value;
+  if (!f || !config.value.wear || threat.value.rank >= 2) return null;
+  return whatToWear(f, localNow(tzNow()));
+});
+
+export const snowDay = computed(() => {
+  void minute.value;
+  const f = forecast.value;
+  return f ? snowDayOdds(f, threat.value.active, localNow(tzNow())) : null;
+});
+
+export const reportsNearby = computed(() => {
+  const r = reports.value;
+  if (!r) return [];
+  const since = now.value - 12 * 3_600_000;
+  return r.reports.filter((x) => x.distanceMi <= 100 && Date.parse(x.time) >= since);
+});
+
+/** The grades are for the site's default location; only show them there. */
+export const gradeHere = computed(() => {
+  const g = grade.value;
+  const home = config.value.defaultLocation;
+  const p = place.value;
+  if (!g?.latest || !home || !p) return null;
+  return Math.abs(home.lat - p.lat) < 0.05 && Math.abs(home.lon - p.lon) < 0.05 ? g : null;
+});
+
 export const loop = computed(() =>
   buildLoop({
     forecast: forecast.value,
@@ -76,6 +160,9 @@ export const loop = computed(() =>
     studio: studioProducts.value.length > 0,
     hidden: config.value.hiddenSegments,
     seconds: config.value.segmentSeconds,
+    reportsNearby: reportsNearby.value.length,
+    hazards: hazardScore(hazards.value, snowDay.value),
+    graded: gradeHere.value !== null,
   }),
 );
 
@@ -102,6 +189,9 @@ export async function setPlace(p: Place): Promise<void> {
   forecast.value = null;
   outlook.value = null;
   air.value = null;
+  confidence.value = null;
+  reports.value = null;
+  hazards.value = null;
   await refreshAll();
 }
 
@@ -129,6 +219,7 @@ export const refresh = {
           (r) => {
             alerts.value = r.alerts;
             alertsUpdated.value = r.updated;
+            alertsOkAt.value = Date.now();
           },
         )
       : Promise.resolve();
@@ -201,6 +292,48 @@ export const refresh = {
         announcements.value = a;
       },
     ),
+  confidence: () => {
+    const p = place.value;
+    return p
+      ? guarded(
+          () => api.confidence(p),
+          (c) => {
+            confidence.value = c;
+            save("confidence", c);
+          },
+        )
+      : Promise.resolve();
+  },
+  reports: () => {
+    const p = place.value;
+    return p
+      ? guarded(
+          () => api.reports(p),
+          (r) => {
+            reports.value = r;
+          },
+        )
+      : Promise.resolve();
+  },
+  hazards: () => {
+    const p = place.value;
+    return p
+      ? guarded(
+          () => api.hazards(p),
+          (h) => {
+            hazards.value = h;
+            save("hazards", h);
+          },
+        )
+      : Promise.resolve();
+  },
+  grade: () =>
+    guarded(
+      () => api.grade(),
+      (g) => {
+        grade.value = g;
+      },
+    ),
 };
 
 export async function refreshAll(): Promise<void> {
@@ -221,6 +354,10 @@ export function startPollers(): void {
   every(60_000, refresh.announcements);
   every(60_000, refresh.studio);
   every(60_000, refresh.config);
+  every(60 * 60_000, refresh.confidence);
+  every(3 * 60_000, refresh.reports);
+  every(15 * 60_000, refresh.hazards);
+  every(30 * 60_000, refresh.grade);
   every(1_000, () => {
     now.value = Date.now();
   });

@@ -54,14 +54,14 @@ export function ThemeToggle() {
   );
 }
 
-export function MusicControl() {
+export function MusicControl({ compact = false }: { compact?: boolean }) {
   if (!musicAllowed.value) return null;
   return (
     <span class="music">
-      <button type="button" onClick={toggleMusic} aria-pressed={musicOn.value}>
-        {musicOn.value ? "Music on" : "Music off"}
+      <button type="button" onClick={toggleMusic} aria-pressed={musicOn.value} aria-label={musicOn.value ? "Music on. Tap to turn off" : "Music off. Tap to turn on"}>
+        {compact ? (musicOn.value ? "♪ On" : "♪ Off") : musicOn.value ? "Music on" : "Music off"}
       </button>
-      {musicOn.value && nowPlaying.value && (
+      {!compact && musicOn.value && nowPlaying.value && (
         <button type="button" onClick={nextTrack} title={nowPlaying.value}>Next</button>
       )}
     </span>

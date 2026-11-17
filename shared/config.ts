@@ -1,7 +1,10 @@
 import type { SegmentId } from "./scheduler";
+import type { SafetyPlan } from "./actions";
 import type { Bbox, Place } from "./types";
 
-export const SEGMENT_IDS: SegmentId[] = ["now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio"];
+export const SEGMENT_IDS: SegmentId[] = [
+  "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade",
+];
 export const MODES = ["auto", "kiosk", "web", "phone"] as const;
 export const THEMES = ["auto", "light", "dark"] as const;
 
@@ -86,6 +89,10 @@ export interface SiteConfig {
   note: ForecasterNote;
   live: LiveConfig;
   studio: StudioConfig;
+  /** the household's own plan, used in the "what do I do now" card */
+  safety: SafetyPlan;
+  /** "what to wear" line on calm days */
+  wear: boolean;
 }
 
 export const DEFAULT_LIVE: LiveConfig = {
@@ -134,6 +141,8 @@ export const DEFAULT_CONFIG: SiteConfig = {
   note: { enabled: false, title: "", body: "", expires: null },
   live: DEFAULT_LIVE,
   studio: DEFAULT_STUDIO,
+  safety: { shelter: "", evacuation: "" },
+  wear: true,
 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -283,6 +292,11 @@ export function normalizeConfig(raw: unknown): SiteConfig {
     },
     live: normalizeLive(r.live),
     studio: { forecasterName: str(isObj(r.studio) ? r.studio.forecasterName : "", 60) },
+    safety: {
+      shelter: str(isObj(r.safety) ? r.safety.shelter : "", 120).trim(),
+      evacuation: str(isObj(r.safety) ? r.safety.evacuation : "", 120).trim(),
+    },
+    wear: r.wear !== false,
   };
 }
 

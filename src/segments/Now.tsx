@@ -1,6 +1,7 @@
 import { heatIndex, windChill, windDir, wmoToWeather } from "../../shared/wx";
 import { WxIcon } from "../components/Icon";
-import { forecast, place } from "../state/store";
+import { RainStrip } from "../components/RainStrip";
+import { forecast, place, wear } from "../state/store";
 
 export function Now() {
   const f = forecast.value;
@@ -23,6 +24,8 @@ export function Now() {
           </div>
         </div>
       </div>
+      <RainStrip />
+      {wear.value && <p class="wear">{wear.value.line}</p>}
       <dl class="stats">
         <div><dt>Feels like</dt><dd>{Math.round(c.feelsLike)}°</dd></div>
         <div><dt>Wind</dt><dd>{windDir(c.windDir)} {Math.round(c.windSpeed)} mph{c.windGust > c.windSpeed + 5 ? `, gusts ${Math.round(c.windGust)}` : ""}</dd></div>

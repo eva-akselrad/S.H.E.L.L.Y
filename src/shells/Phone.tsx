@@ -1,4 +1,7 @@
-import { AnnouncementBar, Logo, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
+import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
+import { Freshness } from "../components/Freshness";
+import { PushToggle } from "../components/PushToggle";
+import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { loop, threat } from "../state/store";
 
@@ -9,15 +12,18 @@ export function PhoneShell() {
   const t = threat.value;
   return (
     <div class="phone">
+      <StaleBanner />
       <header class="phone-head">
         <Logo />
-        <span class="head-right"><ThreatBadge /><ThemeToggle /></span>
+        <span class="head-right"><ThreatBadge /><MusicControl compact /><ThemeToggle /></span>
       </header>
       {t.level !== "CALM" && t.reasons.length > 0 && (
         <div class={`pin lvl-${t.level.toLowerCase()}`} role="status">{t.reasons.join(" • ")}</div>
       )}
+      <ActionCard />
+      <NearbyNotice />
       <AnnouncementBar />
-      <SearchBox />
+      <div class="phone-tools"><SearchBox /><PushToggle /></div>
       <main class="cards">
         {cards.map((s) => {
           const View = SEGMENT_VIEWS[s.id];
@@ -25,6 +31,7 @@ export function PhoneShell() {
             <section key={s.id} class="card" aria-label={s.title}>
               <h2>{s.title}</h2>
               <View />
+              <Freshness id={s.id} />
             </section>
           );
         })}

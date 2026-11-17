@@ -19,6 +19,9 @@ const TITLES: Record<SegmentId, string> = {
   almanac: "Sun and moon",
   note: "Forecaster note",
   studio: "Forecaster Studio graphics",
+  reports: "Storm reports near you",
+  local: "Local hazards (rivers, tides, tropical, snow day)",
+  grade: "How SHELLY did (forecast report card)",
 };
 const DEFAULT_SECONDS = Object.fromEntries(SEGMENTS.map((s) => [s.id, s.seconds])) as Record<SegmentId, number>;
 
@@ -117,6 +120,16 @@ export function Display() {
             <button type="button" class="adm-btn small primary" onClick={() => { set("defaultLocation", found); setFound(null); setQuery(""); }}>Use as default</button>
           </div>
         )}
+      </Card>
+
+      <Card title="Your safety plan" hint="Used in the 'What do I do right now' card on every screen during warnings. The rest of the card is fixed safety text, never AI-written.">
+        <Field label="Where you take shelter from a tornado" hint={'Example: "the basement, under the stairs". Leave blank for general advice.'}>
+          <input class="adm-input" maxLength={120} value={draft.safety.shelter} onInput={(e) => set("safety", { ...draft.safety, shelter: (e.target as HTMLInputElement).value })} />
+        </Field>
+        <Field label="Where you go if told to leave (flood, surge)" hint={`Example: "Aunt Pat's house in Lansdale".`}>
+          <input class="adm-input" maxLength={120} value={draft.safety.evacuation} onInput={(e) => set("safety", { ...draft.safety, evacuation: (e.target as HTMLInputElement).value })} />
+        </Field>
+        <Toggle checked={draft.wear} onChange={(v) => set("wear", v)} label="Show a 'what to wear' line" hint="Calm days only. It's hidden during warnings." />
       </Card>
 
       <Card title="Weather scenes" hint="The whole display takes on the mood of the weather outside: sunny sky, rain, snow, fog, thunderstorms with lightning, starry nights. Warnings and emergencies still take over the screen.">

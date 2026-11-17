@@ -1,13 +1,14 @@
 import { effect } from "@preact/signals";
 import { useEffect, useState } from "preact/hooks";
 import { Logo, SearchBox } from "./components/Chrome";
-import { applyThreatToMusic, musicOn, refreshMusic, startMusic } from "./music";
+import { applyThreatToMusic, musicOn, refreshMusic, setBackgroundPlay, startMusic } from "./music";
 import { Scene } from "./scene/Scene";
 import { KioskShell } from "./shells/Kiosk";
 import { PhoneShell } from "./shells/Phone";
 import { WebShell } from "./shells/Web";
 import { config, locateByCoords, mode, place, startCycling, startPollers, threat } from "./state/store";
 import { Takeover } from "./takeover/Takeover";
+import { initPush, syncPush } from "./push";
 import { announce } from "./tts";
 
 let wired = false;
@@ -28,6 +29,14 @@ function wire(): void {
   effect(() => {
     void musicOn.value;
     refreshMusic();
+  });
+  // only a TV/kiosk keeps the music going when the page isn't on screen
+  effect(() => setBackgroundPlay(mode.value === "kiosk"));
+  if (mode.peek() !== "kiosk") void initPush();
+  // keep the push subscription pointed at the place this device is watching
+  effect(() => {
+    const p = place.value;
+    if (p) void syncPush(p);
   });
 }
 

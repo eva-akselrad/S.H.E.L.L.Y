@@ -11,7 +11,11 @@ interface Status {
   announcements: number;
   defaultLocation: string | null;
   lastAction: { t: string; action: string; detail: string } | null;
+  latency?: { count: number; medianS: number | null; p90S: number | null; worstS: number | null; warningsMedianS: number | null };
+  push?: { configured: boolean; subscribers: number };
 }
+
+const secs = (s: number | null | undefined) => (s === null || s === undefined ? "--" : s < 90 ? `${s} s` : `${Math.round(s / 60)} min`);
 
 export function Overview() {
   const [s, setS] = useState<Status | null>(null);
@@ -29,6 +33,10 @@ export function Overview() {
     const r = await call("POST", "/api/admin/refresh-alerts");
     toast(r.ok ? "Alerts refreshed from NWS" : "NWS did not respond. Kept the last snapshot.", r.ok ? "ok" : "error");
     void load();
+  };
+  const testPush = async () => {
+    const r = await call<{ sent: number; total: number }>("POST", "/api/admin/push-test");
+    toast(r.ok ? `Test sent to ${r.data.sent} of ${r.data.total} devices` : "Push isn't set up yet", r.ok ? "ok" : "error");
   };
   const stopSims = async () => {
     await call("DELETE", "/api/admin/simulate");
@@ -58,6 +66,20 @@ export function Overview() {
           <b class="adm-tile-value">{s.announcements}</b>
           <span class="adm-hint">live or scheduled</span>
         </Card>
+        <Card tone={s.latency?.warningsMedianS && s.latency.warningsMedianS > 120 ? "warn" : undefined}>
+          <span class="adm-tile-label">Alert speed (7 days)</span>
+          <b class="adm-tile-value">{secs(s.latency?.medianS)}</b>
+          <span class="adm-hint">
+            {s.latency?.count
+              ? `median from NWS issuing to SHELLY having it · 90% within ${secs(s.latency.p90S)} · warnings ${secs(s.latency.warningsMedianS)} · worst ${secs(s.latency.worstS)}. Screens add up to 30 s.`
+              : "Measured from the next new alert."}
+          </span>
+        </Card>
+        <Card>
+          <span class="adm-tile-label">Push alerts</span>
+          <b class="adm-tile-value">{s.push?.configured ? s.push.subscribers : "Off"}</b>
+          <span class="adm-hint">{s.push?.configured ? "devices signed up" : "Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to turn on"}</span>
+        </Card>
         <Card>
           <span class="adm-tile-label">Default location</span>
           <b class="adm-tile-value small">{s.defaultLocation ?? "Not set"}</b>
@@ -70,6 +92,7 @@ export function Overview() {
           <div class="adm-row">
             <button type="button" class="adm-btn" onClick={() => void repoll()}>Re-poll NWS now</button>
             <button type="button" class="adm-btn" disabled={!s.simulated} onClick={() => void stopSims()}>Stop all test alerts</button>
+            <button type="button" class="adm-btn" disabled={!s.push?.configured || !s.push.subscribers} onClick={() => void testPush()}>Send test push</button>
             <a class="adm-btn" href="/" target="_blank" rel="noopener">Open site</a>
             <a class="adm-btn" href="/?mode=kiosk" target="_blank" rel="noopener">Open kiosk view</a>
           </div>

@@ -12,5 +12,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["worker", "shared", "test", "worker-configuration.d.ts"],
-  "exclude": ["test/app.test.tsx", "test/tts.test.ts", "test/broadcast.test.tsx", "test/studio.test.tsx"]
+  "exclude": ["test/app.test.tsx", "test/tts.test.ts", "test/music.test.ts", "test/broadcast.test.tsx", "test/studio.test.tsx"]
 }

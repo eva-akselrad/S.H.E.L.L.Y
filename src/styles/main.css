@@ -79,9 +79,20 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .h-bar i { display: block; width: 100%; background: var(--accent); border-radius: 6px; }
 
 .days { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.days li { display: grid; grid-template-columns: 4.5em 44px 1fr 3em 3em 3em; align-items: center; gap: 12px; background: var(--panel); border-radius: 12px; padding: 8px 14px; }
+.days li { display: grid; grid-template-columns: 4.5em 44px minmax(0, 1fr) 3em 3em 3em; align-items: center; gap: 12px; background: var(--panel); border-radius: 12px; padding: 8px 14px; }
 .d-pop { color: var(--info); text-align: right; }
-@container (max-width: 420px) { .days li { grid-template-columns: 3.5em 40px 1fr 2.5em 2.5em; } .d-pop { display: none; } }
+@container (max-width: 420px) { .days li { grid-template-columns: 3.2em 36px minmax(0, 1fr) 2.6em 2.4em; gap: 8px; padding: 8px 12px; } .d-pop { display: none; } }
+.d-desc { display: block; min-width: 0; }
+/* Big system font or a very narrow phone: description gets its own line under the day.
+   (em here follows the font size, so larger text switches layouts sooner.) */
+@container (max-width: 20em) {
+  .days li { grid-template-columns: minmax(0, 1fr) 36px auto auto; grid-template-areas: "name icon hi lo" "desc desc desc desc"; row-gap: 2px; }
+  .days li > .d-name { grid-area: name; }
+  .days li > svg { grid-area: icon; }
+  .days li > b { grid-area: hi; }
+  .days li > .muted { grid-area: lo; }
+  .days li > .d-desc { grid-area: desc; font-size: .9em; color: var(--muted); }
+}
 
 .spc { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .spc li { background: var(--panel); border-left: 10px solid var(--c); border-radius: 12px; padding: 16px; display: grid; gap: 6px; }
@@ -116,7 +127,8 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 @keyframes fade { from { opacity: 0; } }
 
 /* web */
-.web { min-height: 100%; display: grid; grid-template-rows: auto auto auto 1fr auto; max-width: 1200px; margin: 0 auto; }
+.web { min-height: 100%; display: flex; flex-direction: column; max-width: 1200px; margin: 0 auto; }
+.web .web-main { flex: 1; }
 .web-head { display: flex; align-items: center; gap: 16px; padding: 14px 20px; flex-wrap: wrap; }
 .web-head .search { flex: 1; min-width: 220px; }
 .web-nav { display: flex; gap: 6px; padding: 0 20px 8px; flex-wrap: wrap; align-items: center; }
@@ -145,7 +157,7 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .card .stats div, .card .days li, .card .hours li, .card .spc li, .card .pollen li { background: var(--panel-2); }
 
 /* takeover */
-.takeover { position: fixed; inset: 0; z-index: 1000; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 18px; padding: max(20px, env(safe-area-inset-top)) 28px 0; color: #fff; }
+.takeover { position: fixed; inset: 0; z-index: 1000; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 18px; padding: max(20px, env(safe-area-inset-top)) 28px 0; color: #fff; }
 .takeover.warning { background: radial-gradient(120% 90% at 20% 0%, #4a0c10 0%, #1d0507 70%); box-shadow: inset 0 0 0 6px var(--warning); }
 .takeover.emergency { background: var(--emergency); animation: flash 1.2s steps(2) infinite; box-shadow: inset 0 0 0 8px #fff; }
 .takeover header { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
@@ -162,9 +174,27 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .tk-area { margin: 0; font-size: clamp(1rem, 1.7vw, 1.5rem); line-height: 1.4; opacity: .92; }
 .takeover.emergency .tk-text { font-size: clamp(1.8rem, 4.4vw, 3.8rem); font-weight: 700; line-height: 1.2; }
 .takeover.emergency .tk-area { font-size: clamp(1.3rem, 3vw, 2.6rem); font-weight: 700; opacity: 1; }
+.tk-count.long { font-size: clamp(1.2rem, 2.6vw, 2.2rem); }
+.tk-loc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: clamp(.95rem, 1.4vw, 1.15rem); }
+.tk-loc-btn { background: #ffffff1f; color: #fff; border: 1px solid #ffffff59; font-weight: 600; }
+.tk-loc-form { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tk-loc-form .search { flex: 1 1 260px; }
+.tk-loc-form input { background: #0008; color: #fff; border-color: #ffffff59; }
+.tk-loc-form input::placeholder { color: #ffffffb0; }
+.tk-loc-form .err, .tk-loc-msg { color: #ffe7a3; font-weight: 600; }
 @media (max-width: 800px) {
-  .tk-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, 38%) minmax(0, 1fr); }
-  .takeover.emergency .tk-body { grid-template-rows: minmax(0, 1fr); }
+  /* Phones: level + time on one line, the event name below, then everything scrolls. */
+  .takeover { gap: 12px; padding-left: 16px; padding-right: 16px; }
+  .takeover header { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "level count" "title title"; align-items: center; gap: 10px 14px; }
+  .tk-level { grid-area: level; justify-self: start; }
+  .tk-count { grid-area: count; justify-self: end; text-align: right; font-size: clamp(1.6rem, 8vw, 2.4rem); }
+  .tk-count.long { font-size: clamp(1rem, 4.6vw, 1.4rem); font-weight: 700; }
+  .takeover h1 { grid-area: title; font-size: clamp(1.8rem, 8.5vw, 2.8rem); overflow-wrap: anywhere; }
+  .tk-body, .takeover.emergency .tk-body { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 12px; }
+  .tk-map { flex: 0 0 auto; height: clamp(170px, 32vh, 300px); }
+  .tk-info { align-self: stretch; padding: 0; }
+  .tk-text, .tk-title { overflow: visible; }
+  .crawl { margin: 0 -16px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
 }
 .crawl { overflow: hidden; white-space: nowrap; background: #000a; margin: 0 -24px; padding: 10px 0; }
 .crawl span { display: inline-block; padding-left: 100%; animation: crawl 30s linear infinite; font-weight: 600; }
@@ -181,3 +211,97 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .seg-note h3 { margin: 0 0 8px; font-family: var(--display); font-size: 1.5em; color: var(--accent); }
 .seg-note p { margin: 0; font-size: 1.25em; line-height: 1.5; white-space: pre-wrap; }
 .stage .seg-note p { font-size: 1.6em; }
+
+/* -- safety: stale banner, action card, nearby warnings, storm ETA -- */
+.stale { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px clamp(12px, 3vw, 24px); background: #3a2a00; color: #ffe7a3; border-bottom: 3px solid var(--warn); font-weight: 600; line-height: 1.35; }
+.stale-tag { flex: none; background: var(--warn); color: #1b1006; padding: 3px 10px; border-radius: 999px; font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.action { --c: var(--elevated); margin: 10px clamp(12px, 3vw, 24px) 0; padding: 14px 18px; border-radius: var(--radius); background: color-mix(in srgb, var(--c) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-left: 8px solid var(--c); }
+.action.u-now { --c: var(--warning); }
+.action.u-aware { --c: var(--info); }
+.action header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.action h3 { margin: 0; font-size: 1.2em; }
+.action-tag { font-size: .78em; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.action ol { margin: 8px 0 0; padding-left: 1.3em; display: grid; gap: 4px; line-height: 1.4; }
+.action.compact { margin: 0; padding: 10px 18px; font-size: .9em; }
+.nearby { margin: 10px clamp(12px, 3vw, 24px) 0; padding: 10px 16px; border-radius: 12px; background: var(--panel); border: 1px dashed var(--elevated); line-height: 1.4; }
+.nearby.coming { border-style: solid; border-color: var(--warning); font-weight: 600; }
+.kiosk-notices { display: grid; gap: 8px; }
+.kiosk-notices .stale, .kiosk-notices .nearby, .kiosk-notices .notices { margin: 0; padding-left: 18px; padding-right: 18px; border-radius: 12px; }
+.kiosk-notices .notices { padding: 0; }
+.eta { display: grid; gap: 4px; padding: 12px 16px; border-radius: 12px; background: #000a; border-left: 6px solid #fff; }
+.eta b { font-size: clamp(1.3rem, 2.6vw, 2.4rem); line-height: 1.2; }
+.tk-title { margin: 0; font-size: clamp(1.4rem, 2.8vw, 2.6rem); font-weight: 800; line-height: 1.2; }
+.tk-steps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: clamp(1.05rem, 1.9vw, 1.7rem); font-weight: 600; line-height: 1.3; }
+.tk-nws { margin: 4px 0 0; font-size: clamp(.9rem, 1.3vw, 1.1rem); opacity: .85; line-height: 1.4; }
+.tk-nws .tk-label { margin: 0; }
+.takeover.emergency .tk-steps { font-size: clamp(1.4rem, 3vw, 2.6rem); }
+
+/* -- freshness -- */
+.fresh { margin: 10px 0 0; color: var(--muted); font-size: .8em; }
+.botbar .fresh { margin: 0 0 0 auto; }
+.botbar { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+.small { font-size: .85em; }
+
+/* -- rain nowcast + what to wear -- */
+.rainstrip { margin-top: 18px; padding: 12px 16px; background: var(--panel); border-radius: var(--radius); }
+.rain-line { margin: 0; font-weight: 600; font-size: 1.1em; }
+.rainstrip.k-dry .rain-line { font-weight: 500; color: var(--muted); }
+.rain-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 10px; }
+.rb { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; }
+.rb i { display: block; width: 100%; background: var(--panel-2); border-radius: 3px 3px 0 0; }
+.rb i.wet { background: var(--info); }
+.t-snow .rb i.wet { background: #e8f1ff; }
+.t-mix .rb i.wet { background: #c9a7ff; }
+.rb small { height: 1.2em; font-size: .62em; color: var(--muted); white-space: nowrap; }
+.wear { margin: 14px 0 0; font-size: 1.05em; line-height: 1.4; }
+.stage .rain-bars { height: 90px; }
+
+/* -- confidence -- */
+.d-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: .78em; margin-top: 4px; }
+.conf { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.conf.c-high { color: var(--calm); }
+.conf.c-medium { color: var(--elevated); }
+.conf.c-low { color: var(--warning); }
+.d-snow { color: #cfe3ff; font-weight: 600; }
+
+/* -- storm reports -- */
+.rep-sum { margin: 0 0 10px; font-weight: 600; }
+.reports { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.reports li { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 12px; align-items: center; background: var(--panel); border-radius: 12px; padding: 10px 14px; }
+.rep-icon { width: 2em; height: 2em; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #0b1220; background: var(--info); }
+.rep-tornado .rep-icon { background: var(--warning); color: #fff; }
+.rep-hail .rep-icon { background: var(--calm); }
+.rep-main { display: grid; gap: 2px; min-width: 0; }
+.rep-c { font-size: .85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -- local hazards -- */
+.seg-local { display: grid; gap: 14px; }
+.seg-local h3 { margin: 0 0 8px; font-size: 1em; color: var(--accent); }
+.snowday { display: flex; gap: 16px; align-items: center; background: var(--panel); border-radius: var(--radius); padding: 14px 18px; }
+.snowday > span { display: grid; gap: 4px; }
+.sd-odds { font-family: var(--display); font-size: 3em; line-height: 1; color: #cfe3ff; }
+.tropical { display: grid; gap: 4px; background: var(--panel); border-left: 8px solid var(--warning); border-radius: 12px; padding: 12px 16px; }
+.rivers ul, .tides ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.river { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; background: var(--panel); border-radius: 12px; padding: 10px 14px; }
+.river-name { font-weight: 600; min-width: 0; }
+.river-cat { grid-column: 1 / -1; font-size: .85em; color: var(--muted); }
+.river.r-1 .river-cat { color: var(--elevated); }
+.river.r-2 .river-cat, .river.r-3 .river-cat, .river.r-4 .river-cat { color: var(--warning); font-weight: 700; }
+.gauge { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.gauge i { display: block; height: 100%; background: var(--info); }
+.river.r-1 .gauge i { background: var(--elevated); }
+.river.r-2 .gauge i, .river.r-3 .gauge i, .river.r-4 .gauge i { background: var(--warning); }
+.tides li { display: grid; grid-template-columns: 4em 1fr auto; gap: 12px; background: var(--panel); border-radius: 12px; padding: 8px 14px; }
+.card .river, .card .tides li, .card .reports li, .card .snowday, .card .tropical, .card .rainstrip { background: var(--panel-2); }
+
+/* -- report card -- */
+.grade-line { margin: 0; font-size: 1.25em; line-height: 1.4; }
+
+/* -- push -- */
+.push { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.push button[aria-pressed="true"] { background: var(--calm); color: #06231a; border: 0; font-weight: 700; }
+.push-watch { display: inline-flex; gap: 6px; align-items: center; font-size: .85em; color: var(--muted); }
+.push-watch input { min-height: 0; width: 18px; height: 18px; }
+.push-note { font-size: .85em; }
+.phone-tools { display: grid; gap: 8px; padding: 0 16px 8px; }
+.phone-tools .search { padding: 12px 0 0; }

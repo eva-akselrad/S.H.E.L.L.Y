@@ -30,6 +30,7 @@ interface RawAlertFeature {
     areaDesc?: string;
     geocode?: { UGC?: string[] };
     parameters?: Record<string, string[] | undefined>;
+    references?: { identifier?: string }[];
   };
 }
 
@@ -74,6 +75,9 @@ export function normalizeAlert(f: RawAlertFeature): Alert {
     zones: p.geocode?.UGC ?? [],
     geometry: f.geometry && (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon") ? f.geometry : null,
     params,
+    ...(p.references?.length
+      ? { references: p.references.map((r) => r.identifier).filter((x): x is string => !!x).slice(0, 10) }
+      : {}),
   };
 }
 

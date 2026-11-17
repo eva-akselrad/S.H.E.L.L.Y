@@ -3,7 +3,11 @@ import type { Forecast, Place } from "../shared/types";
 import { handleAdmin } from "./admin";
 import { cached, round } from "./cache";
 import { handleLiveTts, produceRundown } from "./live";
+import { gradeSummary, runGrading } from "./grade";
 import { pollAlerts } from "./poll";
+import { fanOutPushes, handlePush } from "./push";
+import { fetchConfidence, fetchHazards, fetchStormReports } from "./sources/extra";
+import { nearbyReports, type StormReport } from "../shared/reports";
 import { publicProducts } from "./studio";
 import { fetchForecastText, fetchPoint } from "./sources/nws";
 import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
@@ -44,6 +48,9 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
 
   const admin = await handleAdmin(request, env, url);
   if (admin) return admin;
+
+  const push = await handlePush(request, env, url);
+  if (push) return push;
 
   if (path === "/api/config") {
     const c = await readConfig(env);
@@ -138,11 +145,38 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
   if (path === "/api/airquality") {
     const c = coords(url);
     if (!c) return json({ error: "bad_location" }, 400);
-    const { data } = await cached(ctx, `aq:${round(c.lat, 1)}:${round(c.lon, 1)}`, 1800, () =>
-      fetchAirQuality(c.lat, c.lon),
-    );
+    const { data } = await cached(ctx, `aq:${round(c.lat, 1)}:${round(c.lon, 1)}`, 1800, async () => ({
+      ...(await fetchAirQuality(c.lat, c.lon)),
+      fetchedAt: new Date().toISOString(),
+    }));
     return json(data, 200, 300);
   }
+
+  if (path === "/api/confidence") {
+    const c = coords(url);
+    if (!c) return json({ error: "bad_location" }, 400);
+    const { data } = await cached(ctx, `ens:${round(c.lat, 1)}:${round(c.lon, 1)}`, 3600, () => fetchConfidence(c.lat, c.lon));
+    return json(data, 200, 900);
+  }
+
+  if (path === "/api/reports") {
+    const c = coords(url);
+    if (!c) return json({ error: "bad_location" }, 400);
+    const { data } = await cached<{ fetchedAt: string; reports: StormReport[] }>(ctx, "spc-reports", 300, async () => ({
+      fetchedAt: new Date().toISOString(),
+      reports: await fetchStormReports(env.NWS_USER_AGENT),
+    }));
+    return json({ fetchedAt: data.fetchedAt, reports: nearbyReports(data.reports, c.lat, c.lon, Date.now()).slice(0, 60) }, 200, 120);
+  }
+
+  if (path === "/api/hazards") {
+    const c = coords(url);
+    if (!c) return json({ error: "bad_location" }, 400);
+    const { data } = await cached(ctx, `hz:${round(c.lat, 2)}:${round(c.lon, 2)}`, 900, () => fetchHazards(env.NWS_USER_AGENT, c.lat, c.lon));
+    return json(data, 200, 300);
+  }
+
+  if (path === "/api/grade") return json(await gradeSummary(env), 200, 600);
 
   if (path === "/api/radar") {
     const { data } = await cached(ctx, "radar", 120, fetchRadarFrames);
@@ -167,8 +201,13 @@ export default {
   async scheduled(_event, env, ctx): Promise<void> {
     ctx.waitUntil(
       pollAlerts(env)
-        .then(() => produceRundown(env))
+        .then(async (alerts) => {
+          // push first: it's the time-critical part
+          if (alerts) await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
+          await produceRundown(env);
+        })
         .catch((err) => console.error(JSON.stringify({ msg: "producer_failed", err: String(err) }))),
     );
+    ctx.waitUntil(runGrading(env).catch((err) => console.error(JSON.stringify({ msg: "grading_failed", err: String(err) }))));
   },
 } satisfies ExportedHandler<Env>;

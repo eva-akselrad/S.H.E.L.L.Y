@@ -1,5 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { AnnouncementBar, Logo, StatusLine, ThreatBadge } from "../components/Chrome";
+import { Freshness } from "../components/Freshness";
+import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, paused } from "../state/store";
 
@@ -35,9 +37,14 @@ export function KioskShell() {
           <ThreatBadge />
           <Clock />
         </header>
-        <AnnouncementBar />
+        <div class="kiosk-notices">
+          <StaleBanner />
+          <ActionCard compact />
+          <NearbyNotice />
+          <AnnouncementBar />
+        </div>
         <main key={seg.id} class="stage-main"><View /></main>
-        <footer class="botbar"><StatusLine />{paused.value && <span class="muted">Paused</span>}</footer>
+        <footer class="botbar"><StatusLine /><Freshness id={seg.id} />{paused.value && <span class="muted">Paused</span>}</footer>
       </div>
     </div>
   );

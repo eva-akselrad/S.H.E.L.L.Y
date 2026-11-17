@@ -5,7 +5,9 @@ import { produceRundown } from "./live";
 import { isSimPreset, SIM_PRESETS, type SimEntry } from "../shared/simulate";
 import type { Announcement } from "../shared/types";
 import { isAuthed, login, logout } from "./auth";
-import { pollAlerts } from "./poll";
+import { latencyStats, type LatencySample } from "../shared/health";
+import { LATENCY_KEY, pollAlerts } from "./poll";
+import { readSubs, sendTestPush, vapid } from "./push";
 import {
   audit,
   readAlerts,
@@ -48,13 +50,15 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
 
   // ── overview ──
   if (path === "/api/admin/status" && method === "GET") {
-    const [{ updated, alerts }, sim, anns, config, log, ttsUsed] = await Promise.all([
+    const [{ updated, alerts }, sim, anns, config, log, ttsUsed, samples, subs] = await Promise.all([
       readAlerts(env),
       readSim(env),
       readAnnouncements(env, true),
       readConfig(env),
       readAudit(env),
       ttsUsage(env),
+      env.STATE.get<LatencySample[]>(LATENCY_KEY, "json"),
+      readSubs(env),
     ]);
     const ageSeconds = updated ? Math.round((Date.now() - new Date(updated).getTime()) / 1000) : null;
     const events = new Map<string, number>();
@@ -67,6 +71,8 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
       defaultLocation: config.defaultLocation?.name ?? null,
       voice: { engine: config.voice.engine, speaker: config.voice.speaker, used: ttsUsed, cap: config.voice.dailyCharCap },
       lastAction: log[0] ?? null,
+      latency: latencyStats(samples ?? [], Date.now() - 7 * 86_400_000),
+      push: { configured: !!vapid(env), subscribers: subs.length },
     });
   }
 
@@ -177,9 +183,16 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
 
   // ── tools ──
   if (path === "/api/admin/refresh-alerts" && method === "POST") {
-    const ok = await pollAlerts(env); // keeps the old snapshot if NWS is unreachable
+    const ok = (await pollAlerts(env)) !== null; // keeps the old snapshot if NWS is unreachable
     await audit(env, "alerts.refresh", ok ? "repolled NWS" : "repoll failed");
     return json({ ok }, ok ? 200 : 502);
+  }
+
+  if (path === "/api/admin/push-test" && method === "POST") {
+    if (!vapid(env)) return json({ error: "push_not_configured" }, 409);
+    const r = await sendTestPush(env);
+    await audit(env, "push.test", `${r.sent}/${r.total} delivered`);
+    return json(r);
   }
 
   if (path === "/api/admin/audit" && method === "GET") return json(await readAudit(env));

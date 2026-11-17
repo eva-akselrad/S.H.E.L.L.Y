@@ -57,6 +57,8 @@ export interface Alert {
   zones: string[]; // zone ids, e.g. "TXZ123" or "TXC201"
   geometry: PolygonGeom | null;
   params: AlertParams;
+  /** ids of earlier messages this one updates (NWS "references"); used to avoid duplicate pushes */
+  references?: string[];
 }
 
 export interface Current {
@@ -119,6 +121,7 @@ export interface Outlook {
 }
 
 export interface AirQuality {
+  fetchedAt?: string;
   aqi: number | null;
   pm25: number | null;
   ozone: number | null;

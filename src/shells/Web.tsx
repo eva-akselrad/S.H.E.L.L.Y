@@ -1,4 +1,7 @@
 import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
+import { Freshness } from "../components/Freshness";
+import { PushToggle } from "../components/PushToggle";
+import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, loop, paused, segIndex } from "../state/store";
 
@@ -8,13 +11,17 @@ export function WebShell() {
   const View = SEGMENT_VIEWS[seg.id];
   return (
     <div class="web">
+      <StaleBanner />
       <header class="web-head">
         <Logo />
         <SearchBox />
         <ThreatBadge />
+        <PushToggle />
         <MusicControl />
         <ThemeToggle />
       </header>
+      <ActionCard />
+      <NearbyNotice />
       <AnnouncementBar />
       <nav class="web-nav" aria-label="Segments">
         {loop.value.map((s, i) => (
@@ -30,6 +37,7 @@ export function WebShell() {
       <main class="web-main">
         <h2>{seg.title}</h2>
         <div key={seg.id} class="web-card"><View /></div>
+        <Freshness id={seg.id} />
       </main>
       <footer class="botbar"><StatusLine /></footer>
     </div>
