@@ -22,6 +22,8 @@ export interface VoiceConfig {
   speaker: Speaker;
   /** hard cap on characters synthesized per UTC day (~$0.03 per 1,000) */
   dailyCharCap: number;
+  /** Your own voice server (Kokoro on your PC through a tunnel). Tried first, no daily cap; Aura-2 is the fallback. */
+  local: { enabled: boolean; baseUrl: string; voice: string };
 }
 
 export interface ForecasterNote {
@@ -136,7 +138,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
   segmentSeconds: {},
   tts: true,
   scenes: true,
-  voice: { engine: "ai", speaker: "athena", dailyCharCap: 20000 },
+  voice: { engine: "ai", speaker: "athena", dailyCharCap: 20000, local: { enabled: false, baseUrl: "", voice: "af_heart" } },
   music: { enabled: true, volume: 0.35, disabledTracks: [] },
   note: { enabled: false, title: "", body: "", expires: null },
   live: DEFAULT_LIVE,
@@ -241,6 +243,13 @@ function normalizeLive(v: unknown): LiveConfig {
   };
 }
 
+function normalizeLocalVoice(raw: unknown): VoiceConfig["local"] {
+  const l = isObj(raw) ? raw : {};
+  const baseUrl = typeof l.baseUrl === "string" && /^https:\/\//.test(l.baseUrl.trim()) ? l.baseUrl.trim().slice(0, 300).replace(/\/+$/, "") : "";
+  const voice = typeof l.voice === "string" && /^[a-z]{2}_[a-z]+$/.test(l.voice) ? l.voice : "af_heart";
+  return { enabled: l.enabled === true && baseUrl !== "", baseUrl, voice };
+}
+
 /** Validate and clamp untrusted config JSON. Never throws; unknown input yields defaults. */
 export function normalizeConfig(raw: unknown): SiteConfig {
   const r = isObj(raw) ? raw : {};
@@ -271,6 +280,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
     tts: r.tts !== false,
     scenes: r.scenes !== false,
     voice: {
+      local: normalizeLocalVoice(voice.local),
       engine: voice.engine === "browser" ? "browser" : "ai",
       speaker: (SPEAKERS as readonly unknown[]).includes(voice.speaker) ? (voice.speaker as Speaker) : "athena",
       dailyCharCap: Math.round(

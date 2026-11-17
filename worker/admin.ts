@@ -146,7 +146,8 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
   if (path === "/api/admin/tts-preview" && method === "POST") {
     const b = await body();
     const speaker = (SPEAKERS as readonly unknown[]).includes(b.speaker) ? (b.speaker as Speaker) : "athena";
-    return handleTtsPreview(env, speaker, (await readConfig(env)).voice.dailyCharCap);
+    const vc = (await readConfig(env)).voice;
+    return handleTtsPreview(env, speaker, vc.dailyCharCap, vc.local);
   }
 
   const studio = await handleStudioAdmin(request, env, url);

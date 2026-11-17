@@ -1,5 +1,5 @@
 // A small lock in front of Ollama. Only requests carrying the right Bearer key get through,
-// and only the two calls SHELLY needs (chat completions and the model list).
+// and only the calls SHELLY needs: chat completions, the model list, and text-to-speech.
 //
 //   node scripts/llm-proxy.mjs
 //
@@ -12,7 +12,8 @@ import { join } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 
 const PORT = Number(process.env.SHELLY_LLM_PORT ?? 11435);
-const UPSTREAM = { host: "127.0.0.1", port: Number(process.env.OLLAMA_PORT ?? 11434) };
+const LLM = { host: "127.0.0.1", port: Number(process.env.OLLAMA_PORT ?? 11434) };
+const TTS = { host: "127.0.0.1", port: Number(process.env.SHELLY_TTS_PORT ?? 8880) };
 const MAX_BODY = 1_000_000;
 
 function loadKey() {
@@ -29,7 +30,7 @@ if (KEY.length < 24) {
   process.exit(1);
 }
 
-const ALLOWED = new Set(["POST /v1/chat/completions", "GET /v1/models"]);
+const ALLOWED = new Set(["POST /v1/chat/completions", "GET /v1/models", "POST /v1/audio/speech"]);
 const same = (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const deny = (res, code, msg) => {
   res.writeHead(code, { "content-type": "application/json" });
@@ -45,12 +46,12 @@ createServer((req, res) => {
 
   const headers = { "content-type": req.headers["content-type"] ?? "application/json" };
   if (req.headers["content-length"]) headers["content-length"] = req.headers["content-length"];
-  const up = request({ ...UPSTREAM, path: req.url, method: req.method, headers }, (r) => {
+  const up = request({ ...(path === "/v1/audio/speech" ? TTS : LLM), path: req.url, method: req.method, headers }, (r) => {
     res.writeHead(r.statusCode ?? 502, { "content-type": r.headers["content-type"] ?? "application/json" });
     r.pipe(res);
   });
   up.on("error", () => deny(res, 502, "ollama_unreachable"));
   req.pipe(up);
-}).listen(PORT, "127.0.0.1", () => console.log(`SHELLY LLM proxy on 127.0.0.1:${PORT} -> Ollama ${UPSTREAM.port}`));
+}).listen(PORT, "127.0.0.1", () => console.log(`SHELLY LLM proxy on 127.0.0.1:${PORT} -> Ollama ${LLM.port}, voice ${TTS.port}`));
 
 process.on("uncaughtException", (e) => console.error("proxy error:", e.message));

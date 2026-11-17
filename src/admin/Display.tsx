@@ -183,6 +183,21 @@ export function Display() {
                   </div>
                 </div>
                 <div class="adm-field">
+                  <Toggle
+                    checked={draft.voice.local.enabled}
+                    onChange={(v) => set("voice", { ...draft.voice, local: { ...draft.voice.local, enabled: v } })}
+                    label="Use my own voice server first"
+                    hint="Kokoro running on your PC, reached through the locked tunnel. No character limit. If your PC is off or unreachable, the Natural voice above is used instead."
+                  />
+                  {draft.voice.local.enabled && (
+                    <div class="adm-row">
+                      <input class="adm-input grow" placeholder="https://llm.example.com/v1" value={draft.voice.local.baseUrl} onInput={(e) => set("voice", { ...draft.voice, local: { ...draft.voice.local, baseUrl: (e.target as HTMLInputElement).value } })} aria-label="Voice server address" />
+                      <input class="adm-input narrow" placeholder="af_heart" value={draft.voice.local.voice} onInput={(e) => set("voice", { ...draft.voice, local: { ...draft.voice.local, voice: (e.target as HTMLInputElement).value } })} aria-label="Voice name" />
+                    </div>
+                  )}
+                  {draft.voice.local.baseUrl === "" && <span class="adm-hint">Enter the address first (it must start with https://). It uses the same secret key as the local LLM.</span>}
+                </div>
+                <div class="adm-field">
                   <label class="adm-label" for="cap">Daily character cap</label>
                   <input id="cap" class="adm-input narrow" type="number" min={0} max={200000} step={1000} value={draft.voice.dailyCharCap} onInput={(e) => set("voice", { ...draft.voice, dailyCharCap: Number((e.target as HTMLInputElement).value) })} />
                   <span class="adm-hint">

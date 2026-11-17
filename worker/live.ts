@@ -120,7 +120,7 @@ export async function handleLiveTts(env: Env, url: URL): Promise<Response> {
   const r = await readRundown(env);
   const item = r?.items.find((i) => i.key === url.searchParams.get("item"));
   if (!item?.speak) return err("not_found", 404);
-  const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap);
+  const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap, cfg.voice.local);
   if (!out.ok) return err(`tts_${out.reason}`, out.reason === "cap" ? 429 : 502);
   return new Response(out.audio, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=3600" } });
 }

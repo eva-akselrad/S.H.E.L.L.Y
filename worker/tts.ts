@@ -1,4 +1,4 @@
-import type { Speaker } from "../shared/config";
+import type { Speaker, VoiceConfig } from "../shared/config";
 import { alertScript, isSpokenAlert } from "../shared/script";
 import { buildSimAlert } from "../shared/simulate";
 import { isEmergency } from "../shared/threat";
@@ -42,8 +42,33 @@ async function toBytes(out: unknown): Promise<ArrayBuffer | null> {
 // Best-effort: two viewers asking for the same new alert at once share one generation (per isolate).
 const inflight = new Map<string, Promise<TtsResult>>();
 
-/** Synthesize `text` in `speaker`'s voice. Cached in KV; counts against the daily character cap. */
-export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number): Promise<TtsResult> {
+/** One call to the user's own Kokoro server (through the locked tunnel). Null on any failure. */
+async function localAudio(env: Env, local: VoiceConfig["local"], text: string): Promise<ArrayBuffer | null> {
+  if (!local.enabled || !local.baseUrl || !env.LLM_API_KEY) return null;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20_000);
+  try {
+    const res = await fetch(`${local.baseUrl}/audio/speech`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${env.LLM_API_KEY}` },
+      body: JSON.stringify({ input: text, voice: local.voice, response_format: "mp3" }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) return null;
+    const audio = await res.arrayBuffer();
+    return audio.byteLength > 100 ? audio : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Synthesize `text`. Tries the user's own voice server first (no daily cap); falls back to the
+ * Aura-2 `speaker` voice, which is cached in KV and counts against the daily character cap.
+ */
+export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, local?: VoiceConfig["local"]): Promise<TtsResult> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_CHARS);
   if (!clean) return Promise.resolve({ ok: false, reason: "empty" });
   const flightKey = `${speaker}:${clean}`;
@@ -51,6 +76,17 @@ export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number):
   if (existing) return existing;
 
   const run = (async (): Promise<TtsResult> => {
+    if (local?.enabled) {
+      const lkey = `tts:${await digest(`local:${local.voice}:${clean}`)}`;
+      const lhit = await env.STATE.get(lkey, "arrayBuffer");
+      if (lhit) return { ok: true, audio: lhit, cached: true };
+      const audio = await localAudio(env, local, clean);
+      if (audio) {
+        await env.STATE.put(lkey, audio, { expirationTtl: AUDIO_TTL });
+        return { ok: true, audio, cached: false };
+      }
+      console.error(JSON.stringify({ msg: "tts_local_unavailable_using_fallback" }));
+    }
     const key = `tts:${await digest(flightKey)}`;
     const hit = await env.STATE.get(key, "arrayBuffer");
     if (hit) return { ok: true, audio: hit, cached: true };
@@ -107,15 +143,15 @@ export async function handleTts(env: Env, url: URL): Promise<Response> {
   }
   if (!alert || !isSpokenAlert(alert)) return err("not_found", 404);
 
-  const r = await ttsAudio(env, config.voice.speaker, alertScript(alert, isEmergency(alert)), config.voice.dailyCharCap);
+  const r = await ttsAudio(env, config.voice.speaker, alertScript(alert, isEmergency(alert)), config.voice.dailyCharCap, config.voice.local);
   if (r.ok) return audioResponse(r.audio);
   return err(`tts_${r.reason}`, r.reason === "cap" ? 429 : 502);
 }
 
 /** Admin: hear a voice. Counts toward the daily cap like any other synthesis. */
-export async function handleTtsPreview(env: Env, speaker: Speaker, cap: number): Promise<Response> {
+export async function handleTtsPreview(env: Env, speaker: Speaker, cap: number, local?: VoiceConfig["local"]): Promise<Response> {
   const text = "Attention. This is a test of the SHELLY alert voice. A Tornado Warning has been issued for your area. Move to an interior room now.";
-  const r = await ttsAudio(env, speaker, text, cap);
+  const r = await ttsAudio(env, speaker, text, cap, local);
   if (r.ok) return new Response(r.audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
   return err(`tts_${r.reason}`, r.reason === "cap" ? 429 : 502);
 }
