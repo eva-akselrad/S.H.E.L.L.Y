@@ -1,10 +1,10 @@
 # CLAUDE.md
 
 ## Current state (read first)
-- **SHELLY v2 core is built** on branch **`rebuild`**: Worker + Preact app,
+- **SHELLY v2 core is built and merged to `main`** (the old `rebuild` branch was deleted; nothing was lost): Worker + Preact app,
   threat engine, scheduler, segments, admin with password login, TTS, music and
   weather scenes. Architecture and the original decisions are in
-  **[docs/REBUILD_PLAN.md](docs/REBUILD_PLAN.md)**. `main` and tag **`legacy-v1`**
+  **[docs/REBUILD_PLAN.md](docs/REBUILD_PLAN.md)**. tag **`legacy-v1`** and branch **`legacy`**
   hold the old app (`git show legacy-v1:<path>`). Cutover (REBUILD_PLAN phase 8)
   needs the user's go-ahead.
 - **SHELLY Live + Forecaster Studio: L0 to L6 are built and committed** (plan:

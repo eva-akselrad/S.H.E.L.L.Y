@@ -1,6 +1,6 @@
 # SHELLY v2 — Rebuild Plan
 
-Status: **planning done, nothing built yet.** Work happens on branch `rebuild`.
+Status: **done and merged to `main`.** (This plan is historical; the `rebuild` branch has been deleted.)
 The old app is preserved at tag `legacy-v1` (also still on `main`).
 
 ---
