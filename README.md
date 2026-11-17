@@ -1,3 +1,8 @@
+> [!WARNING]
+> **This is the legacy version of SHELLY (v1). It is no longer maintained, and some or all features may not work.**
+> The old site can still be found at https://weathernow-7uq.pages.dev/
+> The current SHELLY lives on the `main` branch.
+
 # S.H.E.L.L.Y. – Severe Hydrology & Environmental Live Logging Yearbook
 
 S.H.E.L.L.Y. is a high-availability, edge-optimized weather communication platform designed for kiosks, dashboards, and critical alert systems.
