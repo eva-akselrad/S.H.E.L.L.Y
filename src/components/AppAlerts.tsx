@@ -5,6 +5,7 @@ import { appBridge, parseAppPermissions, parseAppPrefs } from "../native";
 export function AppAlerts() {
   const app = appBridge();
   const [prefs, setPrefs] = useState(() => parseAppPrefs(app?.getAlertPrefs()));
+  const [open, setOpen] = useState(false);
   const [perm, setPerm] = useState(() => parseAppPermissions(app?.permissionStatus()));
   // coming back from a Settings screen: re-read what the user granted
   useEffect(() => {
@@ -25,6 +26,15 @@ export function AppAlerts() {
   };
   const quiet = prefs.quietStart !== null && prefs.quietEnd !== null;
   const allSet = perm.notifications && perm.location && perm.background;
+
+  // Once the required permissions are granted the panel folds away; the optional checkboxes never keep it open.
+  if (allSet && !open) {
+    return (
+      <button type="button" class="app-alerts-chip" onClick={() => setOpen(true)} aria-expanded={false}>
+        App alerts: on · Settings
+      </button>
+    );
+  }
 
   return (
     <section class="app-alerts" aria-label="App alerts">
@@ -53,6 +63,7 @@ export function AppAlerts() {
       <span class="app-alerts-buttons">
         <button type="button" onClick={() => app.runSetup()}>Check setup</button>
         <button type="button" onClick={() => app.openNotificationSettings()}>Warning sound settings</button>
+        {allSet && <button type="button" onClick={() => setOpen(false)}>Done</button>}
       </span>
     </section>
   );

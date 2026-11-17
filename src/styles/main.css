@@ -331,3 +331,6 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .get-android h1 { margin: 0; font-family: var(--display); }
 .get-android ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
 .get-android .ga-card { padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 10px; }
+
+.app-alerts-chip { justify-self: start; min-height: 36px; padding: 4px 12px; font-size: .9em; }
+.web > .app-alerts-chip, .phone-tools > .app-alerts-chip { margin: 0 16px 8px; }
