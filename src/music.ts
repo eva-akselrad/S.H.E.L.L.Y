@@ -1,5 +1,6 @@
 import { signal } from "@preact/signals";
 import type { ThreatLevel } from "../shared/types";
+import { routeAudio } from "./audioOut";
 
 export interface Track {
   title: string;
@@ -121,6 +122,7 @@ export async function startMusic(): Promise<void> {
   }
   if (tracks.length === 0) return;
   audio = new Audio();
+  await routeAudio(audio); // follows "Play sound on…" (e.g. a Roku), default speaker otherwise
   // If autoplay was blocked (no gesture yet), the first interaction unlocks it.
   const unlock = (): void => apply();
   addEventListener("pointerdown", unlock, { once: true });

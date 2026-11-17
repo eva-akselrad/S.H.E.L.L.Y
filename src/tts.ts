@@ -1,5 +1,6 @@
 import { alertScript, isSpokenAlert } from "../shared/script";
 import type { Alert, ThreatLevel } from "../shared/types";
+import { routeAudio, unrouteAudio } from "./audioOut";
 
 export { alertScript };
 
@@ -51,7 +52,11 @@ async function speak(a: Alert, emergency: boolean, voice?: VoiceOpts): Promise<v
     current?.pause();
     const audio = new Audio(url);
     current = audio;
-    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      unrouteAudio(audio);
+    };
+    await routeAudio(audio); // same speaker as the music
     await audio.play();
   } catch {
     fallback();

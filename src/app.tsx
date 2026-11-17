@@ -8,6 +8,7 @@ import { PhoneShell } from "./shells/Phone";
 import { WebShell } from "./shells/Web";
 import { config, locateByCoords, mode, place, startCycling, startPollers, threat } from "./state/store";
 import { Takeover } from "./takeover/Takeover";
+import { initAudioOut } from "./audioOut";
 import { initPush, syncPush } from "./push";
 import { announce } from "./tts";
 
@@ -33,6 +34,7 @@ function wire(): void {
   // only a TV/kiosk keeps the music going when the page isn't on screen
   effect(() => setBackgroundPlay(mode.value === "kiosk"));
   if (mode.peek() !== "kiosk") void initPush();
+  if (mode.peek() !== "phone") initAudioOut();
   // keep the push subscription pointed at the place this device is watching
   effect(() => {
     const p = place.value;

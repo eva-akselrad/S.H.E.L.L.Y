@@ -1,6 +1,7 @@
 import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { Freshness } from "../components/Freshness";
 import { PushToggle } from "../components/PushToggle";
+import { SoundOutput } from "../components/SoundOutput";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, loop, paused, segIndex } from "../state/store";
@@ -18,6 +19,7 @@ export function WebShell() {
         <ThreatBadge />
         <PushToggle />
         <MusicControl />
+        <SoundOutput />
         <ThemeToggle />
       </header>
       <ActionCard />
