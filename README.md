@@ -6,6 +6,12 @@ display that gets louder when the weather does. Named after the author's grandmo
 SHELLY v2 is one Cloudflare Worker serving a Preact app and a small JSON API. The old v1 app is
 tagged `legacy-v1`.
 
+## Screenshots
+
+| TV / kiosk | Desktop | Phone |
+| --- | --- | --- |
+| ![Kiosk layout](docs/screenshots/kiosk.png) | ![Desktop layout](docs/screenshots/desktop.png) | ![Phone layout](docs/screenshots/phone.png) |
+
 ## What it does
 
 - Computes a **threat level** (CALM / ELEVATED / WARNING / EMERGENCY) from NWS alerts, the SPC
