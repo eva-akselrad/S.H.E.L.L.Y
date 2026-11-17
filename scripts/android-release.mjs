@@ -174,7 +174,7 @@ if (!nsId) fail('Could not find the "shelly-state" KV namespace. Run `npx wrangl
 
 // refuse to go backwards: the app only installs a higher versionCode
 try {
-  const cur = await fetch("https://shelly.scienceandfire66.workers.dev/api/android/latest.json").then((r) => (r.ok ? r.json() : null));
+  const cur = await fetch("https://shelly.evaakselrad.com/api/android/latest.json").then((r) => (r.ok ? r.json() : null));
   if (cur && cur.versionCode >= versionCode) fail(`The live release is already versionCode ${cur.versionCode}. Bump versionCode in android/app/build.gradle.kts.`);
 } catch {
   /* offline check is best effort */
@@ -185,4 +185,4 @@ const a = put(`android:apk:${versionCode}`, apkCopy);
 if (a.status !== 0) fail(`Uploading the APK failed:\n${a.stdout}${a.stderr}`);
 const l = put("android:latest", join(outDir, "latest.json"));
 if (l.status !== 0) fail(`Uploading latest.json failed:\n${l.stdout}${l.stderr}`);
-console.log(`Published SHELLY ${versionName}. Download page: https://shelly.scienceandfire66.workers.dev/get-android/`);
+console.log(`Published SHELLY ${versionName}. Download page: https://shelly.evaakselrad.com/get-android/`);

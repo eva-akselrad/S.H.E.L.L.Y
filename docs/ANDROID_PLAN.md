@@ -49,7 +49,7 @@ Phone (SHELLY app)  <──── FCM high-priority data message {type:"alert", 
       topic subscriptions when zones change, check for app updates (daily)
 ```
 
-The app's main screen is a **WebView of the live site** (`https://shelly.scienceandfire66.workers.dev`),
+The app's main screen is a **WebView of the live site** (`https://shelly.evaakselrad.com`),
 so every website deploy updates the app UI with no new APK. Only native changes (widget,
 notifications, updater) need a new APK. No Capacitor: a plain Kotlin WebView activity plus
 a tiny JS bridge is simpler and everything else is native anyway.
