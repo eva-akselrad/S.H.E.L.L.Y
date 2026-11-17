@@ -14,7 +14,7 @@
   card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
   confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
   `VAPID_*` secrets; self-grading needs a default location set in admin.
-- **SHELLY Android app: shipped (A1 to A6), signed release 1.0.2 is live** at `/get-android/` with in-app update checks. Admin simulator has custom test alerts and custom notifications. Release runbook: **[docs/ANDROID.md](docs/ANDROID.md)** (run `node scripts/android-release.mjs --upload`; always bump `versionCode`). Still the user's: Android Developer Console package registration, backups of the keystore and Firebase key. Open: widget not checked on a real launcher, test notifications not confirmed on the phone. The full build plan is
+- **SHELLY Android app: shipped (A1 to A6), signed release 1.0.2 is live (2.0.0 is next, versionCode 4)** at `/get-android/` with in-app update checks. Admin simulator has custom test alerts and custom notifications. Release runbook: **[docs/ANDROID.md](docs/ANDROID.md)** (run `node scripts/android-release.mjs --upload`; always bump `versionCode`). Still the user's: Android Developer Console package registration, backups of the keystore and Firebase key. Open: widget not checked on a real launcher, test notifications not confirmed on the phone. The full build plan is
   **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
   stop points. The user decided all of this on 2026-11-17 (don't re-ask):
   - Native app, **sideloaded** from the website with a **self-updater**. **Not on the Play Store.**

@@ -428,4 +428,4 @@ A4 widget (RemoteViews, small + wide, reads saved glance), A5 self-updater (sha2
 
 
 ## Status: shipped (2026-11-17)
-Signed 1.0.2 published. Added after A6: My location button (app GPS bridge), in-app Check for updates, custom simulator alerts, admin announcements (FCM + web push).
+Signed 1.0.2 published (next release is 2.0.0, versionCode 4). Added after A6: My location button (app GPS bridge), in-app Check for updates, custom simulator alerts, admin announcements (FCM + web push).
