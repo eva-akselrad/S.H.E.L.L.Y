@@ -12,6 +12,7 @@ export default defineConfig({
           input: {
             main: resolve(import.meta.dirname, "index.html"),
             admin: resolve(import.meta.dirname, "admin/index.html"),
+            getAndroid: resolve(import.meta.dirname, "get-android/index.html"),
           },
         },
       },

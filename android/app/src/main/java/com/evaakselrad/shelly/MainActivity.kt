@@ -26,6 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.evaakselrad.shelly.update.UpdateWorker
+import com.evaakselrad.shelly.update.Updater
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity(), BridgeHost {
@@ -111,6 +113,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // alerts: periodic catch-up plus one run now (also keeps the FCM topics current)
         Refresh.schedulePeriodic(this)
         Refresh.enqueueNow(this, expedited = false)
+        UpdateWorker.schedule(this)
+        UpdateWorker.checkNow(this) // limited to once per six hours inside
         if (!prefs.onboarded) {
             prefs.onboarded = true // an interrupted walkthrough must not nag on every launch
             runSetup()
@@ -189,6 +193,14 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun openAppSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
     }
+
+    override fun canInstallUpdates(): Boolean = Updater.canInstall(this)
+
+    override fun openInstallSettings() {
+        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+    }
+
+    override fun checkForUpdate() = UpdateWorker.checkNow(this, force = true)
 
     override fun openNotificationSettings() {
         startActivity(

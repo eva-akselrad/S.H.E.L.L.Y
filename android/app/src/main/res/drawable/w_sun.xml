@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same glyph as the website WxIcon "sun". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_sun" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M22,32a10,10 0 1,0 20,0a10,10 0 1,0 -20,0M47,32L52,32M42.61,42.61L46.14,46.14M32,47L32,52M21.39,42.61L17.86,46.14M17,32L12,32M21.39,21.39L17.86,17.86M32,17L32,12M42.61,21.39L46.14,17.86" />
+</vector>

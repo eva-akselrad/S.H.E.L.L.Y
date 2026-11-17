@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- home-screen widget, dark mode -->
+    <color name="w_bg">#0B1220</color>
+    <color name="w_ink">#E8EEF7</color>
+    <color name="w_muted">#9AA9BF</color>
+    <color name="w_sun">#FFC24B</color>
+    <color name="w_blue">#6CB6FF</color>
+</resources>

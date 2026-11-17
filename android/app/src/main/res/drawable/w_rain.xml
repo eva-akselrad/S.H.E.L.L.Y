@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same glyph as the website WxIcon "rain". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <group android:translateX="0" android:translateY="-6">
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_ink" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M20,44h26a9,9 0 0,0 1,-17.9A12,12 0 0,0 24,24a10,10 0 0,0 -4,20z" />
+    </group>
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_blue" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M22,50l-3,7M34,50l-3,7M46,50l-3,7" />
+</vector>

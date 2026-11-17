@@ -321,3 +321,13 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .sound-label { font-size: .85em; color: var(--muted); }
 .kiosk-settings { position: absolute; right: 54px; bottom: 110px; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; max-width: 900px; padding: 20px 24px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 40px #0008; font-size: 22px; cursor: auto; }
 .kiosk-frame:has(.kiosk-settings) { cursor: auto; }
+
+.install-app { display: grid; gap: 8px; padding: 10px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.install-app p { margin: 0; }
+.install-app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.web > .install-app, .phone > .install-app { margin: 0 16px 8px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 16px; border-radius: 10px; background: var(--accent); color: #1b1410; font-weight: 700; text-decoration: none; }
+.get-android { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 16px; }
+.get-android h1 { margin: 0; font-family: var(--display); }
+.get-android ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+.get-android .ga-card { padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 10px; }

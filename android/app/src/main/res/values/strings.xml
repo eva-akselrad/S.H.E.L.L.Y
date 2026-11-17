@@ -3,4 +3,5 @@
     <string name="offline_title">Can\'t reach SHELLY</string>
     <string name="offline_body">Check your connection, then try again.</string>
     <string name="retry">Try again</string>
+    <string name="widget_description">Current conditions and warnings for where you are</string>
 </resources>

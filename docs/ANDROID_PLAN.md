@@ -421,3 +421,7 @@ doing it now avoids a cliff later.
 - [ ] Self-update from version N to N+1 (first with a tap, then silent); tampered APK refused.
 - [ ] Website on Android Chrome shows the banner; inside the app it doesn't; `/get-android/` works.
 - [ ] `npm test`, `npm run typecheck`, `./gradlew test`, `./gradlew assembleRelease` all pass.
+
+
+## Status: A4 to A6 (2026-11-17)
+A4 widget (RemoteViews, small + wide, reads saved glance), A5 self-updater (sha256 + cert check, blocked during warnings) and release script, A6 install banner and `/get-android/` are built and deployed. Unit tests pass. Not emulator-tested: widget on a launcher, and an end-to-end self-update. See [ANDROID.md](ANDROID.md).

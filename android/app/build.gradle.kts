@@ -36,12 +36,14 @@ android {
     }
 
     signingConfigs {
-        if (keystoreProps.containsKey("storeFile")) {
+        // keystore.properties, or the SHELLY_* environment variables that scripts/android-release.mjs sets
+        val storeFile = System.getenv("SHELLY_KEYSTORE") ?: keystoreProps.getProperty("storeFile")
+        if (storeFile != null) {
             create("release") {
-                storeFile = file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias", "shelly")
-                keyPassword = keystoreProps.getProperty("keyPassword")
+                this.storeFile = file(storeFile)
+                storePassword = System.getenv("SHELLY_STORE_PASSWORD") ?: keystoreProps.getProperty("storePassword")
+                keyAlias = System.getenv("SHELLY_KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias", "shelly")
+                keyPassword = System.getenv("SHELLY_KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword")
             }
         }
     }

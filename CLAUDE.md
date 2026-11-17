@@ -14,7 +14,7 @@
   card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
   confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
   `VAPID_*` secrets; self-grading needs a default location set in admin.
-- **SHELLY Android app: A1 (Worker), A2 (app shell) and the app side of A3 (alerts) are built; A1/A2 are deployed. NEXT: the user's Firebase service-account key and `wrangler secret put FCM_SERVICE_ACCOUNT`, then A4 (widget).** The full build plan is
+- **SHELLY Android app: A1 to A6 are built and deployed** (Worker, app shell, alerts via FCM, widget, self-updater, `/get-android/` page + install banner). FCM key is set. **Held for the user:** run `node scripts/android-release.mjs --upload` (needs the keystore password), uninstall the debug APK before the first signed release, register the package + signing-cert SHA-256 in Play Console developer verification. Not emulator-tested: widget rendering and the self-update install flow. Runbook: **[docs/ANDROID.md](docs/ANDROID.md)**. The full build plan is
   **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
   stop points. The user decided all of this on 2026-11-17 (don't re-ask):
   - Native app, **sideloaded** from the website with a **self-updater**. **Not on the Play Store.**

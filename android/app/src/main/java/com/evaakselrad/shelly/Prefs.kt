@@ -66,6 +66,10 @@ class Prefs(context: Context) {
         sp.edit().putLong("lat", lat.toBits()).putLong("lon", lon.toBits()).putLong("locMs", atMs).apply()
     }
 
+    var lastUpdateCheckMs: Long
+        get() = sp.getLong("lastUpdateCheckMs", 0)
+        set(v) = sp.edit().putLong("lastUpdateCheckMs", v).apply()
+
     /** debug builds only: point the app at another server, e.g. wrangler dev (set with adb run-as) */
     var siteOverride: String?
         get() = if (BuildConfig.DEBUG) sp.getString("siteOverride", null) else null

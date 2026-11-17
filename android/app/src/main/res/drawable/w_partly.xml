@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same glyph as the website WxIcon "partly". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_sun" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17,22a7,7 0 1,0 14,0a7,7 0 1,0 -14,0M36,22L41,22M32.49,30.49L36.02,34.02M24,34L24,39M15.51,30.49L11.98,34.02M12,22L7,22M15.51,13.51L11.98,9.98M24,10L24,5M32.49,13.51L36.02,9.98" />
+    <group android:translateX="4" android:translateY="6">
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_ink" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M20,44h26a9,9 0 0,0 1,-17.9A12,12 0 0,0 24,24a10,10 0 0,0 -4,20z" />
+    </group>
+</vector>

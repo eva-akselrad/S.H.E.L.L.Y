@@ -3,4 +3,14 @@
     <color name="shelly_bg">#FF0B1220</color>
     <color name="shelly_accent">#FFFF8A65</color>
     <color name="shelly_text">#FFE8EEF7</color>
+
+    <!-- home-screen widget, light mode -->
+    <color name="w_bg">#F2F6FC</color>
+    <color name="w_ink">#0B1220</color>
+    <color name="w_muted">#4A5A72</color>
+    <color name="w_sun">#E08A00</color>
+    <color name="w_blue">#1F6FBF</color>
+    <color name="w_warn_bg">#7A0010</color>
+    <color name="w_elev_bg">#6B4A00</color>
+    <color name="w_on_alert">#FFFFFF</color>
 </resources>

@@ -3,6 +3,7 @@ package com.evaakselrad.shelly
 import android.content.Context
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.evaakselrad.shelly.widget.ShellyWidgetProvider
 import androidx.work.CoroutineWorker
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -75,6 +76,8 @@ object Refresh {
 class RefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try { Refresh.run(applicationContext) } catch (_: Exception) { }
+        // repaint even when the fetch failed, so the "not updated since" label stays truthful
+        try { ShellyWidgetProvider.updateAll(applicationContext) } catch (_: Exception) { }
         Result.success()
     }
 

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same glyph as the website WxIcon "unknown". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_ink" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M18,32a14,14 0 1,0 28,0a14,14 0 1,0 -28,0" />
+    <path android:fillColor="#00000000" android:strokeColor="@color/w_ink" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M32,38v.1M28,28a4,4 0 1,1 6,3c-1.5,1 -2,2 -2,4" />
+</vector>

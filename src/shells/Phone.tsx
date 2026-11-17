@@ -1,5 +1,6 @@
 import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { Freshness } from "../components/Freshness";
+import { InstallApp } from "../components/InstallApp";
 import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
@@ -23,6 +24,7 @@ export function PhoneShell() {
       )}
       <ActionCard />
       <NearbyNotice />
+      <InstallApp />
       <AnnouncementBar />
       <div class="phone-tools"><SearchBox /><PushToggle /><AppAlerts /></div>
       <main class="cards">

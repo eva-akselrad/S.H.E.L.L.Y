@@ -9,6 +9,9 @@ interface BridgeHost {
     fun openNotificationSettings()
     fun runSetup()
     fun permissionState(): JSONObject
+    fun canInstallUpdates(): Boolean
+    fun openInstallSettings()
+    fun checkForUpdate()
 }
 
 /**
@@ -35,6 +38,17 @@ class Bridge(private val prefs: Prefs, private val host: BridgeHost, private val
     /** {"notifications":bool,"location":bool,"background":bool} */
     @JavascriptInterface
     fun permissionStatus(): String = host.permissionState().toString()
+
+    /** Whether Android lets SHELLY install its own updates ("Install unknown apps"). */
+    @JavascriptInterface
+    fun canInstallUpdates(): Boolean = host.canInstallUpdates()
+
+    @JavascriptInterface
+    fun openInstallSettings() = post { host.openInstallSettings() }
+
+    /** Looks for a newer SHELLY app right now. */
+    @JavascriptInterface
+    fun checkForUpdate() = post { host.checkForUpdate() }
 
     @JavascriptInterface
     fun getAlertPrefs(): String = prefs.alertPrefs.toJson()
