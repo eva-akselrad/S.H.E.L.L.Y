@@ -33,8 +33,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private lateinit var offline: View
     private lateinit var prefs: Prefs
 
-    private val siteUri: Uri = Uri.parse(BuildConfig.SITE_URL)
-    private val siteOrigin: String = "${siteUri.scheme}://${siteUri.authority}"
+    private lateinit var siteUrl: String
+    private lateinit var siteOrigin: String
 
     /** Continues the setup walkthrough after the user comes back from a Settings screen. */
     private var afterSettings: (() -> Unit)? = null
@@ -61,6 +61,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
         prefs = Prefs(this)
+        siteUrl = Site.url(this)
+        Uri.parse(siteUrl).let { siteOrigin = "${it.scheme}://${it.authority}" }
         Notifier.createChannels(this)
 
         // dark app: light status/navigation bar icons
@@ -106,6 +108,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         })
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState) else load()
+        // alerts: periodic catch-up plus one run now (also keeps the FCM topics current)
+        Refresh.schedulePeriodic(this)
+        Refresh.enqueueNow(this, expedited = false)
         if (!prefs.onboarded) {
             prefs.onboarded = true // an interrupted walkthrough must not nag on every launch
             runSetup()
@@ -132,7 +137,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     private fun load() {
         offline.visibility = View.GONE
         web.visibility = View.VISIBLE
-        web.loadUrl(BuildConfig.SITE_URL)
+        web.loadUrl(siteUrl)
     }
 
     private fun isOurs(uri: Uri): Boolean = "${uri.scheme}://${uri.authority}" == siteOrigin

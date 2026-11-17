@@ -257,6 +257,16 @@ the site loads, GPS locates, music plays, back button works, external links leav
 
 ## Phase A3: Alerts (FCM + catch-up)
 
+**STATUS: app side built and tested on the emulator 2026-11-17.** Firebase project `shelly-eva` exists
+(Spark), `android/app/google-services.json` is in place (gitignored). Verified on the emulator against
+`wrangler dev` with an admin test alert: location, `/api/glance`, topic subscribe (`all`, `z_<zone>`),
+AlertDecider, then a Warnings-channel notification with the template steps. Unit tests cover the decider.
+**Still to do:** the user creates a service-account key (Firebase console, Project settings, Service accounts,
+Generate new private key) and we `wrangler secret put FCM_SERVICE_ACCOUNT` (the user pastes it); then test
+"Send test to app" and a real push with the phone idle. Notes: debug builds accept a server override
+(`siteOverride` in the app prefs, set with `adb run-as`) so the app can talk to `wrangler dev`; the emulator's
+GPS does not feed location to apps, so seed the saved location in prefs to test.
+
 **Prerequisite, user action:** the user creates a free Firebase project (Spark plan, no
 billing), adds an Android app with package `com.evaakselrad.shelly`, downloads
 `google-services.json` into `android/app/` (gitignored), and creates a service-account

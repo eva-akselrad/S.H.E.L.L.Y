@@ -40,4 +40,34 @@ class Prefs(context: Context) {
     var alertPrefs: AlertPrefs
         get() = AlertPrefs.parse(sp.getString("alertPrefs", null) ?: "") ?: AlertPrefs.DEFAULT
         set(v) = sp.edit().putString("alertPrefs", v.toJson()).apply()
+
+    /** AlertDecider memory (which alerts were already shown) */
+    var deciderState: String?
+        get() = sp.getString("deciderState", null)
+        set(v) = sp.edit().putString("deciderState", v).apply()
+
+    /** last /api/glance payload; the widget (phase A4) reads only this */
+    var lastGlance: String?
+        get() = sp.getString("lastGlance", null)
+        set(v) = sp.edit().putString("lastGlance", v).apply()
+
+    /** FCM topics this phone is subscribed to (zones). Stays on the phone. */
+    var topics: Set<String>
+        get() = sp.getStringSet("topics", emptySet()) ?: emptySet()
+        set(v) = sp.edit().putStringSet("topics", v).apply()
+
+    /** last known position, kept only on this phone as a fallback when a fresh fix is not possible */
+    fun lastLocation(): Triple<Double, Double, Long>? {
+        if (!sp.contains("lat")) return null
+        return Triple(Double.fromBits(sp.getLong("lat", 0)), Double.fromBits(sp.getLong("lon", 0)), sp.getLong("locMs", 0))
+    }
+
+    fun saveLocation(lat: Double, lon: Double, atMs: Long) {
+        sp.edit().putLong("lat", lat.toBits()).putLong("lon", lon.toBits()).putLong("locMs", atMs).apply()
+    }
+
+    /** debug builds only: point the app at another server, e.g. wrangler dev (set with adb run-as) */
+    var siteOverride: String?
+        get() = if (BuildConfig.DEBUG) sp.getString("siteOverride", null) else null
+        set(v) = sp.edit().putString("siteOverride", v).apply()
 }

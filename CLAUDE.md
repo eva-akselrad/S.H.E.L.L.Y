@@ -14,7 +14,7 @@
   card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
   confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
   `VAPID_*` secrets; self-grading needs a default location set in admin.
-- **SHELLY Android app: A1 (Worker) and A2 (app shell) are built and deployed; NEXT is A3 (Firebase alerts).** The full build plan is
+- **SHELLY Android app: A1 (Worker), A2 (app shell) and the app side of A3 (alerts) are built; A1/A2 are deployed. NEXT: the user's Firebase service-account key and `wrangler secret put FCM_SERVICE_ACCOUNT`, then A4 (widget).** The full build plan is
   **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
   stop points. The user decided all of this on 2026-11-17 (don't re-ask):
   - Native app, **sideloaded** from the website with a **self-updater**. **Not on the Play Store.**
