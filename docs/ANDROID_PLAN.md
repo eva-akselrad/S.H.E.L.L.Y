@@ -425,3 +425,7 @@ doing it now avoids a cliff later.
 
 ## Status: A4 to A6 (2026-11-17)
 A4 widget (RemoteViews, small + wide, reads saved glance), A5 self-updater (sha256 + cert check, blocked during warnings) and release script, A6 install banner and `/get-android/` are built and deployed. Unit tests pass. Not emulator-tested: widget on a launcher, and an end-to-end self-update. See [ANDROID.md](ANDROID.md).
+
+
+## Status: shipped (2026-11-17)
+Signed 1.0.2 published. Added after A6: My location button (app GPS bridge), in-app Check for updates, custom simulator alerts, admin announcements (FCM + web push).
