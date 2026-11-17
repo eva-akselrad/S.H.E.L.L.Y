@@ -23,6 +23,8 @@ object Notifier {
     const val CH_WARNINGS = "warnings"
     const val CH_WATCHES = "watches"
     const val CH_APP = "app"
+    const val CH_ANNOUNCE = "announcements"
+    private const val ANNOUNCE_ID = 7700
     private const val TEST_ID = 7001
 
     /** Safe to call repeatedly; Android keeps the user's changes to existing channels. */
@@ -47,7 +49,10 @@ object Notifier {
         val app = NotificationChannel(CH_APP, "App updates", NotificationManager.IMPORTANCE_LOW).apply {
             description = "SHELLY app updates"
         }
-        nm.createNotificationChannels(listOf(warnings, watches, app))
+        val announce = NotificationChannel(CH_ANNOUNCE, "Announcements", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Messages from SHELLY"
+        }
+        nm.createNotificationChannels(listOf(warnings, watches, app, announce))
     }
 
     private fun canPost(context: Context): Boolean =
@@ -128,6 +133,25 @@ object Notifier {
             .build()
         try {
             NotificationManagerCompat.from(context).notify(TEST_ID, n)
+        } catch (_: SecurityException) {
+        }
+    }
+
+    /** A plain message written by the SHELLY admin. Shown when the app is open (otherwise Android shows it from the push itself). */
+    fun showAnnouncement(context: Context, title: String, body: String) {
+        if (!canPost(context)) return
+        val n = NotificationCompat.Builder(context, CH_ANNOUNCE)
+            .setSmallIcon(R.drawable.ic_stat_shelly)
+            .setContentTitle(title.take(65))
+            .setContentText(body.take(240))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body.take(240)))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(openApp(context, ANNOUNCE_ID))
+            .setAutoCancel(true)
+            .setColor(0xFFFF8A65.toInt())
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(ANNOUNCE_ID, n)
         } catch (_: SecurityException) {
         }
     }

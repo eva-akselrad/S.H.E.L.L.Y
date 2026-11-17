@@ -161,3 +161,21 @@ export async function sendTestPush(env: Env): Promise<{ sent: number; failed: nu
   );
   return { sent, failed, total: subs.length };
 }
+
+/** Admin: an announcement with admin-written text to every web subscriber. */
+export async function sendCustomPush(env: Env, title: string, body: string): Promise<{ sent: number; failed: number; total: number }> {
+  const keys = vapid(env);
+  if (!keys) return { sent: 0, failed: 0, total: 0 };
+  const subs = await readSubs(env);
+  let sent = 0;
+  let failed = 0;
+  const tag = `shelly-note-${Date.now()}`;
+  await Promise.all(
+    subs.map(async (s) => {
+      const r = await sendPush(s, { title, body, tag, level: "CALM", url: "/" }, keys, { ttl: 3600 }).catch(() => null);
+      if (r?.ok) sent++;
+      else failed++;
+    }),
+  );
+  return { sent, failed, total: subs.length };
+}

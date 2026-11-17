@@ -67,12 +67,24 @@ interface Target {
   topic?: string;
 }
 
-async function send(token: string, sa: ServiceAccount, target: Target, data: Record<string, string>, high: boolean): Promise<{ ok: boolean; status: number }> {
+async function send(token: string, sa: ServiceAccount, target: Target, data: Record<string, string>, high: boolean, notification?: { title: string; body: string }): Promise<{ ok: boolean; status: number }> {
   const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    // data only (no `notification` block) so the app decides what to show from /api/glance
-    body: JSON.stringify({ message: { ...target, data, android: { priority: high ? "HIGH" : "NORMAL", ttl: high ? "1800s" : "10800s" } } }),
+    // alerts are data only (no `notification` block) so the app decides what to show from /api/glance;
+    // an admin announcement carries its own text so even an older app build can show it
+    body: JSON.stringify({
+      message: {
+        ...target,
+        data,
+        ...(notification ? { notification } : {}),
+        android: {
+          priority: high ? "HIGH" : "NORMAL",
+          ttl: high ? "1800s" : "10800s",
+          ...(notification ? { notification: { channel_id: "announcements" } } : {}),
+        },
+      },
+    }),
   });
   return { ok: res.ok, status: res.status };
 }
@@ -124,4 +136,12 @@ export async function sendTestFcm(env: Env): Promise<boolean> {
   if (!sa) return false;
   const token = await accessToken(env, sa);
   return (await send(token, sa, { topic: "all" }, { type: "test" }, true)).ok;
+}
+
+/** Admin: an announcement with admin-written text to every phone running the app (topic "all"). */
+export async function sendCustomFcm(env: Env, title: string, body: string): Promise<boolean> {
+  const sa = serviceAccount(env);
+  if (!sa) return false;
+  const token = await accessToken(env, sa);
+  return (await send(token, sa, { topic: "all" }, { type: "custom", title, body }, true, { title, body })).ok;
 }

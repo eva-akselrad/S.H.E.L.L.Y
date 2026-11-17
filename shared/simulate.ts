@@ -70,19 +70,80 @@ export const SIM_PRESETS = {
 export type SimPreset = keyof typeof SIM_PRESETS;
 export const isSimPreset = (v: unknown): v is SimPreset => typeof v === "string" && v in SIM_PRESETS;
 
+/** An admin-written test alert. Text comes from the admin, never from an LLM, and is always shown as a TEST. */
+export interface CustomSim {
+  event: string;
+  severity: "Extreme" | "Severe" | "Moderate" | "Minor";
+  description: string;
+  instruction: string;
+  tornadoObserved?: boolean;
+}
+
 export interface SimEntry {
   id: string;
-  preset: SimPreset;
+  preset: SimPreset | "custom";
+  custom?: CustomSim;
   created: string;
   expires: string;
 }
+
+export const CUSTOM_SEVERITIES = ["Extreme", "Severe", "Moderate", "Minor"] as const;
+
+/** Common NWS event names to pick from. Anything else can be typed in. */
+export const CUSTOM_EVENTS = [
+  "Tornado Warning",
+  "Severe Thunderstorm Warning",
+  "Flash Flood Warning",
+  "Winter Storm Warning",
+  "Blizzard Warning",
+  "Ice Storm Warning",
+  "Excessive Heat Warning",
+  "Tornado Watch",
+  "Severe Thunderstorm Watch",
+  "Flood Watch",
+  "Winter Weather Advisory",
+  "Heat Advisory",
+  "Wind Advisory",
+  "Dense Fog Advisory",
+  "Special Weather Statement",
+] as const;
+
+const clip = (v: unknown, max: number): string => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/** Validates admin input for a custom test alert. Returns null if the event name is missing. */
+export function normalizeCustomSim(raw: unknown): CustomSim | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const event = clip(r.event, 80);
+  if (!event) return null;
+  const severity = (CUSTOM_SEVERITIES as readonly unknown[]).includes(r.severity) ? (r.severity as CustomSim["severity"]) : "Severe";
+  return {
+    event,
+    severity,
+    description: clip(r.description, 600),
+    instruction: clip(r.instruction, 400),
+    ...(r.tornadoObserved === true ? { tornadoObserved: true } : {}),
+  };
+}
+
+export const simLabel = (e: SimEntry): string => (e.preset === "custom" ? `Custom: ${e.custom?.event ?? "alert"}` : SIM_PRESETS[e.preset].label);
 
 /** Build a clearly-labelled test alert that covers the viewer's point. */
 export function buildSimAlert(
   entry: SimEntry,
   point: { lat: number; lon: number; zones: string[] },
 ): Alert {
-  const p = SIM_PRESETS[entry.preset];
+  const p =
+    entry.preset === "custom" && entry.custom
+      ? {
+          event: entry.custom.event,
+          severity: entry.custom.severity,
+          headline: entry.custom.event,
+          description: entry.custom.description || "Custom test alert.",
+          instruction: entry.custom.instruction || "This is only a test.",
+          params: (entry.custom.tornadoObserved ? { tornadoDetection: "OBSERVED" } : {}) as AlertParams,
+        }
+      : SIM_PRESETS[entry.preset === "custom" ? "tornado-warning" : entry.preset];
   const d = 0.12; // ~8 mile half-width square around the viewer
   const { lat, lon } = point;
   return {

@@ -11,6 +11,12 @@ class ShellyMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         when (message.data["type"]) {
             "alert" -> Refresh.enqueueNow(applicationContext, expedited = true)
+            "custom" -> {
+                Notifier.createChannels(applicationContext)
+                val title = message.data["title"].orEmpty()
+                val body = message.data["body"].orEmpty()
+                if (title.isNotBlank() && body.isNotBlank()) Notifier.showAnnouncement(applicationContext, title, body)
+            }
             "test" -> {
                 Notifier.createChannels(applicationContext)
                 Notifier.showTest(applicationContext)

@@ -2,13 +2,13 @@ import { normalizeConfig, SPEAKERS, type Speaker } from "../shared/config";
 import { filterText } from "../shared/live/llm";
 import { callLlm, llmUsed } from "./llm";
 import { produceRundown } from "./live";
-import { isSimPreset, SIM_PRESETS, type SimEntry } from "../shared/simulate";
+import { isSimPreset, normalizeCustomSim, SIM_PRESETS, simLabel, type SimEntry } from "../shared/simulate";
 import type { Announcement } from "../shared/types";
 import { isAuthed, login, logout } from "./auth";
 import { latencyStats, type LatencySample } from "../shared/health";
 import { LATENCY_KEY, pollAlerts } from "./poll";
-import { serviceAccount, sendTestFcm } from "./fcm";
-import { readSubs, sendTestPush, vapid } from "./push";
+import { sendCustomFcm, serviceAccount, sendTestFcm } from "./fcm";
+import { readSubs, sendCustomPush, sendTestPush, vapid } from "./push";
 import {
   audit,
   readAlerts,
@@ -119,17 +119,19 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
   if (path === "/api/admin/simulate" && method === "GET") return json(await readSim(env));
   if (path === "/api/admin/simulate" && method === "POST") {
     const b = await body();
-    if (!isSimPreset(b.preset)) return json({ error: "bad_preset", presets: Object.keys(SIM_PRESETS) }, 400);
+    const custom = b.preset === "custom" ? normalizeCustomSim(b.custom) : null;
+    if (b.preset === "custom" ? !custom : !isSimPreset(b.preset)) return json({ error: "bad_preset", presets: [...Object.keys(SIM_PRESETS), "custom"] }, 400);
     const minutes = Math.min(120, Math.max(1, Math.round(Number(b.minutes) || 5)));
     const now = Date.now();
     const entry: SimEntry = {
       id: `sim-${crypto.randomUUID()}`,
-      preset: b.preset,
+      preset: b.preset as SimEntry["preset"],
+      ...(custom ? { custom } : {}),
       created: new Date(now).toISOString(),
       expires: new Date(now + minutes * 60_000).toISOString(),
     };
     await writeSim(env, [entry, ...(await readSim(env))]);
-    await audit(env, "simulate.start", `${SIM_PRESETS[b.preset].label} for ${minutes} min`);
+    await audit(env, "simulate.start", `${simLabel(entry)} for ${minutes} min`);
     return json(entry, 201);
   }
   if (path === "/api/admin/simulate" && method === "DELETE") {
@@ -202,6 +204,21 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const ok = await sendTestFcm(env).catch(() => false);
     await audit(env, "fcm.test", ok ? "sent to app topic" : "send failed");
     return json({ ok }, ok ? 200 : 502);
+  }
+
+  // ── custom announcement (admin-written text only) ──
+  if (path === "/api/admin/notify" && method === "POST") {
+    const b = await body();
+    const title = typeof b.title === "string" ? b.title.trim().slice(0, 65) : "";
+    const text = typeof b.body === "string" ? b.body.trim().slice(0, 240) : "";
+    if (!title || !text) return json({ error: "title_and_body_required" }, 400);
+    const toApp = b.app !== false;
+    const toWeb = b.web !== false;
+    const result: { app: boolean | null; web: { sent: number; failed: number; total: number } | null } = { app: null, web: null };
+    if (toApp && serviceAccount(env)) result.app = await sendCustomFcm(env, title, text).catch(() => false);
+    if (toWeb) result.web = await sendCustomPush(env, title, text);
+    await audit(env, "notify.send", `"${title}" app=${result.app ?? "off"} web=${result.web ? result.web.sent : "off"}`);
+    return json(result);
   }
 
   if (path === "/api/admin/audit" && method === "GET") return json(await readAudit(env));
