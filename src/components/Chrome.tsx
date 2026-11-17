@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import { musicAllowed, musicOn, nextTrack, nowPlaying, toggleMusic } from "../music";
 import { cycleTheme, theme } from "../theme";
-import { alertsUpdated, announcements, locateByQuery, online, place, threat } from "../state/store";
+import { alertsUpdated, announcements, locateByCoords, locateByQuery, online, place, threat } from "../state/store";
 
 export function Logo() {
   return (
@@ -82,10 +82,22 @@ export function SearchBox() {
       setErr("US locations only — try a city name or ZIP");
     }
   };
+  const useMyLocation = () => {
+    setErr("");
+    if (!navigator.geolocation) return setErr("Location isn't available here");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        locateByCoords(p.coords.latitude, p.coords.longitude).then(() => setQ("")).catch(() => setErr("SHELLY covers the United States only"));
+      },
+      () => setErr("Couldn't get your location. Check that Location is allowed."),
+      { maximumAge: 60_000, timeout: 15_000 },
+    );
+  };
   return (
     <form class="search" onSubmit={go}>
       <input value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} placeholder={place.value?.name ?? "City or ZIP"} aria-label="Search for a US location" />
       <button type="submit">Go</button>
+      <button type="button" onClick={useMyLocation} aria-label="Use my current location">My location</button>
       {err && <span class="err">{err}</span>}
     </form>
   );
