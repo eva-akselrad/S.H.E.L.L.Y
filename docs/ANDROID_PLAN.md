@@ -191,6 +191,14 @@ Don't deploy yet.
 
 ## Phase A2: Android app shell
 
+**STATUS: built, tested on the emulator and deployed 2026-11-17.** Debug APK copied to
+`G:\My Drive\shelly apps\SHELLY-1.0.0-debug.apk` for the user to install. Debug-signed builds
+can't be updated by a release-signed APK, so the user must uninstall the debug app before
+installing the first signed release (A5). Build with
+`JAVA_HOME="C:\Program Files\Android\Android Studio\jbr" ./gradlew assembleDebug` in `android/`.
+Pinned `core-ktx` to 1.18.0 (1.19.x needs AGP 9.1). `keystore.properties` is still for the user to create
+(copy `android/keystore.properties.example`).
+
 **A2.1 Project** (after the user creates the skeleton, see Toolchain):
 - `minSdk 26`, `targetSdk`/`compileSdk` 36. `applicationId "com.evaakselrad.shelly"`.
 - Dependencies (check latest stable): androidx core-ktx, appcompat, webkit,
