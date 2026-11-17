@@ -14,6 +14,19 @@
   card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
   confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
   `VAPID_*` secrets; self-grading needs a default location set in admin.
+- **NEXT: SHELLY Android app (planned, not built).** The full build plan is
+  **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
+  stop points. The user decided all of this on 2026-11-17 (don't re-ask):
+  - Native app, **sideloaded** from the website with a **self-updater**. **Not on the Play Store.**
+  - **No Android Auto.**
+  - App ID **`com.evaakselrad.shelly`**.
+  - Widget and alerts follow the **phone's GPS**.
+  - Push through **Firebase FCM** (free Spark plan, no billing).
+  - Website **install banner** plus a `/get-android/` download page.
+  - Developer verification goes through the user's **existing Play Console** account.
+
+  The user does these steps themselves: the Android Studio project skeleton, the signing
+  keystore (and its password), the Firebase project, and the Play Console steps.
 
 ## Next work: SHELLY Live + Forecaster Studio (summary of docs/LIVE_PLAN.md)
 - **SHELLY Live:** a 24/7 auto-produced YouTube weather stream with an AI host.

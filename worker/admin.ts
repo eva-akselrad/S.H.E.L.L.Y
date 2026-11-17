@@ -7,6 +7,7 @@ import type { Announcement } from "../shared/types";
 import { isAuthed, login, logout } from "./auth";
 import { latencyStats, type LatencySample } from "../shared/health";
 import { LATENCY_KEY, pollAlerts } from "./poll";
+import { serviceAccount, sendTestFcm } from "./fcm";
 import { readSubs, sendTestPush, vapid } from "./push";
 import {
   audit,
@@ -73,6 +74,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
       lastAction: log[0] ?? null,
       latency: latencyStats(samples ?? [], Date.now() - 7 * 86_400_000),
       push: { configured: !!vapid(env), subscribers: subs.length },
+      fcm: { configured: !!serviceAccount(env) },
     });
   }
 
@@ -193,6 +195,13 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const r = await sendTestPush(env);
     await audit(env, "push.test", `${r.sent}/${r.total} delivered`);
     return json(r);
+  }
+
+  if (path === "/api/admin/fcm-test" && method === "POST") {
+    if (!serviceAccount(env)) return json({ error: "fcm_not_configured" }, 409);
+    const ok = await sendTestFcm(env).catch(() => false);
+    await audit(env, "fcm.test", ok ? "sent to app topic" : "send failed");
+    return json({ ok }, ok ? 200 : 502);
   }
 
   if (path === "/api/admin/audit" && method === "GET") return json(await readAudit(env));

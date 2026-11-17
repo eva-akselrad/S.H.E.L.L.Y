@@ -1,6 +1,8 @@
 import { buildSimAlert } from "../shared/simulate";
-import type { Forecast, Place } from "../shared/types";
 import { handleAdmin } from "./admin";
+import { handleAndroid } from "./android";
+import { fanOutFcm } from "./fcm";
+import { coords, loadForecast, loadPlace } from "./loaders";
 import { cached, round } from "./cache";
 import { handleLiveTts, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
@@ -9,8 +11,7 @@ import { fanOutPushes, handlePush } from "./push";
 import { fetchConfidence, fetchHazards, fetchStormReports } from "./sources/extra";
 import { nearbyReports, type StormReport } from "../shared/reports";
 import { publicProducts } from "./studio";
-import { fetchForecastText, fetchPoint } from "./sources/nws";
-import { fetchAirQuality, fetchOpenMeteo, normalizeForecast } from "./sources/openmeteo";
+import { fetchAirQuality } from "./sources/openmeteo";
 import { fetchRadarFrames } from "./sources/rainviewer";
 import { fetchOutlook } from "./sources/spc";
 import { readAlerts, readAnnouncements, readConfig, readRundown, readSim } from "./store";
@@ -21,14 +22,6 @@ const json = (data: unknown, status = 200, maxAge = 0): Response =>
     status,
     headers: { "cache-control": maxAge ? `public, max-age=${maxAge}` : "no-store" },
   });
-
-function coords(url: URL): { lat: number; lon: number } | null {
-  const lat = Number(url.searchParams.get("lat"));
-  const lon = Number(url.searchParams.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  if (lat < 17 || lat > 72 || lon < -180 || lon > -64) return null; // US + territories bounding box
-  return { lat: round(lat, 4), lon: round(lon, 4) };
-}
 
 async function geocode(q: string): Promise<{ lat: number; lon: number; name: string } | null> {
   const res = await fetch(
@@ -51,6 +44,9 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
 
   const push = await handlePush(request, env, url);
   if (push) return push;
+
+  const android = await handleAndroid(request, env, ctx, url);
+  if (android) return android;
 
   if (path === "/api/config") {
     const c = await readConfig(env);
@@ -95,9 +91,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     if (!c) return json({ error: "bad_location", detail: "US locations only" }, 400);
     const { lat, lon } = c;
     try {
-      const { data } = await cached<Place>(ctx, `loc:${round(lat, 3)}:${round(lon, 3)}`, 86400, () =>
-        fetchPoint(env, lat, lon),
-      );
+      const data = await loadPlace(env, ctx, lat, lon);
       return json(label ? { ...data, name: label } : data, 200, 3600);
     } catch {
       return json({ error: "outside_us" }, 404);
@@ -110,13 +104,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     const office = url.searchParams.get("office");
     const gx = Number(url.searchParams.get("x"));
     const gy = Number(url.searchParams.get("y"));
-    const { data } = await cached<Forecast>(ctx, `fc:${round(c.lat, 2)}:${round(c.lon, 2)}`, 300, async () => {
-      const [raw, text] = await Promise.all([
-        fetchOpenMeteo(c.lat, c.lon),
-        office && gx && gy ? fetchForecastText(env, office, gx, gy).catch(() => []) : Promise.resolve([]),
-      ]);
-      return { fetchedAt: new Date().toISOString(), ...normalizeForecast(raw), text };
-    });
+    const data = await loadForecast(env, ctx, c, { office, x: gx, y: gy });
     return json(data, 200, 60);
   }
 
@@ -203,7 +191,10 @@ export default {
       pollAlerts(env)
         .then(async (alerts) => {
           // push first: it's the time-critical part
-          if (alerts) await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
+          if (alerts) {
+            await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
+            await fanOutFcm(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "fcm_fanout_failed", err: String(err) })));
+          }
           await produceRundown(env);
         })
         .catch((err) => console.error(JSON.stringify({ msg: "producer_failed", err: String(err) }))),

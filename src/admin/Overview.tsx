@@ -13,6 +13,7 @@ interface Status {
   lastAction: { t: string; action: string; detail: string } | null;
   latency?: { count: number; medianS: number | null; p90S: number | null; worstS: number | null; warningsMedianS: number | null };
   push?: { configured: boolean; subscribers: number };
+  fcm?: { configured: boolean };
 }
 
 const secs = (s: number | null | undefined) => (s === null || s === undefined ? "--" : s < 90 ? `${s} s` : `${Math.round(s / 60)} min`);
@@ -37,6 +38,10 @@ export function Overview() {
   const testPush = async () => {
     const r = await call<{ sent: number; total: number }>("POST", "/api/admin/push-test");
     toast(r.ok ? `Test sent to ${r.data.sent} of ${r.data.total} devices` : "Push isn't set up yet", r.ok ? "ok" : "error");
+  };
+  const testApp = async () => {
+    const r = await call("POST", "/api/admin/fcm-test");
+    toast(r.ok ? "Test sent to the SHELLY app" : "App push isn't set up, or the send failed", r.ok ? "ok" : "error");
   };
   const stopSims = async () => {
     await call("DELETE", "/api/admin/simulate");
@@ -81,6 +86,11 @@ export function Overview() {
           <span class="adm-hint">{s.push?.configured ? "devices signed up" : "Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY to turn on"}</span>
         </Card>
         <Card>
+          <span class="adm-tile-label">App push</span>
+          <b class="adm-tile-value">{s.fcm?.configured ? "On" : "Off"}</b>
+          <span class="adm-hint">{s.fcm?.configured ? "Android app alerts are sent through Firebase" : "Set FCM_SERVICE_ACCOUNT to turn on"}</span>
+        </Card>
+        <Card>
           <span class="adm-tile-label">Default location</span>
           <b class="adm-tile-value small">{s.defaultLocation ?? "Not set"}</b>
           <span class="adm-hint">{s.defaultLocation ? "New screens start here" : "Visitors choose their own"}</span>
@@ -93,6 +103,7 @@ export function Overview() {
             <button type="button" class="adm-btn" onClick={() => void repoll()}>Re-poll NWS now</button>
             <button type="button" class="adm-btn" disabled={!s.simulated} onClick={() => void stopSims()}>Stop all test alerts</button>
             <button type="button" class="adm-btn" disabled={!s.push?.configured || !s.push.subscribers} onClick={() => void testPush()}>Send test push</button>
+            <button type="button" class="adm-btn" disabled={!s.fcm?.configured} onClick={() => void testApp()}>Send test to app</button>
             <a class="adm-btn" href="/" target="_blank" rel="noopener">Open site</a>
             <a class="adm-btn" href="/?mode=kiosk" target="_blank" rel="noopener">Open kiosk view</a>
           </div>

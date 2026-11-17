@@ -7,4 +7,6 @@ interface Env {
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_EMAIL?: string;
+  /** Firebase service-account JSON for the Android app push (see docs/ANDROID.md) */
+  FCM_SERVICE_ACCOUNT?: string;
 }
