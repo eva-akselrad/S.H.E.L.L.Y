@@ -160,6 +160,11 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .takeover { position: fixed; inset: 0; z-index: 1000; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 18px; padding: max(20px, env(safe-area-inset-top)) 28px 0; color: #fff; }
 .takeover.warning { background: radial-gradient(120% 90% at 20% 0%, #4a0c10 0%, #1d0507 70%); box-shadow: inset 0 0 0 6px var(--warning); }
 .takeover.emergency { background: var(--emergency); animation: flash 1.2s steps(2) infinite; box-shadow: inset 0 0 0 8px #fff; }
+/* fixed rows: the location bar is absent on TVs, and must not shift the body into the wrong row */
+.takeover > header { grid-row: 1; }
+.tk-loc { grid-row: 2; }
+.tk-body { grid-row: 3; }
+.takeover > .crawl { grid-row: 4; }
 .takeover header { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .takeover h1 { margin: 0; flex: 1; min-width: 0; font-family: var(--display); font-size: clamp(2rem, 5.5vw, 4.6rem); line-height: 1.05; }
 .tk-level { background: #fff; color: #7a0010; font-weight: 800; padding: 8px 16px; border-radius: 8px; letter-spacing: .12em; font-size: clamp(.9rem, 1.6vw, 1.3rem); }
