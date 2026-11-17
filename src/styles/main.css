@@ -308,6 +308,10 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .push-watch { display: inline-flex; gap: 6px; align-items: center; font-size: .85em; color: var(--muted); }
 .push-watch input { min-height: 0; width: 18px; height: 18px; }
 .push-note { font-size: .85em; }
+.app-alerts { display: grid; gap: 6px; padding: 10px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+.app-alerts-note { margin: 0; font-size: .9em; }
+.app-alerts-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.web > .app-alerts { margin: 0 16px 8px; }
 .phone-tools { display: grid; gap: 8px; padding: 0 16px 8px; }
 .phone-tools .search { padding: 12px 0 0; }
 

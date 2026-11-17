@@ -1,5 +1,6 @@
 import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { Freshness } from "../components/Freshness";
+import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
 import { SoundOutput } from "../components/SoundOutput";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
@@ -24,6 +25,7 @@ export function WebShell() {
       </header>
       <ActionCard />
       <NearbyNotice />
+      <AppAlerts />
       <AnnouncementBar />
       <nav class="web-nav" aria-label="Segments">
         {loop.value.map((s, i) => (

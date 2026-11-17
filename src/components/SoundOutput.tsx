@@ -1,11 +1,12 @@
 import { useState } from "preact/hooks";
+import { inApp } from "../native";
 import { choose, outputs, outputsUnlocked, sinkId, sinkLabel, sinkSupported, unlockOutputs } from "../audioOut";
 
 /** "Play sound on…" picker. Desktop header, and the TV overlay (press S). */
 export function SoundOutput() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  if (!sinkSupported()) return null;
+  if (inApp || !sinkSupported()) return null;
 
   const unlock = async () => {
     setBusy(true);

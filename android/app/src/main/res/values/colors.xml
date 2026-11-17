@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="shelly_bg">#FF0B1220</color>
+    <color name="shelly_accent">#FFFF8A65</color>
+    <color name="shelly_text">#FFE8EEF7</color>
+</resources>

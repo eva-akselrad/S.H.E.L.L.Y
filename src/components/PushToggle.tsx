@@ -1,10 +1,12 @@
 import { disablePush, enablePush, pushState, pushWatches, setPushWatches } from "../push";
+import { inApp } from "../native";
 import { place } from "../state/store";
 
 /** "Alert me" control for web and phone. Hidden when push isn't set up on the server or browser. */
 export function PushToggle() {
   const s = pushState.value;
   const p = place.value;
+  if (inApp) return null; // the app has its own native alerts
   if (s === "unsupported" || s === "unconfigured" || !p) return null;
   if (s === "denied") return <span class="muted push-note">Notifications are blocked in this browser's settings.</span>;
   return (

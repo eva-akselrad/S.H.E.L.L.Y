@@ -1,5 +1,6 @@
 import { AnnouncementBar, Logo, MusicControl, SearchBox, StatusLine, ThemeToggle, ThreatBadge } from "../components/Chrome";
 import { Freshness } from "../components/Freshness";
+import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
@@ -23,7 +24,7 @@ export function PhoneShell() {
       <ActionCard />
       <NearbyNotice />
       <AnnouncementBar />
-      <div class="phone-tools"><SearchBox /><PushToggle /></div>
+      <div class="phone-tools"><SearchBox /><PushToggle /><AppAlerts /></div>
       <main class="cards">
         {cards.map((s) => {
           const View = SEGMENT_VIEWS[s.id];

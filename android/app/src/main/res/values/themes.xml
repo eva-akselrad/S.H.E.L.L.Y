@@ -1,0 +1,9 @@
+<resources>
+    <!-- SHELLY is always dark: the website draws its own light/dark scenes inside the WebView. -->
+    <style name="Theme.Shelly" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/shelly_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorPrimary">@color/shelly_accent</item>
+    </style>
+</resources>

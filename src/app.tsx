@@ -10,6 +10,7 @@ import { config, locateByCoords, mode, place, startCycling, startPollers, threat
 import { Takeover } from "./takeover/Takeover";
 import { initAudioOut } from "./audioOut";
 import { initPush, syncPush } from "./push";
+import { inApp } from "./native";
 import { announce } from "./tts";
 
 let wired = false;
@@ -33,7 +34,7 @@ function wire(): void {
   });
   // only a TV/kiosk keeps the music going when the page isn't on screen
   effect(() => setBackgroundPlay(mode.value === "kiosk"));
-  if (mode.peek() !== "kiosk") void initPush();
+  if (mode.peek() !== "kiosk" && !inApp) void initPush();
   if (mode.peek() !== "phone") initAudioOut();
   // keep the push subscription pointed at the place this device is watching
   effect(() => {
@@ -48,6 +49,14 @@ export function App() {
     // No Start screen: begin right away. Audio the browser blocks is retried on the first
     // touch/key, or plays as-is with --autoplay-policy=no-user-gesture-required (kiosks).
     void startMusic();
+    // The app follows the phone's GPS. If GPS fails, the last place stays.
+    if (inApp && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (p) => void locateByCoords(p.coords.latitude, p.coords.longitude).catch(() => undefined),
+        () => undefined,
+        { maximumAge: 5 * 60_000, timeout: 15_000 },
+      );
+    }
   }, []);
 
   if (!place.value) return <PickLocation />;
