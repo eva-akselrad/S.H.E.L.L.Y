@@ -1,5 +1,6 @@
 import { alertScript, isSpokenAlert } from "../shared/script";
 import type { Alert, ThreatLevel } from "../shared/types";
+import { playAlertChime } from "./alertSound";
 import { routeAudio, unrouteAudio } from "./audioOut";
 
 export { alertScript };
@@ -42,6 +43,7 @@ function browserSay(text: string, onEnd?: () => void): void {
 }
 
 async function speak(a: Alert, emergency: boolean, voice?: VoiceOpts): Promise<void> {
+  await playAlertChime(emergency ? "emergency" : "warning"); // notification sound first, then the words
   const fallback = (): void => browserSay(alertScript(a, emergency));
   if (!voice?.ai || typeof Audio === "undefined") return fallback();
   try {
