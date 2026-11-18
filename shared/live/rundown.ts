@@ -20,6 +20,8 @@ interface Base {
   headline: string;
   /** spoken text; absent = silent */
   speak?: string;
+  /** set on things the forecaster sent (say, play next): the page plays each of these once */
+  oneShot?: string;
 }
 export type RundownItem = Base &
   (
@@ -269,9 +271,9 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
   const front: RundownItem[] = [];
   if (ctl.say) {
     const text = ctl.say.text;
-    front.push({ key: key(`say:${ctl.say.id}`), kind: "host", text, source: ctl.say.source, headline: cfg.host.name.toUpperCase(), speak: text, durationSec: Math.max(8, speakSecs(text, 3)) });
+    front.push({ key: key(`say:${ctl.say.id}`), oneShot: ctl.say.id, kind: "host", text, source: ctl.say.source, headline: cfg.host.name.toUpperCase(), speak: text, durationSec: Math.max(8, speakSecs(text, 3)) });
   }
-  if (ctl.cue && level !== "EMERGENCY") front.push(...entryItems(ctl.cue.entry, true));
+  if (ctl.cue && level !== "EMERGENCY") front.push(...entryItems(ctl.cue.entry, true).map((i) => ({ ...i, oneShot: ctl.cue!.id })));
   items.unshift(...front);
 
   return {

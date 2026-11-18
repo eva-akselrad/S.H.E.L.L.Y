@@ -115,7 +115,9 @@ export async function handleLiveTts(env: Env, url: URL): Promise<Response> {
   if (cfg.live.viewerToken && url.searchParams.get("key") !== cfg.live.viewerToken) return err("forbidden", 403);
   if (cfg.voice.engine !== "ai" || !cfg.tts) return err("tts_disabled", 404);
   const r = await readRundown(env);
-  const item = r?.items.find((i) => i.key === url.searchParams.get("item"));
+  // match on the words too (h = hash of the text): a key whose text changed must never get the old audio
+  const h = url.searchParams.get("h");
+  const item = r?.items.find((i) => i.key === url.searchParams.get("item") && (!h || (i.speak && hashKey(i.speak) === h))) ?? (h ? r?.items.find((i) => i.speak && hashKey(i.speak) === h) : undefined);
   if (!item?.speak) return err("not_found", 404);
   const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap, cfg.voice.local);
   if (!out.ok) return err(`tts_${out.reason}`, out.reason === "cap" ? 429 : 502);

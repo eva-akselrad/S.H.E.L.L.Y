@@ -5,6 +5,7 @@ import { blockText, weekendDays } from "../shared/live/blocktext";
 import { computeIntensity } from "../shared/live/intensity";
 import { buildRundown, type CityWx } from "../shared/live/rundown";
 import { moodFor, outfitFor, quipFor } from "../src/live/host/personality";
+import { dropPlayed } from "../src/live/player";
 import type { Alert, SpcCategory } from "../shared/types";
 
 const NOW = Date.parse("2026-11-17T18:00:00Z");
@@ -79,6 +80,16 @@ describe("on-air control", () => {
     expect(r.items[0]).toMatchObject({ kind: "host", text: "Hello from the studio!", speak: "Hello from the studio!", source: "you" });
     expect(r.cmd).toEqual({ id: "s1", kind: "top" });
   });
+  test("say and play-next items are marked one-shot so the page plays them once; nothing else is", () => {
+    const r = run([], ctl({ say: { id: "s9", text: "Hi!", at: iso(0), source: "you" }, cue: { id: "c9", entry: { id: "c", block: "wind", on: true }, at: iso(0) } }));
+    expect(r.items[0]).toMatchObject({ kind: "host", oneShot: "s9" });
+    expect(r.items[1]).toMatchObject({ kind: "block", block: "wind", oneShot: "c9" });
+    expect(r.items.slice(2).every((i) => i.oneShot === undefined)).toBe(true);
+  });
+  test("after two minutes a say is gone from rebuilt rundowns (a settings save cannot bring it back)", () => {
+    const later = buildRundown(computeIntensity({ alerts: [], spc: "NONE", now: NOW + 3 * 60_000 }), { alerts: [], spc: "NONE", cities, studio: [], cams: [], wx, control: ctl({ say: { id: "s", text: "Hi!", at: iso(0), source: "you" } }) }, DEFAULT_LIVE, NOW + 3 * 60_000);
+    expect(later.items.some((i) => i.oneShot)).toBe(false);
+  });
   test("cue plays next; a hold replaces the rotation", () => {
     const cue = run([], ctl({ cue: { id: "c", entry: { id: "c", block: "extremes", on: true }, at: iso(0) } }));
     expect(cue.items[0]).toMatchObject({ kind: "block", block: "extremes" });
@@ -134,5 +145,15 @@ describe("mascot personality", () => {
   test("quips react to the screen and never to alerts", () => {
     expect(quipFor({ key: "k", kind: "segment", id: "now", city: DEFAULT_LIVE.region.cities[0]!, temp: 15, desc: "Clear", headline: "", durationSec: 5 }, "none")).toBe("Brrrr!");
     expect(quipFor({ key: "k", kind: "alert", alertId: "a", headline: "", durationSec: 5 }, "none")).toBeNull();
+  });
+});
+
+describe("page plays one-shots once", () => {
+  test("a played say is dropped from every later rundown, e.g. the rebuild after a settings save", () => {
+    const r = run([], { ...EMPTY_CONTROL, say: { id: "once", text: "Hello!", at: iso(0), source: "you" }, cmd: { id: "once", kind: "top" } });
+    expect(dropPlayed(r, new Set()).items[0]?.oneShot).toBe("once");
+    const after = dropPlayed(r, new Set(["once"]));
+    expect(after.items.some((x) => x.oneShot === "once")).toBe(false);
+    expect(after.items.length).toBe(r.items.length - 1);
   });
 });

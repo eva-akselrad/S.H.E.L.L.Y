@@ -2,7 +2,7 @@ import { computed, signal } from "@preact/signals";
 import type { Rundown, RundownItem } from "../../shared/live/rundown";
 import type { StudioProduct } from "../../shared/studio";
 import type { RadarFrames } from "../../shared/types";
-import { pickIndex } from "./player";
+import { dropPlayed, pickIndex } from "./player";
 
 export const viewerKey = (): string => new URLSearchParams(location.search).get("key") ?? "";
 
@@ -30,6 +30,9 @@ export const upNext = computed<RundownItem[]>(() => {
   return [1, 2, 3].map((d) => r.items[(index.value + d) % n]!).filter((i) => i.key !== current.value?.key);
 });
 
+/** forecaster one-shots (say, play next) this page has already played; never again, even if a rebuild keeps them */
+export const playedOneShots = new Set<string>();
+
 /** last forecaster jump command seen; the first rundown only records it */
 let lastCmd: string | null | undefined;
 
@@ -39,7 +42,7 @@ export async function pollRundown(): Promise<void> {
     if (res.status === 404) status.value = "disabled";
     else if (res.status === 403) status.value = "forbidden";
     else if (res.ok) {
-      const next = (await res.json()) as Rundown;
+      const next = dropPlayed((await res.json()) as Rundown, playedOneShots);
       let i = pickIndex(rundown.value, index.value, next);
       let jumped = false;
       const cmd = next.cmd ?? null;

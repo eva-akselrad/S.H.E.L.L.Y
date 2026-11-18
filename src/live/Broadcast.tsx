@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { DEFAULT_LIVE, type SiteConfig } from "../../shared/config";
 import { applyThreatToMusic, configureMusic, setDucked, startMusic } from "../music";
 import { AlertCounters, Crawl, HeadlineBar, IntensityGauge, LowerThird, MainPanel, RightRail } from "./Panels";
-import { advance, clock, current, epoch, pollProducts, pollRadar, pollRundown, rundown, status } from "./state";
+import { advance, clock, current, epoch, playedOneShots, pollProducts, pollRadar, pollRundown, rundown, status } from "./state";
 import { speakItem, stopVoice } from "./voice";
 import "../styles/live.css";
 
@@ -50,6 +50,7 @@ export function Broadcast() {
   useEffect(() => {
     const it = current.value;
     if (!it) return;
+    if (it.oneShot) playedOneShots.add(it.oneShot);
     let cancelled = false;
     const minMs = it.durationSec * 1000;
     const speech = it.speak && speakOn ? Promise.race([speakItem(it, ai), sleep(minMs + 25_000)]) : Promise.resolve();

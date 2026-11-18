@@ -1,3 +1,4 @@
+import { hashKey } from "../../shared/live/llm";
 import type { RundownItem } from "../../shared/live/rundown";
 import { mouth, speaking, viewerKey } from "./state";
 
@@ -29,7 +30,7 @@ function browserSay(text: string): Promise<void> {
 
 async function aiSay(item: RundownItem): Promise<boolean> {
   try {
-    const q = new URLSearchParams({ key: viewerKey(), item: item.key });
+    const q = new URLSearchParams({ key: viewerKey(), item: item.key, h: hashKey(item.speak ?? "") });
     const res = await fetch(`/api/live/tts?${q}`);
     if (!res.ok) return false;
     const url = URL.createObjectURL(await res.blob());

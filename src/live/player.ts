@@ -25,3 +25,9 @@ export function pickIndex(prev: Rundown | null, prevIdx: number, next: Rundown):
 export function project(lon: number, lat: number, b: { south: number; west: number; north: number; east: number }): { x: number; y: number } {
   return { x: (lon - b.west) / (b.east - b.west), y: 1 - (lat - b.south) / (b.north - b.south) };
 }
+
+/** Remove forecaster one-shots (say, play next) this page already played, so a rebuild never repeats them. */
+export function dropPlayed(r: Rundown, played: ReadonlySet<string>): Rundown {
+  const items = r.items.filter((i) => !i.oneShot || !played.has(i.oneShot));
+  return items.length === r.items.length ? r : { ...r, items };
+}
