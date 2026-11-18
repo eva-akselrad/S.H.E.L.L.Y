@@ -31,6 +31,12 @@ const toLocal = (iso: string): string => {
 };
 const fromLocal = (v: string, fallback: string): string => (Number.isFinite(Date.parse(v)) ? new Date(v).toISOString() : fallback);
 
+/** "Highs Tomorrow", "Feels Like Today"... */
+export function cityTempsTitle(metric: CityTemps["metric"], day: "0" | "1"): string {
+  return `${{ high: "Highs", low: "Lows", feelsLike: "Feels Like" }[metric]} ${day === "1" ? "Tomorrow" : "Today"}`;
+}
+const DEFAULT_TITLES = new Set(["high", "low", "feelsLike"].flatMap((m) => ["0", "1"].map((d) => cityTempsTitle(m as CityTemps["metric"], d as "0" | "1"))));
+
 function blank(kind: StudioKind): StudioProduct {
   const now = new Date();
   const to = new Date(now.getTime() + (kind === "sevenDay" ? 7 : 1) * 86400_000);
@@ -54,21 +60,68 @@ export function Studio() {
   const load = () => void call<StudioProduct[]>("GET", "/api/admin/studio").then((r) => r.ok && setList(r.data));
   useEffect(load, []);
 
+  const [setBusy, setSetBusy] = useState(false);
+  const [setDay, setSetDay] = useState<"0" | "1">("1");
+  const [setMetrics, setSetMetrics] = useState<Record<CityTemps["metric"], boolean>>({ high: true, low: true, feelsLike: true });
+
+  // one press: a separate published map for each chosen measure, filled from the model
+  const publishSet = async () => {
+    const metrics = (Object.keys(setMetrics) as CityTemps["metric"][]).filter((m) => setMetrics[m]);
+    if (!metrics.length) return toast("Pick at least one map.", "error");
+    setSetBusy(true);
+    let made = 0;
+    for (const metric of metrics) {
+      const v = await call<CityTemps>("GET", `/api/admin/studio/city-temps?metric=${metric}&day=${setDay}`);
+      if (!v.ok) continue;
+      const base = blank("cityTemps");
+      const end = new Date();
+      end.setHours(23, 59, 0, 0);
+      if (setDay === "1") end.setDate(end.getDate() + 1);
+      const p = { ...base, title: cityTempsTitle(metric, setDay), validTo: end.toISOString(), published: true, body: v.data };
+      if ((await call("PUT", "/api/admin/studio", p)).ok) made++;
+    }
+    setSetBusy(false);
+    toast(made ? `Published ${made} map${made > 1 ? "s" : ""}` : "Couldn't load the model values.", made ? "ok" : "error");
+    load();
+  };
+
+  const togglePublish = async (p: StudioProduct) => {
+    const r = await call("PUT", "/api/admin/studio", { ...p, published: !p.published });
+    if (r.ok) load();
+    else toast(p.kind === "discussion" ? "Review the discussion before publishing it." : "Couldn't change it.", "error");
+  };
+  const duplicate = (p: StudioProduct) => setEdit({ ...p, id: "", title: `${p.title} (copy)`, published: false });
+  const publishedCount = list.filter((p) => p.published).length;
+
   if (edit) return <Editor product={edit} onClose={() => { setEdit(null); load(); }} />;
   return (
-    <Page title="Forecaster Studio" lead="Your own forecast graphics. Published ones appear in the SHELLY loop, in SHELLY Live, and can be downloaded as images for social media.">
+    <Page title="Forecaster Studio" lead="Your own forecast graphics. Publish as many as you like: every published one plays in the SHELLY loop and on SHELLY Live, and can be downloaded as an image for social media.">
       <Card title="Create">
         <div class="adm-row">
           {BUILT.map((k) => <button key={k} type="button" class="adm-btn" onClick={() => setEdit(blank(k))}>{KIND_LABEL[k]}</button>)}
         </div>
       </Card>
-      <Card title="Your graphics">
+      <Card title="Quick set: temperature maps" hint="Makes and publishes one map for each measure you pick, filled from the model. Edit any of them afterwards.">
+        <div class="adm-row">
+          {(["high", "low", "feelsLike"] as const).map((m) => (
+            <label key={m} class="adm-row" style={{ gap: ".35rem" }}>
+              <input type="checkbox" checked={setMetrics[m]} onChange={(e) => setSetMetrics({ ...setMetrics, [m]: (e.target as HTMLInputElement).checked })} />
+              {{ high: "Highs", low: "Lows", feelsLike: "Feels like" }[m]}
+            </label>
+          ))}
+          <Segmented label="Day" value={setDay} onChange={setSetDay} options={[{ value: "1", label: "Tomorrow" }, { value: "0", label: "Today" }]} />
+          <button type="button" class="adm-btn primary" disabled={setBusy} onClick={() => void publishSet()}>{setBusy ? "Publishing…" : "Make and publish"}</button>
+        </div>
+      </Card>
+      <Card title={`Your graphics${list.length ? ` · ${publishedCount} published` : ""}`}>
         {list.length === 0 && <p class="adm-hint">Nothing yet. Create one above.</p>}
         {list.map((p) => (
           <div key={p.id} class="adm-row" style={{ justifyContent: "space-between" }}>
             <span><b>{p.title}</b> <span class="adm-hint">{KIND_LABEL[p.kind]} · until {new Date(p.validTo).toLocaleString()}</span></span>
             <span class="adm-row">
               {p.published ? <Chip kind="ok">Published</Chip> : <Chip kind="muted">Draft</Chip>}
+              <button type="button" class="adm-btn small" onClick={() => void togglePublish(p)}>{p.published ? "Unpublish" : "Publish"}</button>
+              {BUILT.includes(p.kind) && <button type="button" class="adm-btn small" onClick={() => duplicate(p)}>Duplicate</button>}
               {BUILT.includes(p.kind) && <button type="button" class="adm-btn small" onClick={() => setEdit(p)}>Edit</button>}
               <button type="button" class="adm-btn small danger" onClick={() => { if (confirm(`Delete "${p.title}"?`)) void call("DELETE", `/api/admin/studio?id=${encodeURIComponent(p.id)}`).then(load); }}>Delete</button>
             </span>
@@ -139,7 +192,13 @@ function Editor({ product, onClose }: { product: StudioProduct; onClose: () => v
       </Card>
 
       {p.kind === "sevenDay" && <SevenDayEditor body={p.body as SevenDay} onChange={setBody} />}
-      {p.kind === "cityTemps" && <CityTempsEditor body={p.body as CityTemps} onChange={setBody} />}
+      {p.kind === "cityTemps" && (
+        <CityTempsEditor
+          body={p.body as CityTemps}
+          onChange={setBody}
+          onRetitle={(t) => setP((x) => (!x.title || DEFAULT_TITLES.has(x.title) ? { ...x, title: t } : x))}
+        />
+      )}
       {p.kind === "totalsMap" && <TotalsEditor product={p} body={p.body as TotalsMap} onChange={setBody} />}
       {p.kind === "timeline" && <TimelineEditor body={p.body as Timeline} onChange={setBody} />}
       {p.kind === "discussion" && <DiscussionEditor body={p.body as Discussion} onChange={setBody} />}
@@ -207,10 +266,11 @@ function SevenDayEditor({ body, onChange }: { body: SevenDay; onChange: (b: Seve
   );
 }
 
-function CityTempsEditor({ body, onChange }: { body: CityTemps; onChange: (b: CityTemps) => void }) {
+function CityTempsEditor({ body, onChange, onRetitle }: { body: CityTemps; onChange: (b: CityTemps) => void; onRetitle: (t: string) => void }) {
   const [day, setDay] = useState<"0" | "1">("1");
-  const load = async (metric = body.metric) => {
-    const r = await call<CityTemps>("GET", `/api/admin/studio/city-temps?metric=${metric}&day=${day}`);
+  const load = async (metric = body.metric, d = day) => {
+    onRetitle(cityTempsTitle(metric, d));
+    const r = await call<CityTemps>("GET", `/api/admin/studio/city-temps?metric=${metric}&day=${d}`);
     if (r.ok) onChange(r.data);
     else toast("Couldn't load temperatures.", "error");
   };
@@ -218,7 +278,7 @@ function CityTempsEditor({ body, onChange }: { body: CityTemps; onChange: (b: Ci
     <Card title="Temperatures" hint="Loaded from the model for every city in your rotation; change any value before publishing.">
       <div class="adm-row">
         <Segmented label="Measure" value={body.metric} onChange={(m) => { onChange({ ...body, metric: m }); void load(m); }} options={[{ value: "high", label: "Highs" }, { value: "low", label: "Lows" }, { value: "feelsLike", label: "Feels like" }]} />
-        <Segmented label="Day" value={day} onChange={setDay} options={[{ value: "1", label: "Tomorrow" }, { value: "0", label: "Today" }]} />
+        <Segmented label="Day" value={day} onChange={(d) => { setDay(d); if (body.cities.length) void load(body.metric, d); }} options={[{ value: "1", label: "Tomorrow" }, { value: "0", label: "Today" }]} />
         <button type="button" class="adm-btn" onClick={() => void load()}>Load from model</button>
       </div>
       <div class="adm-row">

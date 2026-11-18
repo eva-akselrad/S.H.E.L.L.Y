@@ -1,6 +1,7 @@
 import type { SegmentId } from "./scheduler";
 import type { SafetyPlan } from "./actions";
 import type { Bbox, Place } from "./types";
+import { DEFAULT_PLAYLIST, normalizePlaylist, type PlaylistEntry } from "./live/blocks";
 
 export const SEGMENT_IDS: SegmentId[] = [
   "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade",
@@ -71,6 +72,8 @@ export interface LiveConfig {
   host: { name: string; /** 0 calm .. 1 playful */ tone: number; bannedTopics: string[] };
   /** seconds per rundown item kind overrides */
   itemSeconds: Record<string, number>;
+  /** the forecaster-built rotation (calm and elevated; content between alerts during warnings) */
+  playlist: PlaylistEntry[];
 }
 
 export interface StudioConfig {
@@ -126,6 +129,7 @@ export const DEFAULT_LIVE: LiveConfig = {
   llm: { enabled: false, provider: "openrouter", baseUrl: "https://openrouter.ai/api/v1", models: [], dailyRequestCap: 45, temperature: 0.7 },
   host: { name: "SHELLY", tone: 0.4, bannedTopics: [] },
   itemSeconds: {},
+  playlist: DEFAULT_PLAYLIST,
 };
 
 export const DEFAULT_STUDIO: StudioConfig = { forecasterName: "" };
@@ -240,6 +244,7 @@ function normalizeLive(v: unknown): LiveConfig {
         : [],
     },
     itemSeconds: secs,
+    playlist: normalizePlaylist(r.playlist),
   };
 }
 

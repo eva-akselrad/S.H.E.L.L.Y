@@ -1,6 +1,6 @@
 import type { SiteConfig } from "../shared/config";
 import { computeIntensity } from "../shared/live/intensity";
-import { buildPackPrompt, type LlmPack } from "../shared/live/llm";
+import { buildPackPrompt, hashKey, type LlmPack } from "../shared/live/llm";
 import { SPC_PHRASE } from "../shared/live/templates";
 import { getPack } from "./llm";
 import { ttsAudio } from "./tts";
@@ -10,9 +10,10 @@ import { buildSimAlert } from "../shared/simulate";
 import { productActive } from "../shared/studio";
 import type { SpcCategory } from "../shared/types";
 import { wmoToWeather } from "../shared/wx";
-import { fetchCitiesNow } from "./sources/openmeteo";
+import { fetchRegionWx } from "./sources/openmeteo";
+import type { RegionWx } from "../shared/live/blocks";
 import { fetchRegionSpc } from "./sources/spc";
-import { readAlerts, readConfig, readLiveState, readProducts, readRundown, readSim, writeLiveState, writeRundown } from "./store";
+import { readAlerts, readConfig, readControl, readLiveState, readProducts, readRundown, readSim, writeLiveState, writeRundown } from "./store";
 
 interface Timed<T> {
   at: number;
@@ -47,21 +48,15 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
   const now = Date.now();
   const { region } = live;
 
-  const [{ alerts }, sims, products, state] = await Promise.all([readAlerts(env), readSim(env), readProducts(env), readLiveState(env)]);
+  const [{ alerts }, sims, products, state, control] = await Promise.all([readAlerts(env), readSim(env), readProducts(env), readLiveState(env), readControl(env)]);
   const centre = { lat: (region.bbox.south + region.bbox.north) / 2, lon: (region.bbox.west + region.bbox.east) / 2, zones: [] as string[] };
   const inRegion = regionAlerts([...sims.map((s) => buildSimAlert(s, centre)), ...alerts], region, now);
 
   const spc = await kvCached<SpcCategory>(env, "live:spc", 30 * 60_000, () => fetchRegionSpc(region.cities), "NONE");
-  const cities = await kvCached<CityWx[]>(
-    env,
-    "live:cities",
-    10 * 60_000,
-    async () => {
-      const wx = await fetchCitiesNow(region.cities);
-      return region.cities.map((c, i) => ({ ...c, temp: wx[i]?.temp ?? 0, desc: wmoToWeather(wx[i]?.code ?? 0, wx[i]?.isDay ?? true).desc }));
-    },
-    [],
-  );
+  // one request feeds the city cards and every data block; keyed by the city list so edits refetch
+  const wxKey = `live:wx:${hashKey(JSON.stringify(region.cities))}`;
+  const wx = await kvCached<RegionWx | null>(env, wxKey, 10 * 60_000, () => fetchRegionWx(region.cities), null);
+  const cities: CityWx[] = (wx?.cities ?? []).map((c) => ({ name: c.name, state: c.state, lat: c.lat, lon: c.lon, temp: c.now.temp, desc: wmoToWeather(c.now.code, c.now.isDay).desc }));
 
   // track when the last warning ended so the score can decay
   const warningNow = inRegion.some(isWarning);
@@ -97,6 +92,8 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
       cities,
       studio: products.filter((p) => productActive(p, now)),
       cams: [],
+      wx,
+      control,
       ...(pack ? { talkBreak: pack.talkBreak, headlines: pack.headlines } : {}),
     },
     live,

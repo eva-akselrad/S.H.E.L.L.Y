@@ -1,11 +1,13 @@
 import type { LiveConfig } from "../../shared/config";
 import type { Rundown, RundownItem } from "../../shared/live/rundown";
 import { SPC_PHRASE } from "../../shared/live/templates";
-import type { Alert } from "../../shared/types";
+import type { Alert, PolygonGeom } from "../../shared/types";
+import { decodeRing, makeProjector, type Projector } from "../../shared/projection";
+import basemap from "../studio/basemap.json";
+import { BlockView, BulletinCard } from "./Blocks";
 import { Logo } from "../components/Chrome";
 import { Host } from "./host/Host";
 import { LiveRadar } from "./LiveRadar";
-import { project } from "./player";
 import { ProductView } from "../studio/ProductView";
 import { clock, current, products, rundown, upNext } from "./state";
 
@@ -105,54 +107,106 @@ export function MainPanel({ r, region, forecaster = "" }: { r: Rundown; region: 
       return <div class="bc-card"><p class="bc-kicker">Live camera</p><h2>{it.headline}</h2></div>;
     case "host":
       return (
-        <div class="bc-card bc-host-card">
-          <p class="bc-kicker">{it.headline}</p>
+        <div class={`bc-card bc-host-card src-${it.source}`}>
+          <p class="bc-kicker">{it.source === "you" || it.source === "ai" ? `${it.headline} · live from the studio` : it.headline}</p>
           <h2>{it.text}</h2>
         </div>
       );
+    case "block":
+      return <BlockView it={it} r={r} bbox={region.bbox} />;
+    case "bulletin":
+      return <BulletinCard b={r.bulletins.find((b) => b.id === it.bulletinId)} tz={r.tz} />;
   }
 }
 
-/** Schematic locator: region outline, city dots, and a pin on the city or warning in view. */
+const LOC_W = 432;
+const LOC_H = 196;
+
+/** Region outline cache: county and state paths only change when the region box does. */
+let locCache: { k: string; counties: string; borders: string } | null = null;
+function locPaths(proj: Projector, b: Region["bbox"]): { counties: string; borders: string } {
+  const k = `${b.south},${b.west},${b.north},${b.east}`;
+  if (locCache?.k === k) return locCache;
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const line = (ring: number[][], close: boolean) => ring.map(([lon, lat], i) => `${i ? "L" : "M"}${proj.xy(lon!, lat!).map(r1).join(" ")}`).join("") + (close ? "Z" : "");
+  const counties = basemap.counties.map((c) => c.polys.map((rings) => rings.map((ring) => line(decodeRing(ring), true)).join("")).join("")).join("");
+  const borders = basemap.borders.map((l) => line(decodeRing(l), false)).join("");
+  locCache = { k, counties, borders };
+  return locCache;
+}
+
+function polyPoints(g: PolygonGeom, proj: Projector): string {
+  const ring = (g.type === "Polygon" ? (g.coordinates as number[][][])[0] : (g.coordinates as number[][][][])[0]?.[0]) ?? [];
+  return ring.map(([lon, lat]) => proj.xy(lon!, lat!).map((n) => Math.round(n)).join(",")).join(" ");
+}
+
+/** Locator: the real county and state map, every alert area, and a pin on whatever is on screen. */
 function Locator({ r, region }: { r: Rundown; region: Region }) {
   const it = current.value;
-  const pin = it?.kind === "segment" ? project(it.city.lon, it.city.lat, region.bbox) : null;
-  const warn = it && (it.kind === "alert" || (it.kind === "radar" && it.view === "warning")) ? r.alerts.find((a) => a.id === (it as { alertId?: string }).alertId) : undefined;
+  const b = region.bbox;
+  // widen the view east-west so the map fills the wide locator box instead of a narrow strip
+  const kx = Math.cos((((b.south + b.north) / 2) * Math.PI) / 180);
+  const latSpan = b.north - b.south + 0.3;
+  const lonSpan = Math.max(b.east - b.west + 0.4, (latSpan * (LOC_W / LOC_H)) / kx);
+  const midLon = (b.west + b.east) / 2;
+  const view = { south: b.south - 0.15, west: midLon - lonSpan / 2, north: b.north + 0.15, east: midLon + lonSpan / 2 };
+  const proj = makeProjector(view, { x: 0, y: 0, w: LOC_W, h: LOC_H });
+  const paths = locPaths(proj, view);
+  const f = proj.fit;
+
+  const cityName = it?.kind === "segment" ? it.city.name : it?.kind === "block" ? (it.city || (["sevenDay", "hourly", "sun", "weekend"].includes(it.block) ? region.cities[0]?.name : undefined)) : undefined;
+  const city = cityName ? region.cities.find((c) => c.name === cityName) : undefined;
+  const alertId = it && (it.kind === "alert" || it.kind === "radar") ? it.alertId : undefined;
+  const warn = alertId ? r.alerts.find((a) => a.id === alertId) : undefined;
+  const regionWide = it?.kind === "radar" && it.view === "region";
+  const allCities = it?.kind === "block" && !city;
+  const pin = city ? proj.xy(city.lon, city.lat) : null;
+  const [bx0, by0] = proj.xy(b.west, b.north);
+  const [bx1, by1] = proj.xy(b.east, b.south);
+
+  const caption = city ? `${city.name}, ${city.state}` : warn ? warn.event : regionWide || allCities ? r.region : it?.kind === "map" ? "Forecaster graphic" : r.region;
+
   return (
-    <svg class="bc-locator" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Locator map">
-      <rect x="1" y="1" width="98" height="98" rx="4" class="bc-loc-frame" />
-      {region.cities.map((c) => {
-        const p = project(c.lon, c.lat, region.bbox);
-        return <circle key={c.name} cx={p.x * 100} cy={p.y * 100} r="1.4" class="bc-loc-dot" />;
-      })}
-      {warn?.geometry && (
-        <polygon
-          class="bc-loc-warn"
-          points={
-            ((warn.geometry.type === "Polygon" ? (warn.geometry.coordinates as number[][][])[0] : (warn.geometry.coordinates as number[][][][])[0]?.[0]) ?? [])
-              .map(([lon, lat]) => {
-                const p = project(lon!, lat!, region.bbox);
-                return `${p.x * 100},${p.y * 100}`;
-              })
-              .join(" ")
-          }
-        />
-      )}
-      {pin && <circle cx={pin.x * 100} cy={pin.y * 100} r="3.2" class="bc-loc-pin" />}
-    </svg>
+    <div class="bc-locwrap">
+      <svg class="bc-locator" viewBox={`0 0 ${LOC_W} ${LOC_H}`} role="img" aria-label={`Locator map: ${caption}`}>
+        <defs><clipPath id="loc-clip"><rect x={f.x} y={f.y} width={f.w} height={f.h} rx="8" /></clipPath></defs>
+        <rect x={f.x} y={f.y} width={f.w} height={f.h} rx="8" class="bc-loc-water" />
+        <g clip-path="url(#loc-clip)">
+          <path d={paths.counties} class="bc-loc-land" />
+          <path d={paths.borders} class="bc-loc-border" />
+          {r.alerts.filter((a) => a.geometry && a.id !== warn?.id).map((a) => (
+            <polygon key={a.id} points={polyPoints(a.geometry!, proj)} class={/warning|emergency/i.test(a.event) ? "bc-loc-alert warn" : "bc-loc-alert"} />
+          ))}
+          {warn?.geometry && <polygon points={polyPoints(warn.geometry, proj)} class="bc-loc-warn" />}
+          {regionWide && <rect x={bx0} y={by0} width={bx1 - bx0} height={by1 - by0} class="bc-loc-view" />}
+          {region.cities.map((c) => {
+            const [x, y] = proj.xy(c.lon, c.lat);
+            return <circle key={c.name} cx={x} cy={y} r={allCities ? 4 : 2.6} class={allCities ? "bc-loc-dot on" : "bc-loc-dot"} />;
+          })}
+          {pin && (
+            <g class="bc-loc-pin" transform={`translate(${pin[0]} ${pin[1]})`}>
+              <circle r="14" class="bc-loc-ping" />
+              <circle r="6.5" class="bc-loc-pin-dot" />
+            </g>
+          )}
+        </g>
+        <rect x={f.x} y={f.y} width={f.w} height={f.h} rx="8" class="bc-loc-frame" />
+      </svg>
+      <p class="bc-loc-cap">{caption}</p>
+    </div>
   );
 }
 
 export function RightRail({ r, region }: { r: Rundown; region: Region }) {
   return (
     <aside class="bc-rail">
-      <div class="bc-rail-box"><p class="bc-kicker">Locator</p><Locator r={r} region={region} /></div>
+      <div class="bc-rail-box bc-loc-box"><p class="bc-kicker">Locator</p><Locator r={r} region={region} /></div>
       <div class="bc-rail-box bc-next">
-        <p class="bc-kicker">Up next</p>
+        <p class="bc-kicker">Up next{r.hold ? <span class="bc-hold">Holding: {r.hold}</span> : null}</p>
         <ul>{upNext.value.map((i) => <li key={i.key}>{i.headline}</li>)}</ul>
         <p class="bc-credit">Data: NWS · NOAA SPC · RainViewer · Open-Meteo</p>
       </div>
-      <div class="bc-hostbox"><Host level={r.level} /></div>
+      <div class="bc-hostbox">{!(current.value?.kind === "block" && current.value.block === "ident") && <Host level={r.level} />}</div>
     </aside>
   );
 }
@@ -173,7 +227,12 @@ export function LowerThird({ r }: { r: Rundown }) {
 }
 
 export function Crawl({ r }: { r: Rundown }) {
-  if (r.level !== "WARNING" && r.level !== "EMERGENCY") return null;
-  const text = r.alerts.filter((a) => /warning|emergency/i.test(a.event)).map((a) => `${a.event.toUpperCase()}: ${a.areaDesc}`).join("   •   ");
-  return <div class="bc-crawl" aria-hidden="true"><span>{text}</span></div>;
+  const warn = r.level === "WARNING" || r.level === "EMERGENCY";
+  const parts = [
+    ...(warn ? r.alerts.filter((a) => /warning|emergency/i.test(a.event)).map((a) => `${a.event.toUpperCase()}: ${a.areaDesc}`) : []),
+    ...(r.bulletins ?? []).map((b) => `SHELLY ${b.level.toUpperCase()}: ${b.title.toUpperCase()}${b.area ? ` (${b.area})` : ""}. ${b.body}`),
+  ];
+  if (!parts.length) return null;
+  const text = parts.join("   •   ");
+  return <div class={`bc-crawl${warn ? "" : " bul"}`} aria-hidden="true"><span>{text}</span></div>;
 }

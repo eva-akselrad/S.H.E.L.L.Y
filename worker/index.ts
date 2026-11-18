@@ -63,7 +63,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     if (!c.live.enabled) return json({ error: "live_disabled" }, 404);
     if (c.live.viewerToken && url.searchParams.get("key") !== c.live.viewerToken) return json({ error: "forbidden" }, 403);
     const r = await readRundown(env);
-    return r ? json(r, 200, 15) : json({ error: "no_rundown_yet" }, 503);
+    return r ? json(r, 200, 4) : json({ error: "no_rundown_yet" }, 503);
   }
   if (path === "/api/tts" && request.method === "GET") return handleTts(env, url);
 

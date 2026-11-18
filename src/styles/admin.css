@@ -150,3 +150,10 @@ textarea.adm-input { resize: vertical; line-height: 1.45; }
 .studio-preview { width: 100%; max-width: 960px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #0b1220; }
 .studio-preview svg, .studio-draw { width: 100%; height: 100%; display: block; }
 .studio-draw { max-width: 960px; border-radius: 12px; cursor: crosshair; background: #0b1220; }
+
+/* SHELLY Live rundown builder */
+.adm-playlist { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; counter-reset: pl; }
+.adm-playlist li { counter-increment: pl; padding: 8px 10px 8px 40px; border-radius: 10px; background: var(--adm-panel2, #ffffff08); position: relative; }
+.adm-playlist li::before { content: counter(pl); position: absolute; left: 12px; top: 14px; font-weight: 800; opacity: .5; }
+.adm-playlist li.off { opacity: .5; }
+.adm-row .grow { flex: 1; }

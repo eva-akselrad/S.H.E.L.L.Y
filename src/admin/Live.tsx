@@ -4,12 +4,15 @@ import type { Rundown } from "../../shared/live/rundown";
 import { call, config, saveConfig } from "./api";
 import { toast } from "./toast";
 import { Card, Chip, Field, Page, Segmented, Toggle } from "./ui";
+import { OnAir, PlaylistEditor } from "./LiveControls";
+import type { LiveControl } from "../../shared/live/blocks";
 
 interface LiveStatus {
   keySet: boolean;
   used: number;
   cap: number;
   rundown: Rundown | null;
+  control: LiveControl | null;
 }
 interface TestResult {
   ok: boolean;
@@ -86,6 +89,33 @@ export function Live() {
       lead="The 24/7 broadcast page. Alerts and warnings are always read from National Weather Service data; the AI host only adds calm-weather color."
       actions={<button type="button" class="adm-btn primary" onClick={() => void save()}>Save</button>}
     >
+      {d.enabled ? (
+        <OnAir
+          control={status?.control ?? null}
+          cities={d.region.cities}
+          llmOn={d.llm.enabled && !!status?.keySet}
+          onChange={(x) => setStatus((st) => (st ? { ...st, control: x.control, rundown: x.rundown ?? st.rundown } : st))}
+        />
+      ) : (
+        <Card title="On air now" hint="Switch the broadcast on and save to use the live controls." >
+          <p class="adm-hint">Say something, play or hold a block, skip, and your own bulletins all appear here once the broadcast is on.</p>
+        </Card>
+      )}
+
+      <PlaylistEditor
+        list={d.playlist}
+        cities={d.region.cities}
+        onChange={(l) => set("playlist", l)}
+        onCue={(e) =>
+          void call<{ control: LiveControl; rundown: Rundown | null }>("POST", "/api/admin/live/control", { action: "cue", entry: e }).then((x) => {
+            if (x.ok) {
+              setStatus((st) => (st ? { ...st, control: x.data.control, rundown: x.data.rundown ?? st.rundown } : st));
+              toast("Playing next");
+            } else toast("That didn't go through.", "error");
+          })
+        }
+      />
+
       <Card title="Broadcast">
         <div class="adm-form">
           <Toggle checked={d.enabled} onChange={(v) => set("enabled", v)} label="Broadcast is on" hint="When off, the rundown is not produced and /live shows nothing." />
@@ -181,9 +211,10 @@ export function Live() {
               <Chip kind={r.level === "CALM" ? "ok" : r.level === "ELEVATED" ? "info" : "danger"}>{r.level}</Chip> Index {r.score.toFixed(2)} · {r.status} · {r.topAlert}
             </p>
             {r.drivers.length > 0 && <p class="adm-hint">Because of: {r.drivers.join(", ")}</p>}
+            {r.hold && <p><Chip kind="info">Holding: {r.hold}</Chip></p>}
             <ol>
-              {r.items.slice(0, 12).map((i) => (
-                <li key={i.key}>{i.kind} · {i.headline} · {i.durationSec}s{i.kind === "host" ? ` · ${i.source}` : ""}</li>
+              {r.items.slice(0, 30).map((i) => (
+                <li key={i.key}>{i.headline} <span class="adm-hint">· {i.kind === "block" ? i.block : i.kind} · {i.durationSec}s{i.kind === "host" ? ` · ${i.source}` : ""}{i.speak ? " · spoken" : ""}</span></li>
               ))}
             </ol>
           </>

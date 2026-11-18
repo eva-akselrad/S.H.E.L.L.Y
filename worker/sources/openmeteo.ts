@@ -249,3 +249,50 @@ export async function fetchCitiesHourly(points: { lat: number; lon: number }[]):
     precip: (x.hourly?.precipitation ?? []) as number[],
   }));
 }
+
+/**
+ * Everything SHELLY Live's data blocks need for every city, in ONE multi-location request:
+ * current conditions, 7 days, the next 24 hours, sun times and UV.
+ */
+export async function fetchRegionWx(cities: { name: string; state: string; lat: number; lon: number }[]): Promise<import("../../shared/live/blocks").RegionWx> {
+  if (!cities.length) return { at: new Date().toISOString(), cities: [] };
+  const params = new URLSearchParams({
+    latitude: cities.map((p) => p.lat.toFixed(3)).join(","),
+    longitude: cities.map((p) => p.lon.toFixed(3)).join(","),
+    current: "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code,is_day",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max",
+    hourly: "temperature_2m,precipitation_probability,weather_code",
+    temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
+    timezone: "auto",
+    forecast_days: "7",
+    forecast_hours: "24",
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const d = (await res.json()) as OpenMeteoRaw | OpenMeteoRaw[];
+  const list = Array.isArray(d) ? d : [d];
+  return {
+    at: new Date().toISOString(),
+    cities: cities.map((c, i) => {
+      const x = list[i];
+      const cur = x?.current ?? {};
+      const dl = x?.daily ?? {};
+      const hr = x?.hourly ?? {};
+      return {
+        ...c,
+        now: {
+          temp: num(cur.temperature_2m), feels: num(cur.apparent_temperature), rh: num(cur.relative_humidity_2m), dew: num(cur.dew_point_2m),
+          wind: num(cur.wind_speed_10m), gust: num(cur.wind_gusts_10m), dir: num(cur.wind_direction_10m), code: num(cur.weather_code), isDay: cur.is_day !== 0,
+        },
+        daily: ((dl.time ?? []) as string[]).map((date, k) => ({
+          date, hi: num(dl.temperature_2m_max?.[k]), lo: num(dl.temperature_2m_min?.[k]), pop: num(dl.precipitation_probability_max?.[k]), code: num(dl.weather_code?.[k]),
+        })),
+        hourly: ((hr.time ?? []) as string[]).map((time, k) => ({ time, temp: num(hr.temperature_2m?.[k]), pop: num(hr.precipitation_probability?.[k]), code: num(hr.weather_code?.[k]) })),
+        sunrise: str(dl.sunrise?.[0]),
+        sunset: str(dl.sunset?.[0]),
+        uv: num(dl.uv_index_max?.[0]),
+      };
+    }),
+  };
+}

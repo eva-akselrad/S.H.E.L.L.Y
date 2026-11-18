@@ -30,7 +30,7 @@ export function Broadcast() {
     void pollRadar();
     void pollProducts();
     const timers = [
-      setInterval(() => void pollRundown(), 15_000),
+      setInterval(() => void pollRundown(), 5_000),
       setInterval(() => void pollRadar(), 120_000),
       setInterval(() => void pollProducts(), 60_000),
       setInterval(() => (clock.value = Date.now()), 1000),

@@ -1,5 +1,6 @@
 import { normalizeConfig, SPEAKERS, type Speaker } from "../shared/config";
 import { filterText } from "../shared/live/llm";
+import { BLOCK_INFO, normalizeBulletin, normalizeEntry } from "../shared/live/blocks";
 import { callLlm, llmUsed } from "./llm";
 import { produceRundown } from "./live";
 import { isSimPreset, normalizeCustomSim, SIM_PRESETS, simLabel, type SimEntry } from "../shared/simulate";
@@ -15,10 +16,12 @@ import {
   readAnnouncements,
   readAudit,
   readConfig,
+  readControl,
   readRundown,
   readSim,
   writeAnnouncements,
   writeConfig,
+  writeControl,
   writeSim,
 } from "./store";
 import { handleStudioAdmin } from "./studio";
@@ -156,7 +159,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
   // ── SHELLY Live ──
   if (path === "/api/admin/live" && method === "GET") {
     const c = await readConfig(env);
-    return json({ keySet: !!env.LLM_API_KEY, used: await llmUsed(env), cap: c.live.llm.dailyRequestCap, rundown: await readRundown(env) });
+    return json({ keySet: !!env.LLM_API_KEY, used: await llmUsed(env), cap: c.live.llm.dailyRequestCap, rundown: await readRundown(env), control: await readControl(env) });
   }
   if (path === "/api/admin/live/refresh" && method === "POST") {
     const r = await produceRundown(env);
@@ -184,6 +187,98 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     );
     await audit(env, "live.llm-test", r.ok ? `ok ${r.ms}ms ${r.model ?? ""}` : `failed: ${r.error}`);
     return json({ ...r, filtered: r.text ? filterText(r.text, 240) : null, used: await llmUsed(env), cap: c.live.llm.dailyRequestCap });
+  }
+
+  // on-air controls: play next, hold, release, skip, back to top, say something
+  if (path === "/api/admin/live/control" && method === "POST") {
+    const b = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!b || typeof b.action !== "string") return json({ error: "bad_body" }, 400);
+    const c = await readControl(env);
+    const id = crypto.randomUUID().slice(0, 8);
+    const now = Date.now();
+    let detail = "";
+    switch (b.action) {
+      case "skip":
+      case "top":
+        c.cmd = { id, kind: b.action };
+        break;
+      case "cue":
+      case "hold": {
+        const e = normalizeEntry(b.entry);
+        if (!e) return json({ error: "bad_entry" }, 400);
+        const entry = { ...e, on: true };
+        if (b.action === "cue") c.cue = { id, entry, at: new Date(now).toISOString() };
+        else {
+          const minutes = Math.min(240, Math.max(1, Math.round(Number(b.minutes) || 15)));
+          c.hold = { entry, until: new Date(now + minutes * 60_000).toISOString() };
+          detail = `${minutes} min`;
+        }
+        detail = `${BLOCK_INFO[entry.block].label} ${detail}`.trim();
+        c.cmd = { id, kind: "top" };
+        break;
+      }
+      case "release":
+        c.hold = null;
+        c.cmd = { id, kind: "top" };
+        break;
+      case "say": {
+        const text = typeof b.text === "string" ? b.text.replace(/\s+/g, " ").trim().slice(0, 400) : "";
+        if (!text) return json({ error: "empty_text" }, 400);
+        c.say = { id, text, at: new Date(now).toISOString(), source: b.source === "ai" ? "ai" : "you" };
+        c.cmd = { id, kind: "top" };
+        detail = text.slice(0, 120);
+        break;
+      }
+      default:
+        return json({ error: "bad_action" }, 400);
+    }
+    await writeControl(env, c);
+    await audit(env, `live.${b.action}`, detail);
+    return json({ control: c, rundown: await produceRundown(env) });
+  }
+
+  // your own bulletins: shown and (optionally) read on air, labelled as SHELLY's, never as NWS products
+  if (path === "/api/admin/live/bulletin" && method === "POST") {
+    const raw = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const hours = Math.min(48, Math.max(0.25, Number(raw?.hours) || 3));
+    const bul = normalizeBulletin({ ...raw, id: `b${crypto.randomUUID().slice(0, 8)}`, issued: new Date().toISOString(), until: new Date(Date.now() + hours * 3600_000).toISOString() });
+    if (!bul) return json({ error: "bulletin_needs_title_and_text" }, 400);
+    const c = await readControl(env);
+    c.bulletins = [bul, ...c.bulletins].slice(0, 8);
+    c.cmd = { id: bul.id, kind: "top" };
+    await writeControl(env, c);
+    await audit(env, "live.bulletin", `${bul.level}: ${bul.title}`);
+    return json({ control: c, rundown: await produceRundown(env) });
+  }
+  if (path === "/api/admin/live/bulletin" && method === "DELETE") {
+    const c = await readControl(env);
+    const bid = url.searchParams.get("id");
+    c.bulletins = c.bulletins.filter((x) => x.id !== bid);
+    await writeControl(env, c);
+    await audit(env, "live.bulletin.remove", bid ?? "");
+    return json({ control: c, rundown: await produceRundown(env) });
+  }
+
+  // an AI-written line for the forecaster to read over and approve. Never aired from here.
+  if (path === "/api/admin/live/ai-line" && method === "POST") {
+    const b = (await request.json().catch(() => null)) as { prompt?: unknown } | null;
+    const ask = typeof b?.prompt === "string" ? b.prompt.trim().slice(0, 300) : "";
+    if (!ask) return json({ error: "empty_prompt" }, 400);
+    const c = await readConfig(env);
+    const rd = await readRundown(env);
+    const conditions = (rd?.wx?.cities ?? []).slice(0, 6).map((x) => `${x.name}: ${Math.round(x.now.temp)}F`).join(", ");
+    const system = [
+      `You are ${c.live.host.name}, the friendly on-air host of a 24/7 weather stream for the ${c.live.region.name}.`,
+      "Write ONE or TWO short spoken sentences (under 300 characters) for the host to say, following the producer's request.",
+      "Never write or mention any alert, watch, warning, advisory or emergency, never tell people to shelter or evacuate, and never invent weather numbers.",
+      "No emoji, URLs, hashtags or markdown. Reply with only the sentences.",
+      conditions ? `Current temperatures you may use: ${conditions}.` : "",
+    ].filter(Boolean).join(" ");
+    const res = await callLlm(env, c.live.llm, [{ role: "system", content: system }, { role: "user", content: ask }], { timeoutMs: 20_000 });
+    if (!res.ok || !res.text) return json({ ok: false, error: res.error ?? "no_text", used: await llmUsed(env) });
+    const text = filterText(res.text, 300);
+    await audit(env, "live.ai-line", text ? "drafted" : "filtered");
+    return json(text ? { ok: true, text, used: await llmUsed(env) } : { ok: false, error: "The reply mentioned alerts or safety actions, so it was thrown away. Try again.", used: await llmUsed(env) });
   }
 
   // ── tools ──

@@ -200,3 +200,49 @@ describe("Forecaster Studio API", () => {
     expect(r?.items.some((i) => i.kind === "map" && i.headline === "TOMORROW'S RISK")).toBe(true);
   });
 });
+
+describe("SHELLY Live on-air controls", () => {
+  const enable = () => env.STATE.put("config", JSON.stringify({ ...DEFAULT_CONFIG, live: { ...DEFAULT_CONFIG.live, enabled: true } }));
+
+  test("control routes need a session", async () => {
+    for (const p of ["/api/admin/live/control", "/api/admin/live/bulletin", "/api/admin/live/ai-line"]) {
+      expect((await call(p, { method: "POST", body: "{}" })).status).toBe(401);
+    }
+  });
+
+  test("say puts the forecaster's words first and sets a jump command", async () => {
+    await enable();
+    const res = await authed("POST", "/api/admin/live/control", { action: "say", text: "  Hello   everyone! " });
+    expect(res.status).toBe(200);
+    const d = (await res.json()) as { rundown: { items: { kind: string; text?: string }[]; cmd: { kind: string } } };
+    expect(d.rundown.items[0]).toMatchObject({ kind: "host", text: "Hello everyone!" });
+    expect(d.rundown.cmd.kind).toBe("top");
+  });
+
+  test("hold, then release; bad input is refused", async () => {
+    await enable();
+    const held = (await (await authed("POST", "/api/admin/live/control", { action: "hold", entry: { block: "radar" }, minutes: 5 })).json()) as { rundown: { hold: string } };
+    expect(held.rundown.hold).toBe("Regional radar");
+    const rel = (await (await authed("POST", "/api/admin/live/control", { action: "release" })).json()) as { rundown: { hold: string | null } };
+    expect(rel.rundown.hold).toBeNull();
+    expect((await authed("POST", "/api/admin/live/control", { action: "cue", entry: { block: "nope" } })).status).toBe(400);
+    expect((await authed("POST", "/api/admin/live/control", { action: "say", text: "   " })).status).toBe(400);
+  });
+
+  test("bulletins go on air and come down", async () => {
+    await enable();
+    const res = await authed("POST", "/api/admin/live/bulletin", { level: "alert", title: "Flooded roads", body: "Route 1 is closed at the creek.", hours: 2 });
+    const d = (await res.json()) as { control: { bulletins: { id: string }[] }; rundown: { items: { kind: string }[] } };
+    expect(d.rundown.items[0]!.kind).toBe("bulletin");
+    const id = d.control.bulletins[0]!.id;
+    const gone = (await (await authed("DELETE", `/api/admin/live/bulletin?id=${id}`)).json()) as { control: { bulletins: unknown[] } };
+    expect(gone.control.bulletins).toHaveLength(0);
+    expect((await authed("POST", "/api/admin/live/bulletin", { title: "no body" })).status).toBe(400);
+  });
+
+  test("the AI line endpoint never airs anything and fails cleanly without a key", async () => {
+    await enable();
+    const d = (await (await authed("POST", "/api/admin/live/ai-line", { prompt: "welcome people" })).json()) as { ok: boolean; error: string };
+    expect(d).toMatchObject({ ok: false, error: "no_api_key" });
+  });
+});

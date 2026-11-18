@@ -1,6 +1,7 @@
 import { DEFAULT_CONFIG, normalizeConfig, type SiteConfig } from "../shared/config";
 import type { SimEntry } from "../shared/simulate";
 import type { Rundown } from "../shared/live/rundown";
+import { activeControl, type LiveControl } from "../shared/live/blocks";
 import { normalizeProducts, type StudioProduct } from "../shared/studio";
 import type { Alert, Announcement } from "../shared/types";
 
@@ -88,4 +89,12 @@ export async function readProducts(env: Env): Promise<StudioProduct[]> {
 }
 export async function writeProducts(env: Env, list: StudioProduct[]): Promise<void> {
   await env.STATE.put(STUDIO_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+const CONTROL_KEY = "live:control";
+export async function readControl(env: Env): Promise<LiveControl> {
+  return activeControl(await env.STATE.get(CONTROL_KEY, "json"), Date.now());
+}
+export async function writeControl(env: Env, c: LiveControl): Promise<void> {
+  await env.STATE.put(CONTROL_KEY, JSON.stringify(c));
 }

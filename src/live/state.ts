@@ -30,6 +30,9 @@ export const upNext = computed<RundownItem[]>(() => {
   return [1, 2, 3].map((d) => r.items[(index.value + d) % n]!).filter((i) => i.key !== current.value?.key);
 });
 
+/** last forecaster jump command seen; the first rundown only records it */
+let lastCmd: string | null | undefined;
+
 export async function pollRundown(): Promise<void> {
   try {
     const res = await fetch(`/api/live/rundown?key=${encodeURIComponent(viewerKey())}`);
@@ -37,8 +40,16 @@ export async function pollRundown(): Promise<void> {
     else if (res.status === 403) status.value = "forbidden";
     else if (res.ok) {
       const next = (await res.json()) as Rundown;
-      const i = pickIndex(rundown.value, index.value, next);
-      if (i !== index.value || !rundown.value) epoch.value++;
+      let i = pickIndex(rundown.value, index.value, next);
+      let jumped = false;
+      const cmd = next.cmd ?? null;
+      if (lastCmd !== undefined && cmd && cmd.id !== lastCmd) {
+        // the forecaster pressed something in the admin: play it now
+        i = cmd.kind === "skip" ? (i + 1) % Math.max(1, next.items.length) : 0;
+        jumped = true;
+      }
+      lastCmd = cmd?.id ?? null;
+      if (jumped || i !== index.value || !rundown.value) epoch.value++;
       index.value = i;
       rundown.value = next;
       status.value = "ok";
