@@ -35,7 +35,8 @@ export function project(lon: number, lat: number, b: { south: number; west: numb
 }
 
 /** Remove forecaster one-shots (say, play next) this page already played, so a rebuild never repeats them. */
-export function dropPlayed(r: Rundown, played: ReadonlySet<string>): Rundown {
-  const items = r.items.filter((i) => !i.oneShot || !played.has(i.oneShot));
+export function dropPlayed(r: Rundown, played: ReadonlySet<string>, keepKey?: string): Rundown {
+  // the one playing right now stays until it ends: dropping it would swap in a different item mid-sentence
+  const items = r.items.filter((i) => !i.oneShot || !played.has(i.oneShot) || i.key === keepKey);
   return items.length === r.items.length ? r : { ...r, items };
 }

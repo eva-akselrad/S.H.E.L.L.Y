@@ -4,6 +4,8 @@ import { mouth, speaking, viewerKey } from "./state";
 
 let ctx: AudioContext | null = null;
 let flapTimer: ReturnType<typeof setInterval> | undefined;
+/** the AI voice clip that is playing now, so a new item can cut it off instead of talking over it */
+let playing: { audio: HTMLAudioElement; done: () => void } | null = null;
 
 function stopFlap(): void {
   if (flapTimer) clearInterval(flapTimer);
@@ -62,10 +64,12 @@ async function aiSay(item: RundownItem): Promise<boolean> {
     };
     tick();
     await new Promise<void>((resolve) => {
+      playing = { audio, done: resolve };
       audio.onended = () => resolve();
       audio.onerror = () => resolve();
       void audio.play().catch(() => resolve());
     });
+    playing = null;
     cancelAnimationFrame(raf);
     URL.revokeObjectURL(url);
     stopFlap();
@@ -85,6 +89,11 @@ export async function speakItem(item: RundownItem, ai: boolean): Promise<void> {
 }
 
 export function stopVoice(): void {
+  if (playing) {
+    playing.audio.pause();
+    playing.done();
+    playing = null;
+  }
   if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
   stopFlap();
 }
