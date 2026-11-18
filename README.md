@@ -105,4 +105,8 @@ ensemble, air quality, pollen, geocoding), NOAA SPC (convective outlook, prelimi
 reports), NWS National Water Prediction Service (river gauges), NOAA CO-OPS (tides), NHC (active
 tropical storms), RainViewer (radar tiles), Esri (basemap). Clients never call these
 directly except map and radar tiles. NWS requests carry
-`SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)`.
+`SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)`. 
+
+# WARNING
+
+IF YOU HOST THIS YOURSELF MAKE SURE YOU CHANGE THE TAG FOR NWS REQUESTS
