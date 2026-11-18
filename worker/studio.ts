@@ -1,5 +1,5 @@
 import { geomBbox, bboxOverlap } from "../shared/live/region";
-import { normalizeProducts, productActive, type RiskArea, type RiskLevel, type SevenDayDay, type StudioProduct } from "../shared/studio";
+import { CITY_METRICS, normalizeProducts, type CityMetric, type DayPlanner, productActive, type RiskArea, type RiskLevel, type SevenDayDay, type StudioProduct } from "../shared/studio";
 import type { Bbox, PolygonGeom } from "../shared/types";
 import { gridPoints } from "../shared/contour";
 import { buildTimeline } from "../shared/timeline";
@@ -64,15 +64,34 @@ export async function handleStudioAdmin(request: Request, env: Env, url: URL): P
 
   // city temperature map values for tomorrow (or today)
   if (path === "/api/admin/studio/city-temps" && method === "GET") {
-    const metric = url.searchParams.get("metric") === "low" ? "low" : url.searchParams.get("metric") === "feelsLike" ? "feelsLike" : "high";
+    const m = url.searchParams.get("metric");
+    const metric: CityMetric = (CITY_METRICS as readonly (string | null)[]).includes(m) ? (m as CityMetric) : "high";
     const day = url.searchParams.get("day") === "0" ? 0 : 1;
     const wx = await fetchCitiesDaily(region.cities);
     const cities = region.cities.map((c, i) => {
       const w = wx[i];
-      const v = metric === "low" ? w?.low[day] : metric === "feelsLike" ? w?.feelsHigh[day] : w?.high[day];
+      const v = { high: w?.high[day], low: w?.low[day], feelsLike: w?.feelsHigh[day], pop: w?.pop[day], gust: w?.gust[day] }[metric];
       return { name: c.name, lat: c.lat, lon: c.lon, value: Math.round(v ?? 0) };
     });
     return json({ metric, cities });
+  }
+
+  // today vs tomorrow highs for every city
+  if (path === "/api/admin/studio/compare" && method === "GET") {
+    const wx = await fetchCitiesDaily(region.cities);
+    return json({ cities: region.cities.map((c, i) => ({ name: c.name, today: Math.round(wx[i]?.high[0] ?? 0), tomorrow: Math.round(wx[i]?.high[1] ?? 0) })) });
+  }
+
+  // one city in four parts of a day (today if it is before noon, otherwise tomorrow)
+  if (path === "/api/admin/studio/day-planner" && method === "GET") {
+    const c = region.cities.find((x) => x.name === url.searchParams.get("city")) ?? region.cities[0];
+    if (!c) return json({ error: "no_city" }, 400);
+    const f = normalizeForecast(await fetchOpenMeteo(c.lat, c.lon));
+    const nowLocal = localHour(region.tz);
+    const today = nowLocal.slice(0, 10);
+    const tomorrow = url.searchParams.get("day") === "1" || (url.searchParams.get("day") !== "0" && Number(nowLocal.slice(11, 13)) >= 12);
+    const next = [...new Set(f.hourly.map((h) => h.time.slice(0, 10)))].find((d) => d > today) ?? today;
+    return json(dayParts(c.name, f.hourly, tomorrow ? next : today));
   }
 
   // model snow/rain totals on a grid; the browser contours it so the forecaster can nudge it
@@ -140,4 +159,23 @@ export function spcAreas(fc: { features?: { properties?: { LABEL?: string }; geo
 export function localHour(tz: string, at = new Date()): string {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(at).map((x) => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
+}
+
+const PARTS: [string, number, number][] = [["Morning", 6, 12], ["Afternoon", 12, 18], ["Evening", 18, 24], ["Overnight", 24, 30]];
+
+/** Average/peak the hourly model into morning, afternoon, evening and overnight for one date. */
+export function dayParts(place: string, hourly: { time: string; temp: number; code: number; pop: number }[], date: string): DayPlanner {
+  const base = Date.parse(`${date}T00:00:00Z`);
+  const parts = PARTS.map(([label, from, to]) => {
+    const hrs = hourly.filter((h) => {
+      const t = (Date.parse(`${h.time}:00Z`) - base) / 3600_000;
+      return t >= from && t < to;
+    });
+    if (!hrs.length) return null;
+    const warm = label === "Afternoon";
+    const temps = hrs.map((h) => h.temp);
+    const worst = hrs.reduce((a, b) => (b.code > a.code ? b : a));
+    return { label, temp: Math.round(warm ? Math.max(...temps) : label === "Overnight" ? Math.min(...temps) : temps.reduce((a, b) => a + b, 0) / temps.length), code: worst.code, pop: Math.round(Math.max(...hrs.map((h) => h.pop))), note: "" };
+  }).filter((x): x is NonNullable<typeof x> => !!x);
+  return { place, date, parts };
 }

@@ -6,6 +6,7 @@ import { RiskMapView } from "./views/RiskMap";
 import { SevenDayView } from "./views/SevenDay";
 import { TimelineView } from "./views/Timeline";
 import { TotalsMapView } from "./views/Totals";
+import { CompareView, DayPlannerView, ImpactsView, NoteView, OddsView } from "./views/More";
 
 export interface ViewProps {
   product: StudioProduct;
@@ -28,6 +29,16 @@ export function ProductView({ product, fmt = "wide", forecaster = "" }: ViewProp
       return <TimelineView product={product} fmt={fmt} forecaster={forecaster} />;
     case "discussion":
       return <DiscussionView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "note":
+      return <NoteView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "impacts":
+      return <ImpactsView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "dayPlanner":
+      return <DayPlannerView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "compare":
+      return <CompareView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "odds":
+      return <OddsView product={product} fmt={fmt} forecaster={forecaster} />;
     case "stormTrack":
       return <StormTrackView product={product} fmt={fmt} forecaster={forecaster} />;
     default: {

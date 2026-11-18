@@ -3,7 +3,7 @@
 import type { Bbox, LonLat, PolygonGeom } from "./types";
 
 export type StudioProductId = string;
-export const STUDIO_KINDS = ["riskMap", "totalsMap", "cityTemps", "sevenDay", "timeline", "discussion", "stormTrack"] as const;
+export const STUDIO_KINDS = ["riskMap", "totalsMap", "cityTemps", "sevenDay", "timeline", "discussion", "stormTrack", "note", "impacts", "dayPlanner", "compare", "odds"] as const;
 export type StudioKind = (typeof STUDIO_KINDS)[number];
 export const MAX_STUDIO_PRODUCTS = 50;
 
@@ -33,6 +33,9 @@ export interface TotalsMap {
   bands: TotalsBand[];
 }
 
+export const CITY_METRICS = ["high", "low", "feelsLike", "pop", "gust"] as const;
+export type CityMetric = (typeof CITY_METRICS)[number];
+
 export interface CityTemp {
   name: string;
   lat: number;
@@ -40,7 +43,7 @@ export interface CityTemp {
   value: number;
 }
 export interface CityTemps {
-  metric: "high" | "low" | "feelsLike";
+  metric: CityMetric;
   cities: CityTemp[];
 }
 
@@ -84,7 +87,49 @@ export interface StormTrack {
   towns: { name: string; etaMin: number }[];
 }
 
-export type StudioBody = RiskMap | TotalsMap | CityTemps | SevenDay | Timeline | Discussion | StormTrack;
+
+// ── more forecaster graphics ──
+
+/** A headline card in the forecaster's own words. */
+export const NOTE_ICONS = ["sun", "partly", "cloud", "rain", "snow", "storm", "fog", "wind", "heat", "cold"] as const;
+export type NoteIcon = (typeof NOTE_ICONS)[number];
+export interface NoteCard {
+  headline: string;
+  bullets: string[];
+  icon: NoteIcon;
+  /** 0 calm .. 3 high stakes; picks the accent colour */
+  tone: 0 | 1 | 2 | 3;
+}
+
+/** Impact scale: how much an event will affect daily life. */
+export const IMPACT_LEVELS = ["None", "Minor", "Moderate", "Major", "Extreme"] as const;
+export interface Impacts {
+  event: string;
+  overall: 0 | 1 | 2 | 3 | 4;
+  rows: { label: string; level: 0 | 1 | 2 | 3 | 4; note: string }[];
+}
+
+/** One city's day in four parts. */
+export interface DayPlanner {
+  place: string;
+  date: string;
+  parts: { label: string; temp: number; code: number; pop: number; note: string }[];
+}
+
+/** Today's high against tomorrow's for each city. */
+export interface Compare {
+  cities: { name: string; today: number; tomorrow: number }[];
+}
+
+/** Probabilities for possible outcomes, with the forecaster's confidence. */
+export interface Odds {
+  event: string;
+  outcomes: { label: string; pct: number }[];
+  confidence: "low" | "medium" | "high";
+  note: string;
+}
+
+export type StudioBody = RiskMap | TotalsMap | CityTemps | SevenDay | Timeline | Discussion | StormTrack | NoteCard | Impacts | DayPlanner | Compare | Odds;
 
 export interface StudioProduct {
   id: StudioProductId;
@@ -106,6 +151,8 @@ const iso = (v: unknown): string | null => (typeof v === "string" && Number.isFi
 
 const num = (v: unknown, d = 0): number => (v !== undefined && v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : d);
 const txt = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
+const lvl = (v: unknown, max: number): number => Math.min(max, Math.max(0, Math.round(num(v))));
+const clampPct = (v: unknown): number => Math.min(100, Math.max(0, Math.round(num(v))));
 
 function validGeom(g: unknown): PolygonGeom | null {
   if (!isObj(g) || (g.type !== "Polygon" && g.type !== "MultiPolygon") || !Array.isArray(g.coordinates)) return null;
@@ -153,7 +200,7 @@ export function normalizeBody(kind: StudioKind, raw: unknown): StudioBody | null
         const lat = Number(c.lat), lon = Number(c.lon), value = Number(c.value);
         if (Number.isFinite(lat) && Number.isFinite(lon) && Number.isFinite(value)) cities.push({ name: txt(c.name, 40), lat, lon, value });
       }
-      return { metric: raw.metric === "low" || raw.metric === "feelsLike" ? raw.metric : "high", cities };
+      return { metric: (CITY_METRICS as readonly unknown[]).includes(raw.metric) ? (raw.metric as CityMetric) : "high", cities };
     }
     case "sevenDay": {
       const days: SevenDayDay[] = [];
@@ -193,6 +240,40 @@ export function normalizeBody(kind: StudioKind, raw: unknown): StudioBody | null
         .map((t) => ({ name: txt(t.name, 40), etaMin: Math.round(num(t.etaMin)) }))
         .filter((t) => t.name);
       return { alertId: txt(raw.alertId, 120), origin: [num(o[0]), num(o[1])] as LonLat, bearingDeg: num(raw.bearingDeg), speedKt: num(raw.speedKt), at: txt(raw.at, 40), towns };
+    }
+    case "note": {
+      const bullets = (Array.isArray(raw.bullets) ? raw.bullets : []).map((b) => txt(b, 90).trim()).filter(Boolean).slice(0, 5);
+      return {
+        headline: txt(raw.headline, 90),
+        bullets,
+        icon: (NOTE_ICONS as readonly unknown[]).includes(raw.icon) ? (raw.icon as NoteIcon) : "partly",
+        tone: lvl(raw.tone, 3) as NoteCard["tone"],
+      };
+    }
+    case "impacts": {
+      const rows = (Array.isArray(raw.rows) ? raw.rows : []).filter(isObj).slice(0, 6)
+        .map((x) => ({ label: txt(x.label, 30), level: lvl(x.level, 4) as Impacts["overall"], note: txt(x.note, 80) }))
+        .filter((x) => x.label);
+      return { event: txt(raw.event, 80), overall: lvl(raw.overall, 4) as Impacts["overall"], rows };
+    }
+    case "dayPlanner": {
+      const parts = (Array.isArray(raw.parts) ? raw.parts : []).filter(isObj).slice(0, 4)
+        .map((x) => ({ label: txt(x.label, 20), temp: Math.round(num(x.temp)), code: Math.round(num(x.code)), pop: clampPct(x.pop), note: txt(x.note, 60) }))
+        .filter((x) => x.label);
+      return { place: txt(raw.place, 60), date: txt(raw.date, 10), parts };
+    }
+    case "compare": {
+      const cities = (Array.isArray(raw.cities) ? raw.cities : []).filter(isObj).slice(0, 16)
+        .map((c) => ({ name: txt(c.name, 40), today: Math.round(num(c.today)), tomorrow: Math.round(num(c.tomorrow)) }))
+        .filter((c) => c.name);
+      return { cities };
+    }
+    case "odds": {
+      const outcomes = (Array.isArray(raw.outcomes) ? raw.outcomes : []).filter(isObj).slice(0, 6)
+        .map((o) => ({ label: txt(o.label, 50), pct: clampPct(o.pct) }))
+        .filter((o) => o.label);
+      const confidence = raw.confidence === "low" || raw.confidence === "high" ? raw.confidence : "medium";
+      return { event: txt(raw.event, 80), outcomes, confidence, note: txt(raw.note, 160) };
     }
   }
 }

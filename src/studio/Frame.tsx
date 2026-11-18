@@ -54,8 +54,8 @@ export function Frame({ fmt, title, sub, credit, children }: { fmt: Format; titl
       <rect y={fmt === "wide" ? 114 : 156} width={w} height="4" fill={C.accent} />
       <Logo x={fmt === "wide" ? 60 : 40} y={fmt === "wide" ? 30 : 28} size={52} />
       <text x={fmt === "wide" ? 128 : 108} y={fmt === "wide" ? 66 : 62} font-family={SERIF} font-size="34" font-weight="700" letter-spacing="3" fill={C.text}>SHELLY</text>
-      <text x={fmt === "wide" ? 60 : 40} y={fmt === "wide" ? 108 : 124} font-family={SANS} font-size={fmt === "wide" ? 22 : 24} fill={C.muted}>{sub}</text>
-      <text x={fmt === "wide" ? w - 60 : 40} y={fmt === "wide" ? 70 : 150} text-anchor={fmt === "wide" ? "end" : "start"} font-family={SERIF} font-size={tsize} font-weight="600" fill={C.text}>
+      <text x={fmt === "wide" ? 60 : 40} y={fmt === "wide" ? 108 : 146} font-family={SANS} font-size={fmt === "wide" ? 22 : 20} fill={C.muted}>{sub}</text>
+      <text x={fmt === "wide" ? w - 60 : 40} y={fmt === "wide" ? 70 : 118} text-anchor={fmt === "wide" ? "end" : "start"} font-family={SERIF} font-size={fmt === "wide" ? tsize : 40} font-weight="600" fill={C.text}>
         {title}
       </text>
       {children}

@@ -184,6 +184,8 @@ export interface CityDaily {
   high: number[];
   low: number[];
   feelsHigh: number[];
+  pop: number[];
+  gust: number[];
 }
 
 /** Daily highs/lows for many points in one request. Index 0 = today. */
@@ -192,8 +194,9 @@ export async function fetchCitiesDaily(points: { lat: number; lon: number }[]): 
   const params = new URLSearchParams({
     latitude: points.map((p) => p.lat.toFixed(3)).join(","),
     longitude: points.map((p) => p.lon.toFixed(3)).join(","),
-    daily: "temperature_2m_max,temperature_2m_min,apparent_temperature_max",
+    daily: "temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_probability_max,wind_gusts_10m_max",
     temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
     timezone: "auto",
     forecast_days: "4",
   });
@@ -204,6 +207,8 @@ export async function fetchCitiesDaily(points: { lat: number; lon: number }[]): 
     high: x.daily?.temperature_2m_max ?? [],
     low: x.daily?.temperature_2m_min ?? [],
     feelsHigh: x.daily?.apparent_temperature_max ?? [],
+    pop: x.daily?.precipitation_probability_max ?? [],
+    gust: x.daily?.wind_gusts_10m_max ?? [],
   }));
 }
 

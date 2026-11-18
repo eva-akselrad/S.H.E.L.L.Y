@@ -15,12 +15,16 @@ import { ProductView } from "../studio/ProductView";
 import { HAZARD_LABEL, RISK } from "../studio/views/RiskMap";
 import { HAZARD_COLOR } from "../studio/views/Timeline";
 import type { ComponentChildren } from "preact";
+import type { Compare, DayPlanner, Impacts, NoteCard, Odds } from "../../shared/studio";
+import { CompareEditor, DayPlannerEditor, IMPACT_ROWS, ImpactsEditor, NoteEditor, OddsEditor } from "./StudioMore";
 
 const KIND_LABEL: Record<StudioKind, string> = {
-  sevenDay: "7-day forecast", cityTemps: "City temperatures map", riskMap: "Risk map", totalsMap: "Snow / rain totals",
+  sevenDay: "7-day forecast", cityTemps: "City map (temps, rain, wind)", riskMap: "Risk map", totalsMap: "Snow / rain totals",
   timeline: "Storm timeline", discussion: "Forecast discussion", stormTrack: "Storm tracker",
+  note: "Forecast card", impacts: "Impact scale", dayPlanner: "Day planner", compare: "Today vs tomorrow", odds: "The odds",
 };
-const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "riskMap", "totalsMap", "timeline", "discussion"];
+const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "dayPlanner", "compare", "note", "impacts", "odds", "riskMap", "totalsMap", "timeline", "discussion"];
+const METRIC_NAME: Record<CityTemps["metric"], string> = { high: "Highs", low: "Lows", feelsLike: "Feels Like", pop: "Rain Chance", gust: "Wind Gusts" };
 
 const ICONS: [number, string][] = [[0, "Sunny"], [2, "Partly cloudy"], [3, "Cloudy"], [45, "Fog"], [61, "Rain"], [80, "Showers"], [71, "Snow"], [95, "Thunderstorms"]];
 
@@ -33,9 +37,9 @@ const fromLocal = (v: string, fallback: string): string => (Number.isFinite(Date
 
 /** "Highs Tomorrow", "Feels Like Today"... */
 export function cityTempsTitle(metric: CityTemps["metric"], day: "0" | "1"): string {
-  return `${{ high: "Highs", low: "Lows", feelsLike: "Feels Like" }[metric]} ${day === "1" ? "Tomorrow" : "Today"}`;
+  return `${METRIC_NAME[metric]} ${day === "1" ? "Tomorrow" : "Today"}`;
 }
-const DEFAULT_TITLES = new Set(["high", "low", "feelsLike"].flatMap((m) => ["0", "1"].map((d) => cityTempsTitle(m as CityTemps["metric"], d as "0" | "1"))));
+const DEFAULT_TITLES = new Set(["high", "low", "feelsLike", "pop", "gust"].flatMap((m) => ["0", "1"].map((d) => cityTempsTitle(m as CityTemps["metric"], d as "0" | "1"))));
 
 function blank(kind: StudioKind): StudioProduct {
   const now = new Date();
@@ -46,9 +50,14 @@ function blank(kind: StudioKind): StudioProduct {
     riskMap: { areas: [] },
     totalsMap: { kind: "snow", mode: "model", bands: [] },
     timeline: { rows: [] },
+    note: { headline: "", bullets: [], icon: "partly", tone: 0 },
+    impacts: { event: "", overall: 1, rows: IMPACT_ROWS.slice(0, 4).map((label) => ({ label, level: 0 as const, note: "" })) },
+    dayPlanner: { place: "", date: "", parts: [] },
+    compare: { cities: [] },
+    odds: { event: "", outcomes: [{ label: "Any snow", pct: 70 }, { label: "1 inch or more", pct: 40 }, { label: "3 inches or more", pct: 15 }], confidence: "medium", note: "" },
   };
   return {
-    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline", discussion: "Forecast Discussion" }[kind as string] ?? KIND_LABEL[kind],
+    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline", discussion: "Forecast Discussion", note: "The Forecast", impacts: "Impact Scale", dayPlanner: "Day Planner", compare: "Today vs Tomorrow", odds: "The Odds" }[kind as string] ?? KIND_LABEL[kind],
     validFrom: now.toISOString(), validTo: to.toISOString(), region: config.value.live.region.bbox, published: false, author: "forecaster",
     body: body[kind] ?? ({ text: "", draft: true } as StudioBody), updated: now.toISOString(),
   };
@@ -62,7 +71,7 @@ export function Studio() {
 
   const [setBusy, setSetBusy] = useState(false);
   const [setDay, setSetDay] = useState<"0" | "1">("1");
-  const [setMetrics, setSetMetrics] = useState<Record<CityTemps["metric"], boolean>>({ high: true, low: true, feelsLike: true });
+  const [setMetrics, setSetMetrics] = useState<Record<CityTemps["metric"], boolean>>({ high: true, low: true, feelsLike: true, pop: false, gust: false });
 
   // one press: a separate published map for each chosen measure, filled from the model
   const publishSet = async () => {
@@ -101,12 +110,12 @@ export function Studio() {
           {BUILT.map((k) => <button key={k} type="button" class="adm-btn" onClick={() => setEdit(blank(k))}>{KIND_LABEL[k]}</button>)}
         </div>
       </Card>
-      <Card title="Quick set: temperature maps" hint="Makes and publishes one map for each measure you pick, filled from the model. Edit any of them afterwards.">
+      <Card title="Quick set: city maps" hint="Makes and publishes one map for each measure you pick, filled from the model. Edit any of them afterwards.">
         <div class="adm-row">
-          {(["high", "low", "feelsLike"] as const).map((m) => (
+          {(["high", "low", "feelsLike", "pop", "gust"] as const).map((m) => (
             <label key={m} class="adm-row" style={{ gap: ".35rem" }}>
               <input type="checkbox" checked={setMetrics[m]} onChange={(e) => setSetMetrics({ ...setMetrics, [m]: (e.target as HTMLInputElement).checked })} />
-              {{ high: "Highs", low: "Lows", feelsLike: "Feels like" }[m]}
+              {METRIC_NAME[m]}
             </label>
           ))}
           <Segmented label="Day" value={setDay} onChange={setSetDay} options={[{ value: "1", label: "Tomorrow" }, { value: "0", label: "Today" }]} />
@@ -203,6 +212,11 @@ function Editor({ product, onClose }: { product: StudioProduct; onClose: () => v
       {p.kind === "timeline" && <TimelineEditor body={p.body as Timeline} onChange={setBody} />}
       {p.kind === "discussion" && <DiscussionEditor body={p.body as Discussion} onChange={setBody} />}
       {p.kind === "riskMap" && <RiskEditor product={p} body={p.body as RiskMap} onChange={setBody} />}
+      {p.kind === "note" && <NoteEditor body={p.body as NoteCard} onChange={setBody} />}
+      {p.kind === "impacts" && <ImpactsEditor body={p.body as Impacts} onChange={setBody} />}
+      {p.kind === "dayPlanner" && <DayPlannerEditor body={p.body as DayPlanner} onChange={(b) => { setBody(b); setP((x) => (x.title === "Day Planner" || !x.title ? { ...x, title: `Day Planner: ${b.place}` } : x)); }} />}
+      {p.kind === "compare" && <CompareEditor body={p.body as Compare} onChange={setBody} />}
+      {p.kind === "odds" && <OddsEditor body={p.body as Odds} onChange={setBody} />}
 
       <Card title="Preview and download">
         <div class="adm-row">
@@ -277,7 +291,7 @@ function CityTempsEditor({ body, onChange, onRetitle }: { body: CityTemps; onCha
   return (
     <Card title="Temperatures" hint="Loaded from the model for every city in your rotation; change any value before publishing.">
       <div class="adm-row">
-        <Segmented label="Measure" value={body.metric} onChange={(m) => { onChange({ ...body, metric: m }); void load(m); }} options={[{ value: "high", label: "Highs" }, { value: "low", label: "Lows" }, { value: "feelsLike", label: "Feels like" }]} />
+        <Segmented label="Measure" value={body.metric} onChange={(m) => { onChange({ ...body, metric: m }); void load(m); }} options={(["high", "low", "feelsLike", "pop", "gust"] as const).map((m) => ({ value: m, label: METRIC_NAME[m] }))} />
         <Segmented label="Day" value={day} onChange={(d) => { setDay(d); if (body.cities.length) void load(body.metric, d); }} options={[{ value: "1", label: "Tomorrow" }, { value: "0", label: "Today" }]} />
         <button type="button" class="adm-btn" onClick={() => void load()}>Load from model</button>
       </div>
