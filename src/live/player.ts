@@ -6,6 +6,14 @@ import { isWarning } from "../../shared/live/rundown";
  * - first load, or the threat level changed, or a brand-new warning appeared: start at the top
  * - otherwise keep playing the same item (matched by key, then headline), else keep the position
  */
+/** True when the new rundown carries a threat-level change or a warning the old one did not have. */
+export function isBreakIn(prev: Rundown | null, next: Rundown): boolean {
+  if (!prev) return false;
+  if (prev.level !== next.level) return true;
+  const seen = new Set(prev.alerts.map((a) => a.id));
+  return next.alerts.some((a) => isWarning(a) && !seen.has(a.id));
+}
+
 export function pickIndex(prev: Rundown | null, prevIdx: number, next: Rundown): number {
   if (!prev || next.items.length === 0) return 0;
   if (prev.level !== next.level) return 0;

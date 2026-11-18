@@ -2,7 +2,7 @@ import { computed, signal } from "@preact/signals";
 import type { Rundown, RundownItem } from "../../shared/live/rundown";
 import type { StudioProduct } from "../../shared/studio";
 import type { RadarFrames } from "../../shared/types";
-import { dropPlayed, pickIndex } from "./player";
+import { dropPlayed, isBreakIn, pickIndex } from "./player";
 
 export const viewerKey = (): string => new URLSearchParams(location.search).get("key") ?? "";
 
@@ -52,7 +52,8 @@ export async function pollRundown(): Promise<void> {
         jumped = true;
       }
       lastCmd = cmd?.id ?? null;
-      if (jumped || i !== index.value || !rundown.value) epoch.value++;
+      // a new warning or level change cuts in at once, even if the top item is what is already playing
+      if (jumped || i !== index.value || !rundown.value || isBreakIn(rundown.value, next)) epoch.value++;
       index.value = i;
       rundown.value = next;
       status.value = "ok";

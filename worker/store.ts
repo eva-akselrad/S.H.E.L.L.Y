@@ -47,7 +47,7 @@ export async function writeConfig(env: Env, c: SiteConfig): Promise<void> {
 }
 
 export async function readSim(env: Env): Promise<SimEntry[]> {
-  const list = (await env.STATE.get<SimEntry[]>(SIM_KEY, "json")) ?? [];
+  const list = (await env.STATE.get<SimEntry[]>(SIM_KEY, { type: "json", cacheTtl: 30 })) ?? [];
   const now = Date.now();
   return list.filter((s) => new Date(s.expires).getTime() > now);
 }
@@ -72,7 +72,7 @@ export interface LiveState {
 }
 
 export async function readRundown(env: Env): Promise<Rundown | null> {
-  return env.STATE.get<Rundown>(RUNDOWN_KEY, "json");
+  return env.STATE.get<Rundown>(RUNDOWN_KEY, { type: "json", cacheTtl: 30 }); // 30 s is the shortest KV edge cache
 }
 export async function writeRundown(env: Env, r: Rundown): Promise<void> {
   await env.STATE.put(RUNDOWN_KEY, JSON.stringify(r));
