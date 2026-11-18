@@ -42,7 +42,7 @@ export async function pollRundown(): Promise<void> {
     if (res.status === 404) status.value = "disabled";
     else if (res.status === 403) status.value = "forbidden";
     else if (res.ok) {
-      const next = dropPlayed((await res.json()) as Rundown, playedOneShots);
+      const next = dropPlayed((await res.json()) as Rundown, playedOneShots, current.value?.key);
       let i = pickIndex(rundown.value, index.value, next);
       let jumped = false;
       const cmd = next.cmd ?? null;
