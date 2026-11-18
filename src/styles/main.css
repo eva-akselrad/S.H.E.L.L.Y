@@ -115,6 +115,10 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .stage .clock { font-size: 1.6em; font-variant-numeric: tabular-nums; }
 .stage-main { padding: 12px 0; min-height: 0; animation: fade .5s ease; }
 .stage .radar { height: 760px; }
+/* Forecaster Studio graphics: fit the box instead of using the SVG's fixed 1920 px size (this rule used to ship only with the /live bundle) */
+.seg-studio svg { width: 100%; height: auto; display: block; border-radius: 12px; }
+.stage .seg-studio { height: 100%; display: grid; place-items: center; padding: 0; }
+.stage .seg-studio svg { width: auto; height: auto; max-width: 100%; max-height: 100%; }
 .stage .botbar { padding-bottom: 40px; }
 .stage .big-temp { font-size: 15rem; }
 .stage .now-desc { font-size: 3.4rem; }

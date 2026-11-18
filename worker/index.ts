@@ -63,7 +63,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     if (!c.live.enabled) return json({ error: "live_disabled" }, 404);
     if (c.live.viewerToken && url.searchParams.get("key") !== c.live.viewerToken) return json({ error: "forbidden" }, 403);
     const r = await readRundown(env);
-    return r ? json(r, 200, 4) : json({ error: "no_rundown_yet" }, 503);
+    return r ? json(r, 200, 2) : json({ error: "no_rundown_yet" }, 503);
   }
   if (path === "/api/tts" && request.method === "GET") return handleTts(env, url);
 
@@ -187,16 +187,20 @@ export default {
   },
 
   async scheduled(_event, env, ctx): Promise<void> {
+    // cron fires once a minute; a second pass half a minute later halves the worst-case wait for a new warning
+    const pass = async (): Promise<void> => {
+      const alerts = await pollAlerts(env);
+      // push first: it's the time-critical part (both fan-outs remember what they already sent)
+      if (alerts) {
+        await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
+        await fanOutFcm(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "fcm_fanout_failed", err: String(err) })));
+      }
+      await produceRundown(env);
+    };
     ctx.waitUntil(
-      pollAlerts(env)
-        .then(async (alerts) => {
-          // push first: it's the time-critical part
-          if (alerts) {
-            await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
-            await fanOutFcm(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "fcm_fanout_failed", err: String(err) })));
-          }
-          await produceRundown(env);
-        })
+      pass()
+        .then(() => new Promise<void>((r) => setTimeout(r, 30_000)))
+        .then(pass)
         .catch((err) => console.error(JSON.stringify({ msg: "producer_failed", err: String(err) }))),
     );
     ctx.waitUntil(runGrading(env).catch((err) => console.error(JSON.stringify({ msg: "grading_failed", err: String(err) }))));

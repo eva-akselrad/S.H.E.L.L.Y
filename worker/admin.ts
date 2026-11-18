@@ -135,6 +135,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     };
     await writeSim(env, [entry, ...(await readSim(env))]);
     await audit(env, "simulate.start", `${simLabel(entry)} for ${minutes} min`);
+    await produceRundown(env).catch(() => null); // on the broadcast now, not at the next cron tick
     return json(entry, 201);
   }
   if (path === "/api/admin/simulate" && method === "DELETE") {
@@ -142,6 +143,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const list = await readSim(env);
     await writeSim(env, id ? list.filter((s) => s.id !== id) : []);
     await audit(env, "simulate.stop", id ? "one" : "all");
+    await produceRundown(env).catch(() => null);
     return json({ ok: true });
   }
 

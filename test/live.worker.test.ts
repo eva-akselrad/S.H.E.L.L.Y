@@ -10,7 +10,8 @@ function fakeKv(): KVNamespace & { puts: number } {
   const m = new Map<string, string>();
   const kv = {
     puts: 0,
-    get: async (k: string, type?: string) => {
+    get: async (k: string, opt?: string | { type?: string }) => {
+      const type = typeof opt === "string" ? opt : opt?.type;
       const v = m.get(k);
       if (v === undefined) return null;
       return type === "json" ? JSON.parse(v) : v;

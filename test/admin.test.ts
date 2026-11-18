@@ -7,7 +7,8 @@ type Req = Parameters<typeof worker.fetch>[0];
 function fakeKv(): KVNamespace {
   const m = new Map<string, string>();
   return {
-    get: async (k: string, type?: string) => {
+    get: async (k: string, opt?: string | { type?: string }) => {
+      const type = typeof opt === "string" ? opt : opt?.type;
       const v = m.get(k);
       if (v === undefined) return null;
       return type === "json" ? JSON.parse(v) : v;
