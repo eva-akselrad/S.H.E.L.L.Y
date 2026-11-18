@@ -50,3 +50,29 @@ export function quipFor(it: RundownItem | null, outfit: Outfit): string | null {
       return null;
   }
 }
+
+export type HostPreview = { outfit?: Outfit; mood?: Mood; trick?: Trick };
+const OUTFITS: readonly Outfit[] = ["none", "shades", "winter", "umbrella", "sleepy"];
+const MOODS: readonly Mood[] = ["happy", "curious", "focused", "worried"];
+const TRICK_IDS: readonly Trick[] = ["look", "lookR", "wave", "tilt", "hop", "blink2", "sparkle"];
+
+/**
+ * Preview-only look override for filming: /live?host=winter,worried,wave sets an outfit, a mood
+ * and/or a repeating trick. Cosmetic only: it never changes the threat level, the glow, what airs
+ * or whether the host goes serious. Unknown words are ignored.
+ */
+export function parseHostPreview(search: string): HostPreview {
+  let raw: string | null = null;
+  try {
+    raw = new URLSearchParams(search).get("host");
+  } catch {
+    return {};
+  }
+  const out: HostPreview = {};
+  for (const w of (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean)) {
+    if ((OUTFITS as readonly string[]).includes(w)) out.outfit = w as Outfit;
+    else if ((MOODS as readonly string[]).includes(w)) out.mood = w as Mood;
+    else if ((TRICK_IDS as readonly string[]).includes(w)) out.trick = w as Trick;
+  }
+  return out;
+}

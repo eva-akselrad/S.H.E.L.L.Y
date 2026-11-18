@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ThreatLevel } from "../../../shared/types";
 import { current, mouth, rundown, speaking } from "../state";
-import { hostState, moodFor, outfitFor, quipFor, type Trick } from "./personality";
+import { hostState, moodFor, outfitFor, parseHostPreview, quipFor, type Trick } from "./personality";
 export { hostState, moodFor, outfitFor, quipFor } from "./personality";
 
 /**
@@ -17,6 +17,8 @@ export { hostState, moodFor, outfitFor, quipFor } from "./personality";
  */
 
 const GLOW: Record<ThreatLevel, string> = { CALM: "var(--calm)", ELEVATED: "var(--elevated)", WARNING: "var(--warning)", EMERGENCY: "var(--emergency)" };
+/** ?host=… look override for filming (see parseHostPreview). Read once; cosmetic only. */
+const PREVIEW = parseHostPreview(typeof location === "undefined" ? "" : location.search);
 const TRICKS: Trick[] = ["look", "lookR", "wave", "tilt", "hop", "blink2", "sparkle", "look", "wave"];
 
 function localHour(tz: string | undefined): number {
@@ -29,10 +31,12 @@ function localHour(tz: string | undefined): number {
 
 export function Host({ level, offAir = false, big = false }: { level: ThreatLevel; offAir?: boolean; big?: boolean }) {
   const state = hostState(level, speaking.value, offAir);
-  const mood = moodFor(level);
+  // a real warning always wins over the filming preview
+  const look = level === "WARNING" || level === "EMERGENCY" ? {} : PREVIEW;
+  const mood = look.mood ?? moodFor(level);
   const r = rundown.value;
   const first = r?.wx?.cities[0]?.now ?? null;
-  const outfit = outfitFor(first, localHour(r?.tz), level);
+  const outfit = look.outfit ?? outfitFor(first, localHour(r?.tz), level);
   const calm = state === "idle" || state === "talking";
   const open = state === "talking" || (state === "serious" && speaking.value) ? mouth.value : 0;
 
@@ -60,11 +64,11 @@ export function Host({ level, offAir = false, big = false }: { level: ThreatLeve
     const loop = () => {
       t = setTimeout(() => {
         if (!busy.current) {
-          setTrick(TRICKS[Math.floor(Math.random() * TRICKS.length)]!);
+          setTrick(PREVIEW.trick ?? TRICKS[Math.floor(Math.random() * TRICKS.length)]!);
           setTimeout(() => setTrick("none"), 1800);
         }
         loop();
-      }, 7000 + Math.random() * 6000);
+      }, PREVIEW.trick ? 4000 : 7000 + Math.random() * 6000);
     };
     loop();
     return () => clearTimeout(t);

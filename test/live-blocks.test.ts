@@ -4,7 +4,7 @@ import { activeControl, DEFAULT_PLAYLIST, EMPTY_CONTROL, normalizeBulletin, norm
 import { blockText, weekendDays } from "../shared/live/blocktext";
 import { computeIntensity } from "../shared/live/intensity";
 import { buildRundown, type CityWx } from "../shared/live/rundown";
-import { moodFor, outfitFor, quipFor } from "../src/live/host/personality";
+import { moodFor, outfitFor, parseHostPreview, quipFor } from "../src/live/host/personality";
 import { dropPlayed } from "../src/live/player";
 import type { Alert, SpcCategory } from "../shared/types";
 
@@ -145,6 +145,19 @@ describe("mascot personality", () => {
   test("quips react to the screen and never to alerts", () => {
     expect(quipFor({ key: "k", kind: "segment", id: "now", city: DEFAULT_LIVE.region.cities[0]!, temp: 15, desc: "Clear", headline: "", durationSec: 5 }, "none")).toBe("Brrrr!");
     expect(quipFor({ key: "k", kind: "alert", alertId: "a", headline: "", durationSec: 5 }, "none")).toBeNull();
+  });
+});
+
+describe("host filming preview", () => {
+  test("reads outfit, mood and trick in any order", () => {
+    expect(parseHostPreview("?host=winter,worried,wave")).toEqual({ outfit: "winter", mood: "worried", trick: "wave" });
+    expect(parseHostPreview("?host=wave,shades")).toEqual({ outfit: "shades", trick: "wave" });
+    expect(parseHostPreview("?host=sleepy")).toEqual({ outfit: "sleepy" });
+  });
+  test("ignores unknown words and a missing param", () => {
+    expect(parseHostPreview("?host=tophat,,focused")).toEqual({ mood: "focused" });
+    expect(parseHostPreview("?mode=broadcast")).toEqual({});
+    expect(parseHostPreview("")).toEqual({});
   });
 });
 
