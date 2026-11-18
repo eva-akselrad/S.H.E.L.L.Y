@@ -128,3 +128,20 @@ describe("reasoning-model output", () => {
     expect(needsNoThink("meta-llama/llama-3.3-70b:free")).toBe(false);
   });
 });
+
+describe("local provider request", () => {
+  test("asks a local model not to think", async () => {
+    let sent: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", vi.fn(async (_u: string, init: { body: string }) => {
+      sent = JSON.parse(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] }));
+    }));
+    const env = { LLM_API_KEY: "k".repeat(32), STATE: { get: async () => null, put: async () => undefined } } as unknown as Env;
+    const cfg = { ...DEFAULT_CONFIG.live.llm, enabled: true, provider: "openai-compatible" as const, baseUrl: "https://llm.test/v1", models: ["shelly-qwen3"] };
+    await callLlm(env, cfg, [{ role: "user", content: "hi" }], { json: true });
+    expect(sent.reasoning_effort).toBe("none");
+    await callLlm(env, { ...cfg, provider: "openrouter" }, [{ role: "user", content: "hi" }], { json: true });
+    expect(sent.reasoning_effort).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+});

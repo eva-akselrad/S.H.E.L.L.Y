@@ -47,6 +47,8 @@ export async function callLlm(
   // OpenRouter tries the listed models in order on rate limits and server errors
   if (cfg.provider === "openrouter" && cfg.models.length > 1) body.models = cfg.models.slice(0, 3);
   if (opts.json) body.response_format = { type: "json_object" };
+  // a local reasoning model (Qwen3 on Ollama) otherwise spends the token budget thinking before it answers
+  if (cfg.provider === "openai-compatible") body.reasoning_effort = "none";
 
   const headers: Record<string, string> = { "content-type": "application/json", authorization: `Bearer ${env.LLM_API_KEY}` };
   if (cfg.provider === "openrouter") {
