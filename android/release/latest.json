@@ -1,0 +1,9 @@
+{
+  "versionCode": 5,
+  "versionName": "2.0.1",
+  "sha256": "38e0b03ae3aed60739fc4a2fd53228d3d4ecf29af331fe99aad396f95e82ddf9",
+  "size": 1829943,
+  "minSdk": 26,
+  "notes": "SHELLY 2.0.1: now served from shelly.evaakselrad.com",
+  "published": "2026-11-17T22:17:25.468Z"
+}

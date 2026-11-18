@@ -21,3 +21,9 @@ android/app/google-services.json
 *.aab
 *.jks
 *.keystore
+
+# video: generated audio (remake with npm run video:vo / video:sfx) and raw footage
+video/vo/
+video/sfx/
+video/footage/
+video/renders/

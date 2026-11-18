@@ -1,0 +1,54 @@
+# SHELLY v2 release video: voiceover script (read by SHELLY's own voice, Kokoro on this PC)
+# Target: the whole video runs 3 to 4 minutes, so the speech stays around 2.5 minutes.
+#
+# Format: one line per clip, "<id> | <text>". The id becomes the file name (video/vo/<id>.wav).
+# Lines starting with # are notes. "..." gives a short pause. Spell things the way they should sound
+# (the URL is written out). Regenerate with: npm run video:vo
+# Ids ending in "a"/"b" are alternatives: use one, not both.
+
+# 01 Cold open (over the sky montage)
+01-01 | Every day, the sky does something extraordinary.
+01-02 | And every day, we check it on something... ordinary.
+01-03 | Until now.
+01-04 | This is SHELLY. Version two.
+
+# 02 Rebuilt
+02-01 | Weather for the Philadelphia area. Built on the National Weather Service. And rebuilt from scratch.
+# Optional. Only if you want the name's story in the video.
+02-02 | Named after someone very special. This one's for her.
+02-03 | You open it, and your weather is just... there.
+
+# 03 Every screen, every sky
+03-01 | On your TV, it's a broadcast. On your desktop, a dashboard. And on your phone, it fits right in your hand.
+03-02 | And the screen looks like the sky outside. Twelve scenes, and every one of them is alive.
+
+# 04 Built for warnings (TEST alerts on screen, with the demo line)
+04-01 | But here's what really matters.
+04-02 | When a warning hits, SHELLY takes over the screen. What to do. When it reaches your town. Read out loud, so you hear it even when you're not looking.
+04-03 | Push alerts match the exact shape of the warning. Outside it? Your phone stays quiet.
+04-04 | And one promise we will never break. Alert wording comes from the National Weather Service. Never from A I. Not one word.
+04-05 | The alerts you're seeing here are demos.
+
+# 05 Every day
+05-01 | On calm days, there's a rain and snow nowcast, storm reports, forecast confidence, and yes... what to wear. And SHELLY grades its own forecasts.
+
+# 06 The Android app
+06-01 | And then... there's the app.
+06-02 | Warnings for wherever you are, even when the app is closed. Your location stays private. A widget that turns amber, or red, the moment things get serious. And it updates itself, but never in the middle of a warning.
+
+# 07 SHELLY Live
+07-01 | One. More. Thing.
+07-02 | Meet SHELLY Live. A weather broadcast that runs twenty four seven, and produces itself.
+07-03 | Hosted by... a sea turtle. Always dressed for the weather.
+07-04 | You control the rundown. Nothing the A I writes airs until a person reads it and presses go. And when a real warning hits, it breaks through everything.
+# Pick one, depending on whether Live is on air at release time.
+07-05a | SHELLY Live is on the air. Right now.
+07-05b | SHELLY Live is coming soon.
+
+# 08 Forecaster Studio
+08-01 | And for the forecaster... Forecaster Studio. Forecast cards. Impact scales. Risk maps. Snow totals. Make it once, and it plays on the broadcast.
+
+# 09 Outro
+09-01 | Oh, and the voice you're hearing right now? It's SHELLY's own. Running on a computer in the next room.
+09-02 | SHELLY. Version two. Weather, the way it always should have been.
+09-03 | Find it, and the Android app, at shelly dot eva akselrad dot com. Stay safe out there.

@@ -12,7 +12,9 @@
     "typecheck": "wrangler types && tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json",
     "test": "vitest run",
     "types": "wrangler types",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "video:vo": "\"%USERPROFILE%/.shelly-tts/venv/Scripts/python.exe\" scripts/video-voiceover.py",
+    "video:sfx": "\"%USERPROFILE%/.shelly-tts/venv/Scripts/python.exe\" scripts/video-sfx.py"
   },
   "dependencies": {
     "@preact/signals": "^2.11.4",
