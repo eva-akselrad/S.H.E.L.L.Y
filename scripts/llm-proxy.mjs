@@ -39,6 +39,8 @@ const deny = (res, code, msg) => {
 
 createServer((req, res) => {
   const path = (req.url ?? "").split("?")[0];
+  const t0 = Date.now();
+  res.on("finish", () => console.log(`${new Date().toISOString()} ${req.method} ${path} -> ${res.statusCode} (${Date.now() - t0} ms)`));
   const given = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
   if (!same(given, KEY)) return deny(res, 401, "unauthorized");
   if (!ALLOWED.has(`${req.method} ${path}`)) return deny(res, 404, "not_found");

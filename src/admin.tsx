@@ -3,7 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Logo, ThemeToggle } from "./components/Chrome";
 import { Activity } from "./admin/Activity";
 import { Announcements } from "./admin/Announcements";
-import { authed, call, loadConfig } from "./admin/api";
+import { authed, call, configFailed, configLoaded, loadConfig } from "./admin/api";
 import { Display } from "./admin/Display";
 import { Live } from "./admin/Live";
 import { Login } from "./admin/Login";
@@ -61,7 +61,15 @@ function Shell() {
           <button type="button" class="adm-btn small" onClick={() => void out()}>Log out</button>
         </div>
       </aside>
-      <main class="adm-main"><View /></main>
+      <main class="adm-main">
+        {configLoaded.value ? (
+          <View />
+        ) : configFailed.value ? (
+          <p>Couldn't load your saved settings, so nothing is shown (saving now could overwrite them). <button type="button" class="adm-btn" onClick={() => void loadConfig()}>Try again</button></p>
+        ) : (
+          <p class="muted">Loading your settings…</p>
+        )}
+      </main>
     </div>
   );
 }

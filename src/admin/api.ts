@@ -6,6 +6,9 @@ import { toast } from "./toast";
 /** null = still checking */
 export const authed = signal<boolean | null>(null);
 export const config = signal<SiteConfig>(DEFAULT_CONFIG);
+/** False until the saved settings have really been fetched. Pages must not open (or save) before that: they would show and write defaults. */
+export const configLoaded = signal(false);
+export const configFailed = signal(false);
 
 export interface Result<T> {
   ok: boolean;
@@ -31,7 +34,13 @@ export async function call<T = unknown>(method: string, path: string, body?: unk
 
 export async function loadConfig(): Promise<void> {
   const r = await call<SiteConfig>("GET", "/api/admin/config");
-  if (r.ok) config.value = r.data;
+  if (r.ok) {
+    config.value = r.data;
+    configLoaded.value = true;
+    configFailed.value = false;
+  } else if (!configLoaded.value) {
+    configFailed.value = true;
+  }
 }
 
 /** Merge a patch into the saved config and PUT it. */
