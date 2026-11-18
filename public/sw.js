@@ -1,6 +1,6 @@
 // SHELLY service worker: app-shell cache so the display survives a network drop.
 // API data is kept as last-good in localStorage by the app, not here.
-const VERSION = "shelly-v2-2";
+const VERSION = "shelly-v2-3";
 
 // ── push alerts (sent by the Worker only when a warning's area covers this device's place) ──
 self.addEventListener("push", (event) => {
