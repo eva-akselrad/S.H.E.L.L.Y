@@ -68,17 +68,17 @@ async function localAudio(env: Env, local: VoiceConfig["local"], text: string): 
  * Synthesize `text`. Tries the user's own voice server first (no daily cap); falls back to the
  * Aura-2 `speaker` voice, which is cached in KV and counts against the daily character cap.
  */
-export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, local?: VoiceConfig["local"]): Promise<TtsResult> {
+export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, local?: VoiceConfig["local"], opts: { fresh?: boolean } = {}): Promise<TtsResult> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_CHARS);
   if (!clean) return Promise.resolve({ ok: false, reason: "empty" });
-  const flightKey = `${speaker}:${clean}`;
+  const flightKey = `${opts.fresh ? "fresh:" : ""}${speaker}:${clean}`;
   const existing = inflight.get(flightKey);
   if (existing) return existing;
 
   const run = (async (): Promise<TtsResult> => {
     if (local?.enabled) {
       const lkey = `tts:${await digest(`local:${local.voice}:${clean}`)}`;
-      const lhit = await env.STATE.get(lkey, "arrayBuffer");
+      const lhit = opts.fresh ? null : await env.STATE.get(lkey, "arrayBuffer");
       if (lhit) return { ok: true, audio: lhit, cached: true };
       const audio = await localAudio(env, local, clean);
       if (audio) {
@@ -87,8 +87,8 @@ export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, 
       }
       console.error(JSON.stringify({ msg: "tts_local_unavailable_using_fallback" }));
     }
-    const key = `tts:${await digest(flightKey)}`;
-    const hit = await env.STATE.get(key, "arrayBuffer");
+    const key = `tts:${await digest(`${speaker}:${clean}`)}`;
+    const hit = opts.fresh ? null : await env.STATE.get(key, "arrayBuffer");
     if (hit) return { ok: true, audio: hit, cached: true };
 
     const used = await ttsUsage(env);
@@ -151,7 +151,8 @@ export async function handleTts(env: Env, url: URL): Promise<Response> {
 /** Admin: hear a voice. Counts toward the daily cap like any other synthesis. */
 export async function handleTtsPreview(env: Env, speaker: Speaker, cap: number, local?: VoiceConfig["local"]): Promise<Response> {
   const text = "Attention. This is a test of the SHELLY alert voice. A Tornado Warning has been issued for your area. Move to an interior room now.";
-  const r = await ttsAudio(env, speaker, text, cap, local);
+  // fresh: always make a new sample so a changed voice or server is heard, not a cached one
+  const r = await ttsAudio(env, speaker, text, cap, local, { fresh: true });
   if (r.ok) return new Response(r.audio, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
   return err(`tts_${r.reason}`, r.reason === "cap" ? 429 : 502);
 }

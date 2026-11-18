@@ -57,3 +57,17 @@ describe("ttsAudio with a local voice", () => {
     expect(ai).not.toHaveBeenCalled();
   });
 });
+
+describe("preview always makes a fresh sample", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  test("a repeat plain request is cached, a fresh one calls the server again", async () => {
+    const fetcher = vi.fn(async () => new Response(new Uint8Array(500).fill(3).buffer));
+    vi.stubGlobal("fetch", fetcher);
+    const env = fakeEnv(async () => new Uint8Array(500).buffer);
+    await ttsAudio(env, "athena", "Preview sentence.", 1000, LOCAL);
+    await ttsAudio(env, "athena", "Preview sentence.", 1000, LOCAL);
+    expect(fetcher).toHaveBeenCalledTimes(1); // second came from the cache
+    await ttsAudio(env, "athena", "Preview sentence.", 1000, LOCAL, { fresh: true });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
