@@ -3,6 +3,7 @@ import { Freshness } from "../components/Freshness";
 import { InstallApp } from "../components/InstallApp";
 import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
+import { WatchLive } from "../components/WatchLive";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { loop, threat } from "../state/store";
@@ -25,6 +26,7 @@ export function PhoneShell() {
       <ActionCard />
       <NearbyNotice />
       <InstallApp />
+      <div class="phone-live"><WatchLive /></div>
       <AnnouncementBar />
       <div class="phone-tools"><SearchBox /><PushToggle /><AppAlerts /></div>
       <main class="cards">

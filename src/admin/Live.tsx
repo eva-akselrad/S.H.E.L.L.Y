@@ -119,6 +119,9 @@ export function Live() {
       <Card title="Broadcast">
         <div class="adm-form">
           <Toggle checked={d.enabled} onChange={(v) => set("enabled", v)} label="Broadcast is on" hint="When off, the rundown is not produced and /live shows nothing." />
+          <Field label="Watch-live link" hint="Your YouTube livestream address (https). While the broadcast is on, the website and app show a Watch live button that opens it. Leave blank for no button.">
+            <input class="adm-input" type="url" maxLength={300} placeholder="https://www.youtube.com/watch?v=..." value={d.watchUrl} onInput={(e) => set("watchUrl", (e.target as HTMLInputElement).value)} />
+          </Field>
           <Field label="Region name" hint="Spoken and shown on screen, for example Philadelphia region.">
             <input class="adm-input" value={d.region.name} onInput={(e) => setD((x) => ({ ...x, region: { ...x.region, name: (e.target as HTMLInputElement).value } }))} />
           </Field>

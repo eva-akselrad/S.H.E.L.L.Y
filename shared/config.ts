@@ -68,6 +68,8 @@ export interface LiveConfig {
   region: LiveRegion;
   /** random value in the OBS URL (?key=...); keeps /live unadvertised, not secret-grade */
   viewerToken: string;
+  /** public link (e.g. the YouTube livestream) shown as a "Watch live" button while the broadcast is on */
+  watchUrl: string;
   llm: LlmConfig & { enabled: boolean };
   host: { name: string; /** 0 calm .. 1 playful */ tone: number; bannedTopics: string[] };
   /** seconds per rundown item kind overrides */
@@ -126,6 +128,7 @@ export const DEFAULT_LIVE: LiveConfig = {
     ],
   },
   viewerToken: "",
+  watchUrl: "",
   llm: { enabled: false, provider: "openrouter", baseUrl: "https://openrouter.ai/api/v1", models: [], dailyRequestCap: 45, temperature: 0.7 },
   host: { name: "SHELLY", tone: 0.4, bannedTopics: [] },
   itemSeconds: {},
@@ -226,6 +229,7 @@ function normalizeLive(v: unknown): LiveConfig {
       cities,
     },
     viewerToken: /^[A-Za-z0-9_-]{16,128}$/.test(String(r.viewerToken)) ? String(r.viewerToken) : "",
+    watchUrl: typeof r.watchUrl === "string" && /^https:\/\/[^\s]+$/.test(r.watchUrl.trim()) ? r.watchUrl.trim().slice(0, 300) : "",
     llm: {
       enabled: llm.enabled === true,
       provider: llm.provider === "openai-compatible" ? "openai-compatible" : "openrouter",

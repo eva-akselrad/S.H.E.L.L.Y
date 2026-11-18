@@ -344,3 +344,10 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .phone-tools .search .err { flex: 1 1 100%; }
 .phone-tools > .app-alerts-chip { margin: 0; }
 .phone-tools > .app-alerts { flex: 1 1 100%; margin: 0; }
+
+.watch-live { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #c62828; color: #fff; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.watch-live:hover { filter: brightness(1.1); }
+.watch-live-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+.phone-live { display: flex; padding: 0 12px; }
+.phone-live:empty { display: none; }
+.phone-live .watch-live { flex: 1; justify-content: center; }

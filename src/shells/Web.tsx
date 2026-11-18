@@ -3,6 +3,7 @@ import { Freshness } from "../components/Freshness";
 import { InstallApp } from "../components/InstallApp";
 import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
+import { WatchLive } from "../components/WatchLive";
 import { SoundOutput } from "../components/SoundOutput";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
@@ -19,6 +20,7 @@ export function WebShell() {
         <Logo />
         <SearchBox />
         <ThreatBadge />
+        <WatchLive />
         <PushToggle />
         <MusicControl />
         <SoundOutput />
