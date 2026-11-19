@@ -42,11 +42,20 @@ async function toBytes(out: unknown): Promise<ArrayBuffer | null> {
 // Best-effort: two viewers asking for the same new alert at once share one generation (per isolate).
 const inflight = new Map<string, Promise<TtsResult>>();
 
+/** How long to wait for the local voice before using the cloud voice. Warnings wait up to 60 s so a busy
+ *  day doesn't burn through the cloud voice's daily quota (the owner's choice); a PC that is off fails at once,
+ *  so the wait only applies when the voice is slow. Long on-air items get time to match their length
+ *  (Kokoro on a CPU takes about 25 s for a 600-character bulletin). */
+export const ALERT_LOCAL_TIMEOUT_MS = 60_000;
+export function liveLocalTimeoutMs(chars: number): number {
+  return Math.min(90_000, Math.max(ALERT_LOCAL_TIMEOUT_MS, 15_000 + chars * 75));
+}
+
 /** One call to the user's own Kokoro server (through the locked tunnel). Null on any failure. */
-async function localAudio(env: Env, local: VoiceConfig["local"], text: string): Promise<ArrayBuffer | null> {
+async function localAudio(env: Env, local: VoiceConfig["local"], text: string, timeoutMs: number): Promise<ArrayBuffer | null> {
   if (!local.enabled || !local.baseUrl || !env.LLM_API_KEY) return null;
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 20_000);
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const res = await fetch(`${local.baseUrl}/audio/speech`, {
       method: "POST",
@@ -57,7 +66,8 @@ async function localAudio(env: Env, local: VoiceConfig["local"], text: string): 
     if (!res.ok) return null;
     const audio = await res.arrayBuffer();
     return audio.byteLength > 100 ? audio : null;
-  } catch {
+  } catch (e) {
+    console.error(JSON.stringify({ msg: "tts_local_error", err: ctl.signal.aborted ? `timeout after ${timeoutMs} ms` : String(e), chars: text.length }));
     return null;
   } finally {
     clearTimeout(timer);
@@ -68,10 +78,13 @@ async function localAudio(env: Env, local: VoiceConfig["local"], text: string): 
  * Synthesize `text`. Tries the user's own voice server first (no daily cap); falls back to the
  * Aura-2 `speaker` voice, which is cached in KV and counts against the daily character cap.
  */
-export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, local?: VoiceConfig["local"], opts: { fresh?: boolean } = {}): Promise<TtsResult> {
+export function ttsAudio(
+  env: Env, speaker: Speaker, text: string, cap: number, local?: VoiceConfig["local"],
+  opts: { fresh?: boolean; localTimeoutMs?: number; localOnly?: boolean } = {},
+): Promise<TtsResult> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_CHARS);
   if (!clean) return Promise.resolve({ ok: false, reason: "empty" });
-  const flightKey = `${opts.fresh ? "fresh:" : ""}${speaker}:${clean}`;
+  const flightKey = `${opts.fresh ? "fresh:" : ""}${opts.localOnly ? "local:" : ""}${speaker}:${clean}`;
   const existing = inflight.get(flightKey);
   if (existing) return existing;
 
@@ -80,13 +93,14 @@ export function ttsAudio(env: Env, speaker: Speaker, text: string, cap: number, 
       const lkey = `tts:${await digest(`local:${local.voice}:${clean}`)}`;
       const lhit = opts.fresh ? null : await env.STATE.get(lkey, "arrayBuffer");
       if (lhit) return { ok: true, audio: lhit, cached: true };
-      const audio = await localAudio(env, local, clean);
+      const audio = await localAudio(env, local, clean, opts.localTimeoutMs ?? ALERT_LOCAL_TIMEOUT_MS);
       if (audio) {
         await env.STATE.put(lkey, audio, { expirationTtl: AUDIO_TTL });
         return { ok: true, audio, cached: false };
       }
+      if (opts.localOnly) return { ok: false, reason: "failed" }; // making audio ahead never spends cloud credits
       console.error(JSON.stringify({ msg: "tts_local_unavailable_using_fallback" }));
-    }
+    } else if (opts.localOnly) return { ok: false, reason: "failed" };
     const key = `tts:${await digest(`${speaker}:${clean}`)}`;
     const hit = opts.fresh ? null : await env.STATE.get(key, "arrayBuffer");
     if (hit) return { ok: true, audio: hit, cached: true };

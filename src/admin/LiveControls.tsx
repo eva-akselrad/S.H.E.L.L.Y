@@ -9,7 +9,11 @@ import { Card, Chip, Field, Segmented, Toggle } from "./ui";
 interface ControlReply {
   control: LiveControl;
   rundown: Rundown | null;
+  /** Bulletins and said lines: whether your own voice's audio was made before it went on air. */
+  voice?: "ready" | "fallback" | "off";
 }
+
+const VOICE_NOTE = " Your voice wasn't ready, so it's using the backup voice.";
 
 const BUL_NAME: Record<BulletinLevel, string> = { info: "Bulletin", advisory: "Advisory", alert: "Alert" };
 
@@ -32,12 +36,13 @@ export function OnAir({ control, cities, llmOn, onChange }: { control: LiveContr
   const [city, setCity] = useState("");
   const [minutes, setMinutes] = useState(15);
   const [bul, setBul] = useState({ level: "info" as BulletinLevel, title: "", area: "", body: "", hours: 3, speak: true });
+  const [preparing, setPreparing] = useState<"say" | "bulletin" | null>(null);
 
   const act = async (body: Record<string, unknown>, ok: string) => {
     const r = await call<ControlReply>("POST", "/api/admin/live/control", body);
     if (r.ok) {
       onChange(r.data);
-      toast(r.data.rundown ? ok : "Saved, but the broadcast is switched off.");
+      toast(r.data.rundown ? ok + (r.data.voice === "fallback" ? VOICE_NOTE : "") : "Saved, but the broadcast is switched off.");
     } else toast("That didn't go through.", "error");
     return r.ok;
   };
@@ -58,7 +63,9 @@ export function OnAir({ control, cities, llmOn, onChange }: { control: LiveContr
 
   const say = async () => {
     if (!text.trim()) return toast("Type something for SHELLY to say.", "error");
-    if (await act({ action: "say", text, source }, "SHELLY says it next")) {
+    setPreparing("say");
+    const ok = await act({ action: "say", text, source }, "SHELLY says it next").finally(() => setPreparing(null));
+    if (ok) {
       setText("");
       setSource("you");
     }
@@ -66,11 +73,12 @@ export function OnAir({ control, cities, llmOn, onChange }: { control: LiveContr
 
   const pushBulletin = async () => {
     if (!bul.title.trim() || !bul.body.trim()) return toast("A bulletin needs a title and text.", "error");
-    const r = await call<ControlReply>("POST", "/api/admin/live/bulletin", bul);
+    setPreparing("bulletin"); // the server makes the voice first, which can take up to a minute
+    const r = await call<ControlReply>("POST", "/api/admin/live/bulletin", bul).finally(() => setPreparing(null));
     if (r.ok) {
       onChange(r.data);
       setBul({ ...bul, title: "", area: "", body: "" });
-      toast("Bulletin is on air");
+      toast("Bulletin is on air" + (r.data.voice === "fallback" ? "." + VOICE_NOTE : ""));
     } else toast("Couldn't send the bulletin.", "error");
   };
   const removeBulletin = async (id: string) => {
@@ -100,7 +108,7 @@ export function OnAir({ control, cities, llmOn, onChange }: { control: LiveContr
             <textarea class="adm-input" rows={3} maxLength={400} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} placeholder="Good evening everyone! Clear skies tonight, a great night to look for the meteor shower." />
           </Field>
           <div class="adm-row">
-            <button type="button" class="adm-btn primary" onClick={() => void say()}>Say it now</button>
+            <button type="button" class="adm-btn primary" disabled={!!preparing} onClick={() => void say()}>{preparing === "say" ? "Making the voice…" : "Say it now"}</button>
             <span class="adm-hint">{text.length}/400</span>
           </div>
           <Field label="Ask the AI for a line" hint={llmOn ? "For example: welcome people who just tuned in, or a fun fact about November weather. Uses 1 AI request." : "Turn on the AI host below and save to use this."}>
@@ -138,7 +146,7 @@ export function OnAir({ control, cities, llmOn, onChange }: { control: LiveContr
             <Field label="Hours on air"><input class="adm-input narrow" type="number" min={0.25} max={48} step={0.25} value={bul.hours} onInput={(e) => setBul({ ...bul, hours: Number((e.target as HTMLInputElement).value) })} /></Field>
             <Toggle checked={bul.speak} onChange={(v) => setBul({ ...bul, speak: v })} label="SHELLY reads it out loud" />
           </div>
-          <div class="adm-row"><button type="button" class="adm-btn primary" onClick={() => void pushBulletin()}>Put it on air</button></div>
+          <div class="adm-row"><button type="button" class="adm-btn primary" disabled={!!preparing} onClick={() => void pushBulletin()}>{preparing === "bulletin" ? "Making the voice…" : "Put it on air"}</button></div>
           {(control?.bulletins ?? []).map((b) => (
             <div key={b.id} class="adm-row" style={{ justifyContent: "space-between" }}>
               <span><Chip kind={b.level === "alert" ? "danger" : b.level === "advisory" ? "warn" : "info"}>{BUL_NAME[b.level]}</Chip> <b>{b.title}</b> <span class="adm-hint">until {new Date(b.until).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span></span>

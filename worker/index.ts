@@ -4,7 +4,7 @@ import { handleAndroid } from "./android";
 import { fanOutFcm } from "./fcm";
 import { coords, loadForecast, loadPlace } from "./loaders";
 import { cached, round } from "./cache";
-import { handleLiveTts, produceRundown } from "./live";
+import { handleLiveTts, prepareRundownVoice, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
 import { pollAlerts } from "./poll";
 import { fanOutPushes, handlePush } from "./push";
@@ -202,6 +202,12 @@ export default {
         .then(() => new Promise<void>((r) => setTimeout(r, 30_000)))
         .then(pass)
         .catch((err) => console.error(JSON.stringify({ msg: "producer_failed", err: String(err) }))),
+    );
+    // make the local voice's audio ahead for upcoming items, so nothing waits on it on air
+    ctx.waitUntil(
+      readRundown(env)
+        .then((r) => prepareRundownVoice(env, r))
+        .catch((err) => console.error(JSON.stringify({ msg: "voice_prep_failed", err: String(err) }))),
     );
     ctx.waitUntil(runGrading(env).catch((err) => console.error(JSON.stringify({ msg: "grading_failed", err: String(err) }))));
   },
