@@ -1,0 +1,91 @@
+{
+  "note": "Demo Forecaster Studio graphics for the launch videos. Every title says Demo. The recorder and the stage refresh validFrom/validTo/updated (and dayPlanner's date) to 'now' when they load these.",
+  "products": [
+    {
+      "id": "demo-note", "kind": "note", "title": "Demo: Snow tonight, sun tomorrow",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "headline": "Snow tonight, sun tomorrow", "bullets": ["Snow starts around 7 PM", "1 to 3 inches in Philadelphia, more to the north", "Slick roads for the morning commute", "Clearing by noon, highs near 36"], "icon": "snow", "tone": 2 }
+    },
+    {
+      "id": "demo-impacts", "kind": "impacts", "title": "Demo: Winter storm impacts",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "event": "Demo winter storm", "overall": 2, "rows": [
+        { "label": "Travel", "level": 3, "note": "Slick roads by evening" },
+        { "label": "Schools", "level": 2, "note": "Delays possible" },
+        { "label": "Power", "level": 1, "note": "Isolated outages" },
+        { "label": "Flooding", "level": 0, "note": "None expected" }
+      ] }
+    },
+    {
+      "id": "demo-odds", "kind": "odds", "title": "Demo: Snow in Philadelphia",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "event": "Snow in Philadelphia", "outcomes": [
+        { "label": "1 inch or more", "pct": 70 },
+        { "label": "3 inches or more", "pct": 40 },
+        { "label": "6 inches or more", "pct": 10 }
+      ], "confidence": "medium", "note": "The rain-snow line sits right over the city." }
+    },
+    {
+      "id": "demo-planner", "kind": "dayPlanner", "title": "Demo: Philadelphia tomorrow",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "place": "Philadelphia", "date": "", "parts": [
+        { "label": "Morning", "temp": 29, "code": 73, "pop": 70, "note": "Snow ending" },
+        { "label": "Afternoon", "temp": 36, "code": 2, "pop": 10, "note": "Clearing" },
+        { "label": "Evening", "temp": 31, "code": 0, "pop": 0, "note": "Clear and cold" },
+        { "label": "Overnight", "temp": 22, "code": 0, "pop": 0, "note": "Refreeze" }
+      ] }
+    },
+    {
+      "id": "demo-compare", "kind": "compare", "title": "Demo: Today vs tomorrow",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "cities": [
+        { "name": "Philadelphia", "today": 41, "tomorrow": 36 },
+        { "name": "Trenton", "today": 39, "tomorrow": 34 },
+        { "name": "Wilmington", "today": 43, "tomorrow": 38 },
+        { "name": "Allentown", "today": 36, "tomorrow": 31 },
+        { "name": "Atlantic City", "today": 45, "tomorrow": 40 }
+      ] }
+    },
+    {
+      "id": "demo-risk", "kind": "riskMap", "title": "Demo: Winter weather risk",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "areas": [
+        { "level": "some", "hazard": "winter", "geometry": { "type": "Polygon", "coordinates": [[[-76.2, 39.3], [-74.0, 39.3], [-73.9, 40.2], [-74.6, 41.2], [-76.2, 41.2], [-76.2, 39.3]]] } },
+        { "level": "moderate", "hazard": "winter", "geometry": { "type": "Polygon", "coordinates": [[[-76.0, 40.0], [-74.6, 40.0], [-74.4, 40.6], [-74.9, 41.1], [-76.0, 41.1], [-76.0, 40.0]]] } },
+        { "level": "high", "hazard": "winter", "geometry": { "type": "Polygon", "coordinates": [[[-75.9, 40.5], [-75.0, 40.5], [-74.9, 41.0], [-75.9, 41.0], [-75.9, 40.5]]] } }
+      ] }
+    },
+    {
+      "id": "demo-snow", "kind": "totalsMap", "title": "Demo: Snow totals",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": { "kind": "snow", "mode": "draw", "bands": [
+        { "min": 1, "max": 3, "geometry": { "type": "Polygon", "coordinates": [[[-76.3, 39.4], [-74.1, 39.4], [-73.9, 40.3], [-74.5, 41.3], [-76.3, 41.3], [-76.3, 39.4]]] } },
+        { "min": 3, "max": 6, "geometry": { "type": "Polygon", "coordinates": [[[-76.1, 40.1], [-74.7, 40.1], [-74.5, 40.7], [-75.0, 41.2], [-76.1, 41.2], [-76.1, 40.1]]] } },
+        { "min": 6, "max": null, "geometry": { "type": "Polygon", "coordinates": [[[-75.9, 40.6], [-75.1, 40.6], [-75.0, 41.1], [-75.9, 41.1], [-75.9, 40.6]]] } }
+      ] }
+    },
+    {
+      "id": "demo-area", "kind": "areaMap", "title": "Demo: Coastal flooding",
+      "validFrom": "", "validTo": "", "updated": "", "published": true, "author": "forecaster",
+      "region": { "south": 38.4, "west": -76.4, "north": 41.4, "east": -73.8 },
+      "body": {
+        "caption": "Demo: minor to moderate flooding is possible at Thursday's morning high tide. Avoid driving through water on shore roads.",
+        "shapes": [
+          { "ring": [[-75.05, 38.78], [-74.62, 38.78], [-73.86, 40.2], [-74.02, 40.48], [-74.3, 40.48]], "fill": "#7b4bc4", "fillOpacity": 0.55, "stroke": "#ffffff", "line": "dashed", "label": "Coastal flooding", "labelAt": "right", "note": "Tidal flooding at high tide, roads near the bays and inlets" },
+          { "ring": [[-75.6, 39.05], [-75.3, 38.85], [-74.95, 39.05], [-75.2, 39.45], [-75.55, 39.6]], "fill": "#2fb5a8", "fillOpacity": 0.45, "stroke": "#ffffff", "line": "solid", "label": "Bay shore", "labelAt": "inside", "note": "Minor flooding along the Delaware Bay" }
+        ],
+        "markers": [
+          { "lon": -75.165, "lat": 39.953, "icon": "star", "text": "Philadelphia" },
+          { "lon": -74.423, "lat": 39.364, "icon": "dot", "text": "Atlantic City" }
+        ]
+      }
+    }
+  ]
+}

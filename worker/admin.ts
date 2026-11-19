@@ -2,7 +2,8 @@ import { normalizeConfig, SPEAKERS, type Speaker } from "../shared/config";
 import { filterText } from "../shared/live/llm";
 import { BLOCK_INFO, normalizeBulletin, normalizeEntry } from "../shared/live/blocks";
 import { callLlm, llmUsed } from "./llm";
-import { produceRundown } from "./live";
+import { prepareVoice, produceRundown, type VoicePrep } from "./live";
+import { bulletinSpeech } from "../shared/live/rundown";
 import { isSimPreset, normalizeCustomSim, SIM_PRESETS, simLabel, type SimEntry } from "../shared/simulate";
 import type { Announcement } from "../shared/types";
 import { isAuthed, login, logout } from "./auth";
@@ -199,6 +200,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const id = crypto.randomUUID().slice(0, 8);
     const now = Date.now();
     let detail = "";
+    let voice: VoicePrep | undefined;
     switch (b.action) {
       case "skip":
       case "top":
@@ -226,6 +228,9 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
       case "say": {
         const text = typeof b.text === "string" ? b.text.replace(/\s+/g, " ").trim().slice(0, 400) : "";
         if (!text) return json({ error: "empty_text" }, 400);
+        // make the voice before it goes on air; reread the controls, which may have changed meanwhile
+        voice = await prepareVoice(env, text);
+        Object.assign(c, await readControl(env));
         c.say = { id, text, at: new Date(now).toISOString(), source: b.source === "ai" ? "ai" : "you" };
         c.cmd = { id, kind: "top" };
         detail = text.slice(0, 120);
@@ -236,7 +241,7 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     }
     await writeControl(env, c);
     await audit(env, `live.${b.action}`, detail);
-    return json({ control: c, rundown: await produceRundown(env) });
+    return json({ control: c, rundown: await produceRundown(env), ...(voice ? { voice } : {}) });
   }
 
   // your own bulletins: shown and (optionally) read on air, labelled as SHELLY's, never as NWS products
@@ -245,12 +250,14 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     const hours = Math.min(48, Math.max(0.25, Number(raw?.hours) || 3));
     const bul = normalizeBulletin({ ...raw, id: `b${crypto.randomUUID().slice(0, 8)}`, issued: new Date().toISOString(), until: new Date(Date.now() + hours * 3600_000).toISOString() });
     if (!bul) return json({ error: "bulletin_needs_title_and_text" }, 400);
+    // make the voice first, then put it on air: it plays straight from the cache instead of waiting
+    const voice = await prepareVoice(env, bulletinSpeech(bul));
     const c = await readControl(env);
     c.bulletins = [bul, ...c.bulletins].slice(0, 8);
     c.cmd = { id: bul.id, kind: "top" };
     await writeControl(env, c);
     await audit(env, "live.bulletin", `${bul.level}: ${bul.title}`);
-    return json({ control: c, rundown: await produceRundown(env) });
+    return json({ control: c, rundown: await produceRundown(env), voice });
   }
   if (path === "/api/admin/live/bulletin" && method === "DELETE") {
     const c = await readControl(env);

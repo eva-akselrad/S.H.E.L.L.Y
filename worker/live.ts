@@ -3,7 +3,7 @@ import { computeIntensity } from "../shared/live/intensity";
 import { buildPackPrompt, hashKey, type LlmPack } from "../shared/live/llm";
 import { SPC_PHRASE } from "../shared/live/templates";
 import { getPack } from "./llm";
-import { ttsAudio } from "./tts";
+import { liveLocalTimeoutMs, ttsAudio } from "./tts";
 import { regionAlerts } from "../shared/live/region";
 import { buildRundown, isWarning, type CityWx, type Rundown } from "../shared/live/rundown";
 import { buildSimAlert } from "../shared/simulate";
@@ -39,6 +39,42 @@ const sameContent = (a: Rundown | null, b: Rundown): boolean => {
   const strip = (r: Rundown) => JSON.stringify({ ...r, generatedAt: "" });
   return strip(a) === strip(b);
 };
+
+export type VoicePrep = "ready" | "fallback" | "off";
+
+/**
+ * Make the local voice's audio for `text` now, so it is already cached when it airs (a long bulletin takes
+ * Kokoro about 25 s on a CPU). Never falls back to the cloud voice here: that would spend credits early.
+ * "off": no local voice set up. "fallback": the local voice failed, so on air it will use the cloud voice.
+ */
+export async function prepareVoice(env: Env, text: string | undefined, cfgIn?: SiteConfig): Promise<VoicePrep> {
+  const cfg = cfgIn ?? (await readConfig(env));
+  if (!text || !cfg.live.enabled || cfg.voice.engine !== "ai" || !cfg.tts || !cfg.voice.local.enabled) return "off";
+  const r = await ttsAudio(env, cfg.voice.speaker, text, cfg.voice.dailyCharCap, cfg.voice.local, {
+    localTimeoutMs: liveLocalTimeoutMs(text.length),
+    localOnly: true,
+  });
+  return r.ok ? "ready" : "fallback";
+}
+
+/** Cron: make audio ahead for what's coming up (a few new items per run; cached ones cost nothing). */
+export async function prepareRundownVoice(env: Env, rundown: Rundown | null, maxNew = 2): Promise<number> {
+  if (!rundown) return 0;
+  const cfg = await readConfig(env);
+  if (cfg.voice.engine !== "ai" || !cfg.tts || !cfg.voice.local.enabled) return 0;
+  let made = 0;
+  for (const it of rundown.items) {
+    if (made >= maxNew) break;
+    if (!it.speak || it.kind === "alert") continue; // warning audio is made on demand with the short wait
+    const r = await ttsAudio(env, cfg.voice.speaker, it.speak, cfg.voice.dailyCharCap, cfg.voice.local, {
+      localTimeoutMs: liveLocalTimeoutMs(it.speak.length),
+      localOnly: true,
+    });
+    if (r.ok && !r.cached) made++;
+    if (!r.ok) break; // local voice is down: stop, try again next minute
+  }
+  return made;
+}
 
 /** Compute the rundown from stored data and write it to KV only if it changed. */
 export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rundown | null> {
@@ -119,7 +155,8 @@ export async function handleLiveTts(env: Env, url: URL): Promise<Response> {
   const h = url.searchParams.get("h");
   const item = r?.items.find((i) => i.key === url.searchParams.get("item") && (!h || (i.speak && hashKey(i.speak) === h))) ?? (h ? r?.items.find((i) => i.speak && hashKey(i.speak) === h) : undefined);
   if (!item?.speak) return err("not_found", 404);
-  const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap, cfg.voice.local);
+  // on-air items can be long bulletins: give the local voice time to match (warnings keep the short wait)
+  const out = await ttsAudio(env, cfg.voice.speaker, item.speak, cfg.voice.dailyCharCap, cfg.voice.local, { localTimeoutMs: liveLocalTimeoutMs(item.speak.length) });
   if (!out.ok) return err(`tts_${out.reason}`, out.reason === "cap" ? 429 : 502);
   return new Response(out.audio, { headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=3600" } });
 }

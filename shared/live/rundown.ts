@@ -97,6 +97,13 @@ function rotate<T>(list: T[], by: number): T[] {
 
 const BULLETIN_TAG = { info: "SHELLY BULLETIN", advisory: "SHELLY ADVISORY", alert: "SHELLY ALERT" } as const;
 
+/** What the host reads for a bulletin (undefined when it is shown only). The server makes this audio before it airs. */
+export function bulletinSpeech(b: Bulletin): string | undefined {
+  if (!b.speak) return undefined;
+  const spokenTag = { info: "A SHELLY bulletin", advisory: "A SHELLY advisory", alert: "A SHELLY alert" }[b.level];
+  return `${spokenTag} from the forecaster${b.area ? ` for ${b.area}` : ""}. ${b.title}. ${b.body}`;
+}
+
 export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveConfig, now: number): Rundown {
   const { region } = cfg;
   const secs = (k: string): number => cfg.itemSeconds[k] ?? BLOCK_INFO[k as BlockId]?.seconds ?? DEFAULT_SECONDS[k] ?? 12;
@@ -168,8 +175,7 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
     return { key: key("host"), kind: "host", text, source: data.talkBreak ? "llm" : "template", headline: cfg.host.name.toUpperCase(), speak: text, durationSec: Math.max(s ?? secs("host"), speakSecs(text, 3)) };
   };
   const bulletinItem = (b: Bulletin): RundownItem => {
-    const spokenTag = { info: "A SHELLY bulletin", advisory: "A SHELLY advisory", alert: "A SHELLY alert" }[b.level];
-    const speak = b.speak ? `${spokenTag} from the forecaster${b.area ? ` for ${b.area}` : ""}. ${b.title}. ${b.body}` : undefined;
+    const speak = bulletinSpeech(b);
     return {
       key: key(`bulletin:${b.id}`), kind: "bulletin", bulletinId: b.id, headline: `${BULLETIN_TAG[b.level]}: ${b.title}`.toUpperCase(),
       durationSec: speak ? Math.min(90, Math.max(secs("bulletin"), speakSecs(speak))) : secs("bulletin"),

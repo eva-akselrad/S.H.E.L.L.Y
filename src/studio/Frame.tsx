@@ -44,7 +44,7 @@ export function Logo({ x, y, size = 40 }: { x: number; y: number; size?: number 
 }
 
 /** Title bar, footer and background shared by every graphic. */
-export function Frame({ fmt, title, sub, credit, children }: { fmt: Format; title: string; sub: string; credit: string; children: ComponentChildren }) {
+export function Frame({ fmt, title, sub, credit, data = "Data: NWS · NOAA SPC · Open-Meteo", children }: { fmt: Format; title: string; sub: string; credit: string; data?: string; children: ComponentChildren }) {
   const { w, h } = SIZE[fmt];
   const tsize = fmt === "wide" ? 56 : 48;
   return (
@@ -60,7 +60,7 @@ export function Frame({ fmt, title, sub, credit, children }: { fmt: Format; titl
       </text>
       {children}
       <text x={fmt === "wide" ? 60 : 40} y={h - 24} font-family={SANS} font-size="22" fill={C.muted}>{credit}</text>
-      <text x={fmt === "wide" ? w - 60 : w - 40} y={h - 24} text-anchor="end" font-family={SANS} font-size="20" fill={C.muted}>Data: NWS · NOAA SPC · Open-Meteo</text>
+      <text x={fmt === "wide" ? w - 60 : w - 40} y={h - 24} text-anchor="end" font-family={SANS} font-size="20" fill={C.muted}>{data}</text>
     </svg>
   );
 }

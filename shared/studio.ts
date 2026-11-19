@@ -3,7 +3,7 @@
 import type { Bbox, LonLat, PolygonGeom } from "./types";
 
 export type StudioProductId = string;
-export const STUDIO_KINDS = ["riskMap", "totalsMap", "cityTemps", "sevenDay", "timeline", "discussion", "stormTrack", "note", "impacts", "dayPlanner", "compare", "odds"] as const;
+export const STUDIO_KINDS = ["riskMap", "totalsMap", "cityTemps", "sevenDay", "timeline", "discussion", "stormTrack", "note", "impacts", "dayPlanner", "compare", "odds", "areaMap"] as const;
 export type StudioKind = (typeof STUDIO_KINDS)[number];
 export const MAX_STUDIO_PRODUCTS = 50;
 
@@ -129,7 +129,40 @@ export interface Odds {
   note: string;
 }
 
-export type StudioBody = RiskMap | TotalsMap | CityTemps | SevenDay | Timeline | Discussion | StormTrack | NoteCard | Impacts | DayPlanner | Compare | Odds;
+/** Drawn areas map: the forecaster's own shapes, each with its own text, plus optional markers. */
+export const AREA_LIMITS = { shapes: 12, points: 80, markers: 20, label: 40, note: 100, marker: 40, caption: 240 } as const;
+export const AREA_LINES = ["solid", "dashed"] as const;
+export const AREA_LABEL_AT = ["inside", "above", "below", "left", "right"] as const;
+export const MARKER_ICONS = ["star", "dot", "none"] as const;
+export interface AreaShape {
+  /** open ring of [lon, lat] corners (3..AREA_LIMITS.points), not repeated at the end */
+  ring: LonLat[];
+  /** "#rrggbb" */
+  fill: string;
+  /** 0..1 */
+  fillOpacity: number;
+  stroke: string;
+  line: (typeof AREA_LINES)[number];
+  /** short text drawn on or next to the shape (also the legend name) */
+  label: string;
+  labelAt: (typeof AREA_LABEL_AT)[number];
+  /** longer legend text saying what the shape shows */
+  note: string;
+}
+export interface AreaMarker {
+  lon: number;
+  lat: number;
+  icon: (typeof MARKER_ICONS)[number];
+  text: string;
+}
+export interface AreaMap {
+  caption: string;
+  shapes: AreaShape[];
+  markers: AreaMarker[];
+}
+export const AREA_DEFAULT_STYLE = { fill: "#7b4bc4", fillOpacity: 0.55, stroke: "#ffffff", line: "dashed" } as const;
+
+export type StudioBody = RiskMap | TotalsMap | CityTemps | SevenDay | Timeline | Discussion | StormTrack | NoteCard | Impacts | DayPlanner | Compare | Odds | AreaMap;
 
 export interface StudioProduct {
   id: StudioProductId;
@@ -167,6 +200,39 @@ function validGeom(g: unknown): PolygonGeom | null {
   };
   const depth = g.type === "Polygon" ? 2 : 3;
   return ok(g.coordinates, depth) && points >= 3 && points <= 5000 ? (g as unknown as PolygonGeom) : null;
+}
+
+const hex = (v: unknown, d: string): string => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : d);
+const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => ((list as readonly unknown[]).includes(v) ? (v as T) : d);
+const clean = (v: unknown, max: number): string => txt(v, 2000).replace(/\s+/g, " ").trim().slice(0, max);
+const lonLat = (lon: unknown, lat: unknown): LonLat | null => {
+  const x = typeof lon === "number" ? lon : NaN, y = typeof lat === "number" ? lat : NaN;
+  return Number.isFinite(x) && Number.isFinite(y) && x >= -180 && x <= 180 && y >= -90 && y <= 90 ? [Math.round(x * 1e4) / 1e4, Math.round(y * 1e4) / 1e4] : null;
+};
+
+/** One drawn shape, or null when its corners are unusable (too few, too many, or not numbers). */
+export function normalizeAreaShape(raw: unknown): AreaShape | null {
+  if (!isObj(raw) || !Array.isArray(raw.ring)) return null;
+  const ring: LonLat[] = [];
+  for (const c of raw.ring) {
+    const ll = Array.isArray(c) ? lonLat(c[0], c[1]) : null;
+    if (!ll) return null;
+    ring.push(ll);
+  }
+  // a closed ring repeats its first corner; keep it open
+  if (ring.length > 1 && ring[0]![0] === ring[ring.length - 1]![0] && ring[0]![1] === ring[ring.length - 1]![1]) ring.pop();
+  if (ring.length < 3 || ring.length > AREA_LIMITS.points) return null;
+  const op = num(raw.fillOpacity, AREA_DEFAULT_STYLE.fillOpacity);
+  return {
+    ring,
+    fill: hex(raw.fill, AREA_DEFAULT_STYLE.fill),
+    fillOpacity: Math.round(Math.min(1, Math.max(0, op)) * 100) / 100,
+    stroke: hex(raw.stroke, AREA_DEFAULT_STYLE.stroke),
+    line: oneOf(raw.line, AREA_LINES, AREA_DEFAULT_STYLE.line),
+    label: clean(raw.label, AREA_LIMITS.label),
+    labelAt: oneOf(raw.labelAt, AREA_LABEL_AT, "inside"),
+    note: clean(raw.note, AREA_LIMITS.note),
+  };
 }
 
 /** Coerce an untrusted body into the right shape for its kind, or null if unusable. */
@@ -274,6 +340,20 @@ export function normalizeBody(kind: StudioKind, raw: unknown): StudioBody | null
         .filter((o) => o.label);
       const confidence = raw.confidence === "low" || raw.confidence === "high" ? raw.confidence : "medium";
       return { event: txt(raw.event, 80), outcomes, confidence, note: txt(raw.note, 160) };
+    }
+    case "areaMap": {
+      const shapes = (Array.isArray(raw.shapes) ? raw.shapes : []).map(normalizeAreaShape).filter((x): x is AreaShape => !!x).slice(0, AREA_LIMITS.shapes);
+      const markers: AreaMarker[] = [];
+      for (const m of Array.isArray(raw.markers) ? raw.markers : []) {
+        const ll = isObj(m) ? lonLat(m.lon, m.lat) : null;
+        if (!ll || !isObj(m)) continue;
+        const icon = oneOf(m.icon, MARKER_ICONS, "star");
+        const text = clean(m.text, AREA_LIMITS.marker);
+        if (icon === "none" && !text) continue; // a text label with no text shows nothing
+        markers.push({ lon: ll[0], lat: ll[1], icon, text });
+        if (markers.length >= AREA_LIMITS.markers) break;
+      }
+      return { caption: clean(raw.caption, AREA_LIMITS.caption), shapes, markers };
     }
   }
 }

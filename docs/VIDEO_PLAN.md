@@ -123,7 +123,28 @@ Three videos for the v2 launch. They cover everything up to **SHELLY 2.1.0**
 **Mix targets:** master at **-14 LUFS integrated, -1 dBTP** (YouTube's level).
 Voice sits about -16 LUFS. Sound effects hit hard but never cover a word.
 
-## 4. Shot list (footage library)
+## 4. Rendering (what's automated)
+
+All three videos render from scripts, using real SHELLY UI recorded from local dev:
+
+1. `npm run dev`, then **`npm run video:record`**. Headless Chrome records every shot in
+   `video/shots.mjs` (clips step Chrome's virtual clock, so animation is smooth). Footage goes to
+   `%LOCALAPPDATA%\shelly-video\footage` (outside OneDrive; it's a few GB). Inside that browser
+   only: the location is always Philadelphia, every voice request is refused (no TTS credits),
+   alert shots get a simulator-shaped **TEST** alert, and Studio shows the demo graphics in
+   `video/stage/fixtures.json` (every title says "Demo"). Sky shots relabel the current
+   conditions to match the forced sky; temperatures stay real.
+2. `npm run video:vo` and `npm run video:sfx` (audio).
+3. `npm run video:signal`, `npm run video:forecast`, `npm run video:release`. The output goes to `video/renders/`.
+   - Teasers take `-- --date "12.05"` (default SOON).
+   - The release takes `-- --live-on-air` (line 07-05a) and `-- --no-dedication` (drops 02-02),
+     and writes `release_chapters.txt` for the YouTube description.
+
+**Not automatable:** the Android widget and real notifications only exist on a phone. The release
+uses the phone layout and the `/get-android/` page instead. A real phone clip (S10) can be
+dropped in later.
+
+## 5. Shot list (footage library)
 
 Switches already in the code, so shots don't wait for the weather:
 
@@ -191,7 +212,7 @@ Switches already in the code, so shots don't wait for the weather:
 Phone shots with Do Not Disturb on. For admin + `/live` side by side, record one
 1920×1080 canvas split in two.
 
-## 5. Video 1, "Signal" (8 s): teasing the tease
+## 6. Video 1, "Signal" (8 s): teasing the tease
 
 Almost nothing is shown. No name, no features. The goal is just "huh, what was that?"
 
@@ -205,10 +226,16 @@ Almost nothing is shown. No name, no features. The goal is just "huh, what was t
 | 5.6–6.6 | Black | `reverse_suck` into a hard cut |
 | 6.6–8.0 | Black, then the date in small type at the bottom | Silence, then one `ui_pop` |
 
+**Rendered:** `npm run video:signal` → `video/renders/signal_16x9.mp4` and
+`signal_9x16.mp4`. It's built from real SHELLY pixels: the storm scene and the
+host's eyes, shot with headless Chrome from `video/stage/`. To re-shoot them after
+the look changes, start `npm run dev`, then run `npm run video:capture`. The last card says SOON until there's a date:
+`npm run video:signal -- --date "12.05"`.
+
 Make it 16:9 and 9:16 (re-framed). Title on YouTube: just "2" or "⚡". Description:
 the date, nothing else.
 
-## 6. Video 2, "Forecast" (30 s): the teaser
+## 7. Video 2, "Forecast" (30 s): the teaser
 
 More obvious, still cryptic. You see the product in flashes and three big
 phrases, but nothing is explained. The name appears once, at the end.
@@ -228,7 +255,7 @@ phrases, but nothing is explained. The name appears once, at the end.
 Deliverables: 16:9 plus a 9:16 cut, captions burned in on the vertical one.
 Description: the date and "link at launch".
 
-## 7. Video 3, "SHELLY v2" (3–4 min): the release
+## 8. Video 3, "SHELLY v2" (3–4 min): the release
 
 A keynote with SHELLY's own voice, cut tight: one idea per line, no lingering.
 Voice clip ids are from `video/voiceover.txt`. Each chapter becomes a YouTube chapter.
@@ -253,7 +280,7 @@ Deliverables: 16:9 1080p master, YouTube chapters, captions (from
 `video/voiceover.txt`, which is already the exact text), a thumbnail, and 3
 vertical clips from chapters 4, 6 and 7.
 
-## 8. Still open (only you can decide)
+## 9. Still open (only you can decide)
 
 1. **Release date and time.** Goes on both teasers. It's also when the links go
    back up and the release video goes public.
@@ -262,13 +289,13 @@ vertical clips from chapters 4, 6 and 7.
 3. **Line 02-02** (the name's story): keep or cut.
 4. **Line 07-05a or 07-05b:** is SHELLY Live on air at release time?
 
-## 9. Order of work
+## 10. Order of work
 
 1. ~~`?host=` filming switch.~~ Done.
 2. ~~Voiceover script and audio, sound-effects kit.~~ Done (`npm run video:vo`, `npm run video:sfx`).
 3. Listen to `_all.wav`, fix any word Kokoro says wrong (spell it how it sounds
    in `voiceover.txt`), and remake those lines.
-4. Record the footage library (§4) while the links are up: normal shots from the
+4. Record the footage library (§5) while the links are up: normal shots from the
    public site, anything that sends alerts or messages from local dev. Save it
    to `video/footage/` (ignored by git).
 5. Edit Signal, then Forecast, then the release. Renders go to `video/renders/`.

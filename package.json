@@ -14,7 +14,12 @@
     "types": "wrangler types",
     "deploy": "npm run build && wrangler deploy",
     "video:vo": "\"%USERPROFILE%/.shelly-tts/venv/Scripts/python.exe\" scripts/video-voiceover.py",
-    "video:sfx": "\"%USERPROFILE%/.shelly-tts/venv/Scripts/python.exe\" scripts/video-sfx.py"
+    "video:sfx": "\"%USERPROFILE%/.shelly-tts/venv/Scripts/python.exe\" scripts/video-sfx.py",
+    "video:signal": "python scripts/video-signal.py",
+    "video:capture": "node scripts/video-capture.mjs",
+    "video:record": "node scripts/video-record.mjs",
+    "video:forecast": "python scripts/video-forecast.py",
+    "video:release": "python scripts/video-release.py"
   },
   "dependencies": {
     "@preact/signals": "^2.11.4",
