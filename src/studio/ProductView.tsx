@@ -1,5 +1,6 @@
 import type { StudioProduct } from "../../shared/studio";
 import { C, Frame, SERIF, SIZE, validLine, type Format } from "./Frame";
+import { AreaMapView } from "./views/AreaMap";
 import { CityTempsView } from "./views/CityTemps";
 import { DiscussionView, StormTrackView } from "./views/Discussion";
 import { RiskMapView } from "./views/RiskMap";
@@ -39,6 +40,8 @@ export function ProductView({ product, fmt = "wide", forecaster = "" }: ViewProp
       return <CompareView product={product} fmt={fmt} forecaster={forecaster} />;
     case "odds":
       return <OddsView product={product} fmt={fmt} forecaster={forecaster} />;
+    case "areaMap":
+      return <AreaMapView product={product} fmt={fmt} forecaster={forecaster} />;
     case "stormTrack":
       return <StormTrackView product={product} fmt={fmt} forecaster={forecaster} />;
     default: {

@@ -16,14 +16,17 @@ import { HAZARD_LABEL, RISK } from "../studio/views/RiskMap";
 import { HAZARD_COLOR } from "../studio/views/Timeline";
 import type { ComponentChildren } from "preact";
 import type { Compare, DayPlanner, Impacts, NoteCard, Odds } from "../../shared/studio";
+import type { AreaMap } from "../../shared/studio";
+import { AreaMapEditor } from "./StudioArea";
 import { CompareEditor, DayPlannerEditor, IMPACT_ROWS, ImpactsEditor, NoteEditor, OddsEditor } from "./StudioMore";
 
 const KIND_LABEL: Record<StudioKind, string> = {
   sevenDay: "7-day forecast", cityTemps: "City map (temps, rain, wind)", riskMap: "Risk map", totalsMap: "Snow / rain totals",
   timeline: "Storm timeline", discussion: "Forecast discussion", stormTrack: "Storm tracker",
   note: "Forecast card", impacts: "Impact scale", dayPlanner: "Day planner", compare: "Today vs tomorrow", odds: "The odds",
+  areaMap: "Drawn areas map",
 };
-const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "dayPlanner", "compare", "note", "impacts", "odds", "riskMap", "totalsMap", "timeline", "discussion"];
+const BUILT: StudioKind[] = ["sevenDay", "cityTemps", "dayPlanner", "compare", "note", "impacts", "odds", "riskMap", "areaMap", "totalsMap", "timeline", "discussion"];
 const METRIC_NAME: Record<CityTemps["metric"], string> = { high: "Highs", low: "Lows", feelsLike: "Feels Like", pop: "Rain Chance", gust: "Wind Gusts" };
 
 const ICONS: [number, string][] = [[0, "Sunny"], [2, "Partly cloudy"], [3, "Cloudy"], [45, "Fog"], [61, "Rain"], [80, "Showers"], [71, "Snow"], [95, "Thunderstorms"]];
@@ -55,9 +58,10 @@ function blank(kind: StudioKind): StudioProduct {
     dayPlanner: { place: "", date: "", parts: [] },
     compare: { cities: [] },
     odds: { event: "", outcomes: [{ label: "Any snow", pct: 70 }, { label: "1 inch or more", pct: 40 }, { label: "3 inches or more", pct: 15 }], confidence: "medium", note: "" },
+    areaMap: { caption: "", shapes: [], markers: [] },
   };
   return {
-    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline", discussion: "Forecast Discussion", note: "The Forecast", impacts: "Impact Scale", dayPlanner: "Day Planner", compare: "Today vs Tomorrow", odds: "The Odds" }[kind as string] ?? KIND_LABEL[kind],
+    id: "", kind, title: { sevenDay: "SHELLY 7-Day Forecast", cityTemps: "Highs Tomorrow", riskMap: "SHELLY Risk Outlook", totalsMap: "Snow Totals", timeline: "Storm Timeline", discussion: "Forecast Discussion", note: "The Forecast", impacts: "Impact Scale", dayPlanner: "Day Planner", compare: "Today vs Tomorrow", odds: "The Odds", areaMap: "Affected Area" }[kind as string] ?? KIND_LABEL[kind],
     validFrom: now.toISOString(), validTo: to.toISOString(), region: config.value.live.region.bbox, published: false, author: "forecaster",
     body: body[kind] ?? ({ text: "", draft: true } as StudioBody), updated: now.toISOString(),
   };
@@ -216,6 +220,7 @@ function Editor({ product, onClose }: { product: StudioProduct; onClose: () => v
       {p.kind === "impacts" && <ImpactsEditor body={p.body as Impacts} onChange={setBody} />}
       {p.kind === "dayPlanner" && <DayPlannerEditor body={p.body as DayPlanner} onChange={(b) => { setBody(b); setP((x) => (x.title === "Day Planner" || !x.title ? { ...x, title: `Day Planner: ${b.place}` } : x)); }} />}
       {p.kind === "compare" && <CompareEditor body={p.body as Compare} onChange={setBody} />}
+      {p.kind === "areaMap" && <AreaMapEditor product={p} body={p.body as AreaMap} onChange={setBody} />}
       {p.kind === "odds" && <OddsEditor body={p.body as Odds} onChange={setBody} />}
 
       <Card title="Preview and download">
