@@ -22,6 +22,13 @@ export function alertHeadline(a: Alert, tz: string): string {
   return `${a.event} for ${shortArea(a)}${until ? ` until ${until}` : ""}`.toUpperCase();
 }
 
+/** What the host says for a watch or advisory. Calm and short; built only from NWS fields, never an LLM. */
+export function watchScript(a: Alert, tz: string): string {
+  const until = TIME(a.expires, tz);
+  const tail = /watch$/i.test(a.event) ? " Conditions could develop, so keep an eye on the forecast." : "";
+  return `The National Weather Service has a ${a.event} in effect for ${shortArea(a, 3)}${until ? ` until ${until}` : ""}.${tail}`;
+}
+
 export const SPC_PHRASE: Record<SpcCategory, string> = {
   NONE: "", TSTM: "General thunderstorms", MRGL: "Marginal risk", SLGT: "Slight risk", ENH: "Enhanced risk", MDT: "Moderate risk", HIGH: "High risk",
 };

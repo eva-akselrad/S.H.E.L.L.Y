@@ -39,6 +39,16 @@ export const isSvr = (a: Alert) => ev(a).includes("severe thunderstorm warning")
 export const isFfw = (a: Alert) => ev(a).includes("flash flood warning");
 export const isWatch = (a: Alert) => ev(a).endsWith("watch");
 
+/** How much one watch (or advisory) adds to the score: a Tornado Watch matters far more than a High Wind Watch. */
+export function watchWeight(a: Alert): number {
+  const e = ev(a);
+  if (e.includes("tornado")) return 0.25;
+  if (e.includes("severe thunderstorm")) return 0.15;
+  if (/flash flood|hurricane|tropical storm|storm surge|blizzard|winter storm|ice storm|tsunami/.test(e)) return 0.1;
+  if (e.endsWith("watch")) return 0.02; // high wind, flood, heat, cold, fire weather, etc.
+  return 0.01; // advisories and statements
+}
+
 export function countAlerts(alerts: Alert[]): Counters {
   return {
     tor: alerts.filter(isTor).length,
@@ -65,6 +75,9 @@ export function computeIntensity(input: IntensityInput): Intensity {
 
   let emergency = false;
   let newestWarning = 0;
+  // watches and advisories are low-level: a pile of them must not look like a storm day
+  let watchScore = 0;
+  let minorScore = 0;
   for (const a of active) {
     const l = alertLevel(a);
     raise(l);
@@ -72,10 +85,11 @@ export function computeIntensity(input: IntensityInput): Intensity {
     if (isTor(a)) score += 0.25;
     else if (isSvr(a) || isFfw(a)) score += 0.08;
     else if (l === "WARNING") score += 0.08;
-    else if (isWatch(a)) score += 0.05;
-    else if (l === "ELEVATED") score += 0.02;
+    else if (isWatch(a)) watchScore += watchWeight(a);
+    else if (l === "ELEVATED") minorScore += watchWeight(a);
     if (l === "WARNING" || l === "EMERGENCY") newestWarning = Math.max(newestWarning, Date.parse(a.sent) || 0);
   }
+  score += Math.min(watchScore, 0.3) + Math.min(minorScore, 0.04);
   if (counters.tor) drivers.push(`${counters.tor} tornado warning${counters.tor > 1 ? "s" : ""}`);
   if (counters.svr) drivers.push(`${counters.svr} severe thunderstorm warning${counters.svr > 1 ? "s" : ""}`);
   if (counters.ffw) drivers.push(`${counters.ffw} flash flood warning${counters.ffw > 1 ? "s" : ""}`);
@@ -103,7 +117,7 @@ export function computeIntensity(input: IntensityInput): Intensity {
 
   // floors so the score always agrees with the level
   if (level === "WARNING") score = Math.max(score, 0.5);
-  if (level === "ELEVATED") score = Math.max(score, 0.2);
+  if (level === "ELEVATED") score = Math.max(score, 0.1);
   // a fresh warning spikes the score briefly (applied after the floor so it always shows)
   if (newestWarning && now - newestWarning < FRESH_MS) {
     score += 0.1;

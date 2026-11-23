@@ -65,7 +65,7 @@ export async function prepareRundownVoice(env: Env, rundown: Rundown | null, max
   let made = 0;
   for (const it of rundown.items) {
     if (made >= maxNew) break;
-    if (!it.speak || it.kind === "alert") continue; // warning audio is made on demand with the short wait
+    if (!it.speak || (it.kind === "alert" && /warning|emergency/i.test(it.headline))) continue; // warning audio is made on demand with the short wait
     const r = await ttsAudio(env, cfg.voice.speaker, it.speak, cfg.voice.dailyCharCap, cfg.voice.local, {
       localTimeoutMs: liveLocalTimeoutMs(it.speak.length),
       localOnly: true,

@@ -47,7 +47,7 @@ describe("computeIntensity", () => {
   test("a fog advisory is elevated but low", () => {
     const i = computeIntensity(input([mk("Dense Fog Advisory")]));
     expect(i.level).toBe("ELEVATED");
-    expect(i.score).toBeGreaterThanOrEqual(0.2);
+    expect(i.score).toBeGreaterThanOrEqual(0.1);
     expect(i.score).toBeLessThan(0.35);
   });
   test("a slight-risk day is elevated", () => {
@@ -114,7 +114,9 @@ describe("buildRundown", () => {
   test("elevated: watch alert and outlook, radar interleaved", () => {
     const r = run([mk("Tornado Watch")], "ENH");
     expect(r.level).toBe("ELEVATED");
-    expect(r.items.some((i) => i.kind === "alert" && !i.speak)).toBe(true);
+    const watch = r.items.find((i) => i.kind === "alert");
+    expect(watch?.speak).toMatch(/Tornado Watch/);
+    expect(watch?.speak).not.toMatch(/^Attention/);
     expect(r.items.some((i) => i.kind === "outlook")).toBe(true);
     expect(r.items.filter((i) => i.kind === "radar").length).toBeGreaterThan(1);
   });
@@ -168,5 +170,26 @@ describe("SPC to risk areas", () => {
       ],
     };
     expect(spcAreas(fc, DEFAULT_LIVE.region.bbox).map((a) => a.level)).toEqual(["some", "moderate"]);
+  });
+});
+
+describe("watch weight", () => {
+  test("a pile of watches stays well under a storm-day score", () => {
+    const watches = Array.from({ length: 12 }, (_, i) => mk("Flood Watch", { id: `w${i}` }));
+    const r = computeIntensity(input(watches));
+    expect(r.level).toBe("ELEVATED");
+    expect(r.score).toBeLessThan(0.3);
+  });
+});
+
+describe("watch weights", () => {
+  const score = (event: string) => computeIntensity(input([mk(event)])).score;
+  test("a Tornado Watch outweighs a Severe Thunderstorm Watch, which outweighs a High Wind Watch", () => {
+    expect(score("Tornado Watch")).toBeGreaterThan(score("Severe Thunderstorm Watch"));
+    expect(score("Severe Thunderstorm Watch")).toBeGreaterThan(score("High Wind Watch"));
+  });
+  test("the most serious watch is read first", () => {
+    const r = buildRundown(computeIntensity(input([mk("High Wind Watch"), mk("Tornado Watch")])), { alerts: [mk("High Wind Watch"), mk("Tornado Watch")], spc: "NONE", cities: [], studio: [] } as never, DEFAULT_LIVE, NOW);
+    expect(r.alerts[0]?.event).toBe("Tornado Watch");
   });
 });

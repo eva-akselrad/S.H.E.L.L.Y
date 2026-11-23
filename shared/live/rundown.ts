@@ -6,10 +6,10 @@ import type { Alert, SpcCategory, ThreatLevel } from "../types";
 import { productActive, type StudioProduct } from "../studio";
 import { activeControl, BLOCK_INFO, type BlockId, type Bulletin, type LiveControl, type PlaylistEntry, type RegionWx } from "./blocks";
 import { blockText } from "./blocktext";
-import { isTor, type Counters, type Intensity } from "./intensity";
+import { isTor, watchWeight, type Counters, type Intensity } from "./intensity";
 import { parseMotion, trackHeadline, trackScript, trackStorm, type TrackTown } from "./track";
 import { TOWNS } from "./towns";
-import { alertHeadline, cityHeadline, citySpeak, SPC_PHRASE, statusLine, talkBreak, topAlertLine } from "./templates";
+import { alertHeadline, cityHeadline, citySpeak, SPC_PHRASE, statusLine, talkBreak, topAlertLine, watchScript } from "./templates";
 
 export type RundownKind = "alert" | "radar" | "cam" | "map" | "segment" | "outlook" | "host" | "block" | "bulletin";
 
@@ -111,7 +111,8 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
   const level = intensity.level;
   const active = data.alerts.filter((a) => !a.expires || Date.parse(a.expires) > now);
   const warnings = active.filter(isWarning).sort((a, b) => rank(b) - rank(a));
-  const watches = active.filter((a) => !isWarning(a));
+  // the most serious watches first, so a Tornado Watch gets air time before a High Wind Watch
+  const watches = active.filter((a) => !isWarning(a)).sort((a, b) => watchWeight(b) - watchWeight(a));
   const top = warnings[0] ?? null;
   const ctl = activeControl(data.control ?? null, now);
   const wx = data.wx && data.wx.cities.length ? data.wx : null;
@@ -123,7 +124,7 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
   let cityCursor = 0;
 
   const alertItem = (a: Alert): RundownItem => {
-    const speak = isSpokenAlert(a) ? alertScript(a, isEmergency(a)) : undefined;
+    const speak = isSpokenAlert(a) ? alertScript(a, isEmergency(a)) : watchScript(a, region.tz);
     return {
       key: key(`alert:${a.id}`),
       kind: "alert",
