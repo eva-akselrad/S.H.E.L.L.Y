@@ -14,7 +14,7 @@ function bell(out: Float32Array, at: number, freq: number, secs: number, gain: n
   for (let i = 0; i < n && start + i < out.length; i++) {
     const t = i / SR;
     const env = Math.min(1, t / 0.006) * Math.exp(-t / (secs / 4.5));
-    out[start + i] += gain * env * (Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(2 * Math.PI * freq * 2 * t));
+    out[start + i]! += gain * env * (Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(2 * Math.PI * freq * 2 * t));
   }
 }
 

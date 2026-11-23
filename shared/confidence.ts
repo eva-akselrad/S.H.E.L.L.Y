@@ -3,18 +3,38 @@
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+export interface Band {
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
+export interface Rating {
+  level: ConfidenceLevel;
+  why: string;
+}
+
+/** What the confidence is about. The day's overall level is the worst of these. */
+export type ConfidencePart = "temp" | "rain" | "snow" | "wind" | "dew";
+
 export interface DayConfidence {
   date: string;
-  hi: { p10: number; p50: number; p90: number };
-  lo: { p10: number; p50: number; p90: number };
+  hi: Band;
+  lo: Band;
   /** inches, 10th..90th percentile of the members */
-  precip: { p10: number; p50: number; p90: number };
-  snow: { p10: number; p50: number; p90: number };
+  precip: Band;
+  snow: Band;
+  /** strongest gust, mph (missing in data cached before it was added) */
+  gust?: Band;
+  /** daily mean dew point, °F */
+  dew?: Band;
   /** share of members with at least 0.01 in, 0..100 */
   wetChance: number;
   level: ConfidenceLevel;
   /** short reason, e.g. "Models disagree on the high by 9°" */
   why: string;
+  /** one rating per weather element */
+  parts?: Record<ConfidencePart, Rating>;
 }
 
 export interface Confidence {
@@ -39,20 +59,60 @@ const band = (v: number[], digits = 0) => {
   return { p10: r(percentile(v, 0.1)), p50: r(percentile(v, 0.5)), p90: r(percentile(v, 0.9)) };
 };
 
-/** Rank the spread of one day. Temperature spread grows with lead time, so the cut-offs widen too. */
-export function rateDay(hiSpread: number, precipSpread: number, snowSpread: number, wetChance: number, lead: number): { level: ConfidenceLevel; why: string } {
-  const tHigh = 4 + lead * 0.6;
-  const tLow = 8 + lead * 1.0;
-  const reasons: { level: ConfidenceLevel; why: string }[] = [];
-  if (hiSpread > tLow) reasons.push({ level: "low", why: `Models disagree on the high by ${Math.round(hiSpread)}°` });
-  else if (hiSpread > tHigh) reasons.push({ level: "medium", why: `High could vary by ${Math.round(hiSpread)}°` });
-  if (snowSpread >= 3) reasons.push({ level: "low", why: `Snow totals range widely` });
-  else if (snowSpread >= 1) reasons.push({ level: "medium", why: `Snow totals are uncertain` });
-  if (wetChance >= 30 && wetChance <= 70) reasons.push({ level: "medium", why: `Models split on rain (${wetChance}% of runs)` });
-  if (precipSpread >= 1) reasons.push({ level: "low", why: `Rain totals range widely` });
-  if (reasons.some((r) => r.level === "low")) return reasons.find((r) => r.level === "low")!;
-  if (reasons.length) return reasons[0]!;
-  return { level: "high", why: "Models agree" };
+const HIGH: Rating = { level: "high", why: "Models agree" };
+const RANK: Record<ConfidenceLevel, number> = { high: 0, medium: 1, low: 2 };
+
+const spread = (b: Band) => b.p90 - b.p10;
+
+/**
+ * Rate each weather element of one day from how far the ensemble runs spread.
+ * Temperature and dew point spread grow with lead time, so their cut-offs widen too.
+ */
+export function rateParts(d: { hi: Band; precip: Band; snow: Band; gust?: Band; dew?: Band; wetChance: number }, lead: number): Record<ConfidencePart, Rating> {
+  const hiS = spread(d.hi);
+  const temp: Rating =
+    hiS > 8 + lead ? { level: "low", why: `Models disagree on the high by ${Math.round(hiS)}°` }
+    : hiS > 4 + lead * 0.6 ? { level: "medium", why: `High could vary by ${Math.round(hiS)}°` }
+    : HIGH;
+
+  const snS = spread(d.snow);
+  const snow: Rating = snS >= 3 ? { level: "low", why: "Snow totals range widely" } : snS >= 1 ? { level: "medium", why: "Snow totals are uncertain" } : HIGH;
+
+  const prS = spread(d.precip);
+  const rain: Rating =
+    prS >= 1 ? { level: "low", why: "Rain totals range widely" }
+    : d.wetChance >= 30 && d.wetChance <= 70 ? { level: "medium", why: `Models split on rain (${d.wetChance}% of runs)` }
+    : prS >= 0.4 ? { level: "medium", why: "Rain totals are uncertain" }
+    : HIGH;
+
+  // gust spread only matters once it could get windy
+  const g = d.gust;
+  const gS = g ? spread(g) : 0;
+  const wind: Rating =
+    !g || g.p90 < 25 ? HIGH
+    : gS >= 25 ? { level: "low", why: `Gusts could be ${Math.round(g.p10)} to ${Math.round(g.p90)} mph` }
+    : gS >= 15 ? { level: "medium", why: `Gusts could vary by ${Math.round(gS)} mph` }
+    : HIGH;
+
+  const dS = d.dew ? spread(d.dew) : 0;
+  const dew: Rating =
+    dS > 10 + lead ? { level: "low", why: `Models disagree on humidity (dew point by ${Math.round(dS)}°)` }
+    : dS > 6 + lead * 0.6 ? { level: "medium", why: `Dew point could vary by ${Math.round(dS)}°` }
+    : HIGH;
+
+  return { temp, rain, snow, wind, dew };
+}
+
+/** The day's overall rating: the least sure element (temperature first on ties, so the old wording stays). */
+export function worstPart(parts: Record<ConfidencePart, Rating>): Rating {
+  const order: ConfidencePart[] = ["temp", "snow", "rain", "wind", "dew"];
+  return order.map((k) => parts[k]).reduce((a, b) => (RANK[b.level] > RANK[a.level] ? b : a), HIGH);
+}
+
+/** Overall rating for one day (kept for callers that only have the spreads). */
+export function rateDay(hiSpread: number, precipSpread: number, snowSpread: number, wetChance: number, lead: number): Rating {
+  const b = (s: number): Band => ({ p10: 0, p50: s / 2, p90: s });
+  return worstPart(rateParts({ hi: b(hiSpread), precip: b(precipSpread), snow: b(snowSpread), wetChance }, lead));
 }
 
 /**
@@ -69,20 +129,28 @@ export function buildConfidence(daily: Record<string, (number | string | null)[]
   const loS = series("temperature_2m_min");
   const prS = series("precipitation_sum");
   const snS = series("snowfall_sum");
+  const guS = series("wind_gusts_10m_max");
+  const dwS = series("dew_point_2m_mean");
   const at = (s: (number | string | null)[][], i: number) =>
     s.map((m) => m[i]).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
 
   const days: DayConfidence[] = dates.map((date, i) => {
-    const hi = at(hiS, i);
-    const lo = at(loS, i);
     const pr = at(prS, i);
-    const sn = at(snS, i);
+    const gu = at(guS, i);
+    const dw = at(dwS, i);
     const wetChance = pr.length ? Math.round((pr.filter((x) => x >= 0.01).length / pr.length) * 100) : 0;
-    const hiB = band(hi);
-    const prB = band(pr, 2);
-    const snB = band(sn, 1);
-    const r = rateDay(hiB.p90 - hiB.p10, prB.p90 - prB.p10, snB.p90 - snB.p10, wetChance, i);
-    return { date, hi: hiB, lo: band(lo), precip: prB, snow: snB, wetChance, level: r.level, why: r.why };
+    const d = {
+      hi: band(at(hiS, i)),
+      lo: band(at(loS, i)),
+      precip: band(pr, 2),
+      snow: band(at(snS, i), 1),
+      ...(gu.length ? { gust: band(gu) } : {}),
+      ...(dw.length ? { dew: band(dw) } : {}),
+      wetChance,
+    };
+    const parts = rateParts(d, i);
+    const r = worstPart(parts);
+    return { date, ...d, level: r.level, why: r.why, parts };
   });
   return { fetchedAt, members: hiS.length, model, days };
 }
@@ -91,6 +159,14 @@ export function buildConfidence(daily: Record<string, (number | string | null)[]
 export function rangeText(b: { p10: number; p90: number; p50: number }, unit = "°"): string {
   if (!Number.isFinite(b.p50)) return "--";
   return b.p90 - b.p10 <= 2 ? `${Math.round(b.p50)}${unit}` : `${Math.round(b.p10)}–${Math.round(b.p90)}${unit}`;
+}
+
+/** "0.1–0.6 in", "40% of runs" or "" when it looks dry. */
+export function rainText(b: Band, wetChance: number): string {
+  if (!(b.p90 >= 0.05) && wetChance < 30) return "";
+  if (wetChance >= 30 && wetChance <= 70) return `${wetChance}% of runs`;
+  const f = (x: number) => (x < 0.05 ? "0" : x.toFixed(1));
+  return b.p90 - b.p10 < 0.1 ? `about ${f(b.p50)} in` : `${f(b.p10)}–${f(b.p90)} in`;
 }
 
 /** "1–6 in" for snow, "" when no snow expected. */
