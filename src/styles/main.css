@@ -272,6 +272,8 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .conf.c-medium { color: var(--elevated); }
 .conf.c-low { color: var(--warning); }
 .d-snow { color: #cfe3ff; font-weight: 600; }
+.d-range { color: var(--muted); white-space: nowrap; }
+.d-range.r-low { color: var(--text); }
 
 /* -- storm reports -- */
 .rep-sum { margin: 0 0 10px; font-weight: 600; }
@@ -305,6 +307,7 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 
 /* -- report card -- */
 .grade-line { margin: 0; font-size: 1.25em; line-height: 1.4; }
+.grade-sub { margin: 6px 0 0; font-size: 1.05em; line-height: 1.4; }
 
 /* -- push -- */
 .push { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }

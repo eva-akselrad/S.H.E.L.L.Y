@@ -153,6 +153,25 @@ export async function fetchAirQuality(lat: number, lon: number): Promise<AirQual
   }
 }
 
+/** The forecast the grader saves each morning: 5 days, hourly + daily, epoch-second times in the place's zone. */
+export async function fetchGradeForecast(lat: number, lon: number, tz: string): Promise<import("../../shared/grade").GradeForecastRaw> {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    hourly: "temperature_2m,dew_point_2m,wind_speed_10m,wind_gusts_10m,precipitation,precipitation_probability",
+    daily: "temperature_2m_max,temperature_2m_min,wind_speed_10m_max,wind_gusts_10m_max,precipitation_sum,precipitation_probability_max",
+    temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
+    precipitation_unit: "inch",
+    timezone: tz,
+    timeformat: "unixtime",
+    forecast_days: "5",
+  });
+  const res = await fetch(`${FORECAST}?${params}`);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  return (await res.json()) as import("../../shared/grade").GradeForecastRaw;
+}
+
 export interface CityNow {
   temp: number;
   code: number;

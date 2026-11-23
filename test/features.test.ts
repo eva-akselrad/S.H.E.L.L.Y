@@ -1,9 +1,25 @@
 import { describe, expect, test } from "vitest";
 import { actionFor, urgencyRank } from "../shared/actions";
-import { buildConfidence, percentile, rangeText, snowText } from "../shared/confidence";
+import { buildConfidence, percentile, rainText, rangeText, snowText } from "../shared/confidence";
 import { normalizeConfig } from "../shared/config";
 import { distanceToGeometryMi, etaLine, etaToPoint, nearbyLine, nearbyWarnings } from "../shared/eta";
-import { addDays, dayExtremes, gradeDay, latestLine, summarize, type GradedDay } from "../shared/grade";
+import {
+  addDays,
+  dayExtremes,
+  dayObs,
+  gradeDay,
+  gradeHours,
+  latestLine,
+  predictionsFrom,
+  rainBuckets,
+  rainLine,
+  rainTotal,
+  summarize,
+  windLine,
+  type GradedDay,
+  type HourPrediction,
+  type Obs,
+} from "../shared/grade";
 import { hazardScore, hurricaneCategory, nearestTideStation, parseNhc, parseTides, snowDayOdds, type Hazards } from "../shared/hazards";
 import { agoText, alertHealth, healthMessage, latencySamples, latencyStats } from "../shared/health";
 import { localDate, localHour, localNow, rainNowcast } from "../shared/nowcast";
@@ -235,6 +251,31 @@ describe("forecast confidence", () => {
     expect(rangeText(c.days[0]!.hi)).toMatch(/^\d+–\d+°$/);
     expect(snowText(c.days[0]!.snow)).toMatch(/^\d+–\d+ in$/);
   });
+  test("rain, wind and dew point get their own ratings", () => {
+    const c = buildConfidence(
+      {
+        time: ["2026-11-17"],
+        ...members("temperature_2m_max", [60, 61, 60, 59, 61, 60]),
+        ...members("temperature_2m_min", [40, 41, 40, 40, 39, 40]),
+        ...members("precipitation_sum", [0, 0.3, 0, 0.5, 0.2, 0]),
+        ...members("snowfall_sum", [0, 0, 0, 0, 0, 0]),
+        ...members("wind_gusts_10m_max", [20, 50, 25, 45, 30, 55]),
+        ...members("dew_point_2m_mean", [40, 41, 40, 41, 40, 41]),
+      },
+      "test",
+      "",
+    );
+    const d = c.days[0]!;
+    expect(d.parts!.temp.level).toBe("high");
+    expect(d.parts!.rain.level).toBe("medium");
+    expect(d.parts!.wind.level).toBe("low");
+    expect(d.parts!.dew.level).toBe("high");
+    expect(d.level).toBe("low");
+    expect(d.why).toMatch(/^Gusts could be/);
+    expect(rainText(d.precip, d.wetChance)).toBe("50% of runs");
+    expect(rainText({ p10: 0.2, p50: 0.5, p90: 1.1 }, 90)).toBe("0.2–1.1 in");
+    expect(rainText({ p10: 0, p50: 0, p90: 0 }, 0)).toBe("");
+  });
   test("percentile", () => {
     expect(percentile([1, 2, 3, 4, 5], 0.5)).toBe(3);
   });
@@ -260,6 +301,89 @@ describe("SHELLY grades itself", () => {
     expect(s.hiBias).toBeCloseTo(2.7, 1);
     expect(latestLine(days[0]!)).toBe("The forecast high was 2° too warm (54° forecast, 52° measured).");
     expect(latestLine(days[1]!)).toMatch(/^Nailed it/);
+  });
+  test("rain totals count each hour once, specials included", () => {
+    const obs: Obs[] = [
+      // 13:54 routine (0.5 mm), 14:20 special (1 mm so far), 14:54 routine (3 mm for the hour)
+      { time: "2026-11-15T13:54:00Z", tempC: 5, routine: true, precipMm: 0.5 },
+      { time: "2026-11-15T14:20:00Z", tempC: 5, routine: true, precipMm: 1 },
+      { time: "2026-11-15T14:54:00Z", tempC: 5, routine: true, precipMm: 3 },
+      { time: "2026-11-15T14:58:00Z", tempC: 5 },
+    ];
+    expect([...rainBuckets(obs).values()]).toEqual([0.5, 3]);
+    expect(rainTotal(obs, 2)).toBeCloseTo(3.5 / 25.4, 2);
+    expect(rainTotal(obs)).toBeNull(); // too few hourly reports
+  });
+  test("a full day of readings grades every element", () => {
+    const start = Date.parse("2026-11-15T05:00:00Z");
+    const obs: Obs[] = [];
+    for (let h = 0; h < 24; h++) {
+      const at = start + h * 3_600_000;
+      // a 5-minute reading on the hour, and the routine report at :54
+      obs.push({ time: new Date(at).toISOString(), tempC: 10, dewC: 5, windKmh: 16.09344, gustKmh: null });
+      obs.push({ time: new Date(at + 54 * 60_000).toISOString(), tempC: 10, dewC: 5, windKmh: 16.09344, gustKmh: h === 12 ? 48.28 : null, routine: true, precipMm: h === 15 ? 5.08 : null });
+    }
+    const day = dayObs(obs)!;
+    expect(day).toMatchObject({ hi: 50, lo: 50, dew: 41, wind: 10, gust: 30, precip: 0.2 });
+    const g = gradeDay("2026-11-15", "KPHL", day, [{ issued: "2026-11-14", lead: 1, hi: 52, lo: 48, dew: 43, wind: 12, gust: 25, precip: 0.1, pop: 70 }]);
+    expect(g.leads["1"]).toMatchObject({ hiErr: 2, loErr: -2, dewErr: 2, windErr: 2, gustErr: -5, precipErr: -0.1, rainRight: true, brier: 0.09 });
+    expect(rainLine(g)).toBe("Rain: Right call (0.10 in forecast, 0.20 in measured).");
+    expect(windLine(g)).toBe("Gusts: 25 mph forecast, 30 mph measured.");
+
+    // hour by hour: forecast 1° warm all day, rain in the hour after the 15:54 local report... at t = 16:00 local
+    const hours: HourPrediction[] = Array.from({ length: 24 }, (_, h) => ({
+      t: (start + h * 3_600_000) / 1000,
+      temp: 51,
+      dew: 41,
+      wind: 10,
+      gust: 10,
+      precip: h === 16 ? 0.2 : 0,
+      pop: 0,
+    }));
+    const hg = gradeHours(hours, obs)!;
+    expect(hg).toMatchObject({ n: 24, temp: 1, dew: 0, wind: 0, rainRight: 100, wetObs: 1, wetFc: 1 });
+
+    const s = summarize([{ ...g, hourly: hg }]);
+    expect(s.rain).toEqual({ n: 1, right: 100, brier: 0.09 });
+    expect(s.gust.mae).toBe(5);
+    expect(s.hourly.temp).toBe(1);
+  });
+  test("old records without the new fields still summarize", () => {
+    const old: GradedDay = { date: "2026-11-01", station: "KPHL", obsHi: 50, obsLo: 40, leads: { "1": { hi: 52, lo: 40, hiErr: 2, loErr: 0 } } };
+    const s = summarize([old]);
+    expect(s.hiMae).toBe(2);
+    expect(s.rain.right).toBeNull();
+    expect(rainLine(old)).toBe("");
+  });
+  test("predictions come from the grader's Open-Meteo request", () => {
+    const tz = "America/New_York";
+    const mid = (d: string) => Date.parse(`${d}T05:00:00Z`) / 1000;
+    const raw = {
+      daily: {
+        time: [mid("2026-11-15"), mid("2026-11-16"), mid("2026-11-17"), mid("2026-11-18")],
+        temperature_2m_max: [50, 52.4, 55, 58],
+        temperature_2m_min: [40, 41, 42, 43],
+        wind_speed_10m_max: [10, 12, 14, 16],
+        wind_gusts_10m_max: [20, 22, 24, 26],
+        precipitation_sum: [0, 0.123, 0, 0.5],
+        precipitation_probability_max: [0, 60, 10, 80],
+      },
+      hourly: {
+        time: Array.from({ length: 48 }, (_, i) => mid("2026-11-16") + i * 3600),
+        temperature_2m: Array(48).fill(50),
+        dew_point_2m: Array(48).fill(40),
+        wind_speed_10m: Array(48).fill(8),
+        wind_gusts_10m: Array(48).fill(15),
+        precipitation: Array(48).fill(0),
+        precipitation_probability: Array(48).fill(20),
+      },
+    };
+    const { preds, hours } = predictionsFrom(raw, tz, "2026-11-15", [1, 3]);
+    expect(preds).toEqual([
+      { target: "2026-11-16", issued: "2026-11-15", lead: 1, hi: 52, lo: 41, dew: 40, wind: 12, gust: 22, precip: 0.12, pop: 60 },
+      { target: "2026-11-18", issued: "2026-11-15", lead: 3, hi: 58, lo: 43, wind: 16, gust: 26, precip: 0.5, pop: 80 },
+    ]);
+    expect(hours["2026-11-16"]).toHaveLength(24);
   });
   test("addDays crosses months", () => {
     expect(addDays("2026-11-30", 1)).toBe("2026-12-01");

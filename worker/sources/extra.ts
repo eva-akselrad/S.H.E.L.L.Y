@@ -1,6 +1,7 @@
 // Extra data sources: ensemble confidence, SPC storm reports, local hazards, NWS station observations.
 import { buildConfidence, type Confidence } from "../../shared/confidence";
 import { haversineMi } from "../../shared/geo";
+import type { Obs } from "../../shared/grade";
 import {
   catRank,
   nearestTideStation,
@@ -23,14 +24,15 @@ async function getJson(url: string, init?: RequestInit): Promise<unknown> {
   return res.json();
 }
 
-/** GFS ensemble (31 members), daily max/min/precip/snow for 7 days. */
+/** GFS ensemble (31 members), daily max/min, rain, snow, gusts and dew point for 7 days. */
 export async function fetchConfidence(lat: number, lon: number): Promise<Confidence> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
     models: ENSEMBLE_MODEL,
-    daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum",
+    daily: "temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,wind_gusts_10m_max,dew_point_2m_mean",
     temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
     precipitation_unit: "inch",
     timezone: "auto",
     forecast_days: "7",
@@ -151,15 +153,37 @@ export async function fetchNearestStation(env: Env, office: string, x: number, y
   return d.features?.[0]?.properties?.stationIdentifier ?? null;
 }
 
-/** Temperatures (°C) a station measured between two instants. */
-export async function fetchObservations(env: Env, station: string, startIso: string, endIso: string): Promise<{ time: string; tempC: number | null }[]> {
+interface NwsValue {
+  value?: number | null;
+  qualityControl?: string;
+}
+
+/** A reading's value, or null when missing or failed NWS quality control. */
+const qc = (v: NwsValue | undefined): number | null => (v && v.qualityControl !== "X" && v.qualityControl !== "Q" && typeof v.value === "number" ? v.value : null);
+
+/**
+ * Everything a station measured between two instants: temperature and dew point (°C), wind and gust (km/h),
+ * and the rain since the last hourly report (mm). Only routine hourly reports carry `precipitationLastHour`.
+ */
+export async function fetchObservations(env: Env, station: string, startIso: string, endIso: string): Promise<Obs[]> {
   const d = (await nwsFetch(
     env,
-    `/stations/${encodeURIComponent(station)}/observations?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`,
-  )) as { features?: { properties?: { timestamp?: string; temperature?: { value?: number | null; qualityControl?: string } } }[] };
+    `/stations/${encodeURIComponent(station)}/observations?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}&limit=500`,
+  )) as {
+    features?: {
+      properties?: { timestamp?: string; temperature?: NwsValue; dewpoint?: NwsValue; windSpeed?: NwsValue; windGust?: NwsValue; precipitationLastHour?: NwsValue };
+    }[];
+  };
   return (d.features ?? []).map((f) => {
-    const t = f.properties?.temperature;
-    const bad = t?.qualityControl === "X" || t?.qualityControl === "Q";
-    return { time: f.properties?.timestamp ?? "", tempC: !bad && typeof t?.value === "number" ? t.value : null };
+    const p = f.properties ?? {};
+    return {
+      time: p.timestamp ?? "",
+      tempC: qc(p.temperature),
+      dewC: qc(p.dewpoint),
+      windKmh: qc(p.windSpeed),
+      gustKmh: qc(p.windGust),
+      precipMm: qc(p.precipitationLastHour),
+      routine: p.precipitationLastHour !== undefined,
+    };
   });
 }
