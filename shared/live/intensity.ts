@@ -78,18 +78,23 @@ export function computeIntensity(input: IntensityInput): Intensity {
   // watches and advisories are low-level: a pile of them must not look like a storm day
   let watchScore = 0;
   let minorScore = 0;
+  let otherWarnScore = 0;
+  let coreWarning = false;
   for (const a of active) {
     const l = alertLevel(a);
     raise(l);
     if (isEmergency(a)) emergency = true;
     if (isTor(a)) score += 0.25;
-    else if (isSvr(a) || isFfw(a)) score += 0.08;
-    else if (l === "WARNING") score += 0.08;
+    else if (isSvr(a) || isFfw(a)) {
+      score += 0.08;
+      coreWarning = true;
+    } else if (l === "WARNING") otherWarnScore += 0.03; // coastal flood, wind, winter, etc.: real, but not a storm emergency
     else if (isWatch(a)) watchScore += watchWeight(a);
     else if (l === "ELEVATED") minorScore += watchWeight(a);
     if (l === "WARNING" || l === "EMERGENCY") newestWarning = Math.max(newestWarning, Date.parse(a.sent) || 0);
   }
-  score += Math.min(watchScore, 0.3) + Math.min(minorScore, 0.04);
+  if (counters.tor) coreWarning = true;
+  score += Math.min(otherWarnScore, 0.15) + Math.min(watchScore, 0.3) + Math.min(minorScore, 0.04);
   if (counters.tor) drivers.push(`${counters.tor} tornado warning${counters.tor > 1 ? "s" : ""}`);
   if (counters.svr) drivers.push(`${counters.svr} severe thunderstorm warning${counters.svr > 1 ? "s" : ""}`);
   if (counters.ffw) drivers.push(`${counters.ffw} flash flood warning${counters.ffw > 1 ? "s" : ""}`);
@@ -116,7 +121,7 @@ export function computeIntensity(input: IntensityInput): Intensity {
   }
 
   // floors so the score always agrees with the level
-  if (level === "WARNING") score = Math.max(score, 0.5);
+  if (level === "WARNING") score = Math.max(score, coreWarning ? 0.5 : 0.25);
   if (level === "ELEVATED") score = Math.max(score, 0.1);
   // a fresh warning spikes the score briefly (applied after the floor so it always shows)
   if (newestWarning && now - newestWarning < FRESH_MS) {
