@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildLoop, type SegmentCtx } from "../shared/scheduler";
+import { buildLoop, loopTabs, nextIndexOf, type SegmentCtx } from "../shared/scheduler";
 import type { Forecast } from "../shared/types";
 
 const fc = (precip = 0): Forecast => ({
@@ -46,4 +46,27 @@ test("high pollen makes the air segment relevant", () => {
 
 test("never returns an empty loop", () => {
   expect(buildLoop(base({ forecast: null, aq: null, level: "WARNING" })).length).toBeGreaterThan(0);
+});
+
+test("elevated loop repeats radar, but the tab bar lists each segment once", () => {
+  const loop = buildLoop({ forecast: fc(), aq: null, outlook: null, level: "ELEVATED" });
+  expect(loop.filter((i) => i.id === "radar").length).toBeGreaterThan(1);
+  const tabs = loopTabs(loop);
+  expect(tabs.filter((i) => i.id === "radar")).toHaveLength(1);
+  expect(new Set(tabs.map((t) => t.id)).size).toBe(tabs.length);
+  expect(tabs[0]!.id).toBe(loop[0]!.id);
+});
+
+test("nextIndexOf finds the next occurrence, wrapping, or -1", () => {
+  const loop = [
+    { id: "now", title: "", seconds: 1 },
+    { id: "radar", title: "", seconds: 1 },
+    { id: "hourly", title: "", seconds: 1 },
+    { id: "radar", title: "", seconds: 1 },
+  ] as const;
+  const l = [...loop];
+  expect(nextIndexOf(l, "radar", 2)).toBe(3);
+  expect(nextIndexOf(l, "radar", 0)).toBe(1);
+  expect(nextIndexOf(l, "now", 3)).toBe(0);
+  expect(nextIndexOf(l, "grade", 0)).toBe(-1);
 });
