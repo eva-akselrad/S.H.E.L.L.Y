@@ -1,6 +1,6 @@
 # SHELLY v2: Feature Batch 2 (build plan)
 
-Status: **planned 2026-11-25. Part S built and deployed; part D (damage report) built; part R (future radar, on IEM tiles) built, awaiting the user (not committed).** The user picked these four from the feature
+Status: **planned 2026-11-25. Part S built and deployed; part D (damage report) built; part R (future radar, on IEM tiles) built, awaiting the user (not committed). Part L (lightning) built through L3 (not committed); L4 Android push NOT built, waiting on the user.** The user picked these four from the feature
 brainstorm. This doc is written so a builder (Sonnet) can work through it top to bottom.
 
 | # | Feature | Size | Why this order |

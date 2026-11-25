@@ -74,12 +74,16 @@ export function AppAlerts() {
         Watches and advisories too
       </label>
       <label class="push-watch">
+        <input type="checkbox" checked={prefs.lightning} onChange={(e) => save({ ...prefs, lightning: (e.target as HTMLInputElement).checked })} />
+        Lightning within about 10 miles of me (quiet notification, not an NWS alert)
+      </label>
+      <label class="push-watch">
         <input
           type="checkbox"
           checked={quiet}
           onChange={(e) => save((e.target as HTMLInputElement).checked ? { ...prefs, quietStart: 22, quietEnd: 7 } : { ...prefs, quietStart: null, quietEnd: null })}
         />
-        Quiet hours for watches, 10 PM to 7 AM (warnings always come through)
+        Quiet hours for watches and lightning, 10 PM to 7 AM (warnings always come through)
       </label>
       <span class="app-alerts-buttons">
         <button type="button" onClick={() => app.runSetup()}>Check setup</button>

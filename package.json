@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@preact/signals": "^2.11.4",
+    "jsfive": "^0.4.2",
     "leaflet": "^1.9.4",
     "preact": "^11.2.0"
   },

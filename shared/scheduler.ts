@@ -3,7 +3,7 @@ import type { AirQuality, Forecast, Outlook, ThreatLevel } from "./types";
 
 export type SegmentId =
   | "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note" | "studio"
-  | "reports" | "local" | "grade" | "snowday";
+  | "reports" | "local" | "grade" | "snowday" | "lightning";
 
 export interface SegmentCtx {
   forecast: Forecast | null;
@@ -26,6 +26,8 @@ export interface SegmentCtx {
   graded?: boolean;
   /** snow day odds relevance 0..1, worked out by shared/snowday.ts */
   snowday?: number;
+  /** lightning relevance 0..1, worked out by shared/lightning.ts (1 danger, 0.6 nearby) */
+  lightning?: number;
 }
 
 interface SegmentDef {
@@ -37,6 +39,7 @@ interface SegmentDef {
 
 export const SEGMENTS: SegmentDef[] = [
   { id: "now", title: "Right now", seconds: 12, relevance: () => 1 },
+  { id: "lightning", title: "Lightning nearby", seconds: 14, relevance: (c) => c.lightning ?? 0 },
   { id: "note", title: "From the forecaster", seconds: 14, relevance: (c) => (c.note ? 1 : 0) },
   { id: "studio", title: "Forecaster graphics", seconds: 16, relevance: (c) => (c.studio ? 1 : 0) },
   { id: "snowday", title: "Snow day odds", seconds: 14, relevance: (c) => c.snowday ?? 0 },

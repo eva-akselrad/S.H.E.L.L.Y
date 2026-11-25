@@ -5,6 +5,7 @@ import { Almanac } from "./Almanac";
 import { Daily } from "./Daily";
 import { Grade } from "./Grade";
 import { Hourly } from "./Hourly";
+import { Lightning } from "./Lightning";
 import { Local } from "./Local";
 import { Note } from "./Note";
 import { Now } from "./Now";
@@ -30,4 +31,5 @@ export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
   local: Local,
   grade: Grade,
   snowday: SnowDay,
+  lightning: Lightning,
 };

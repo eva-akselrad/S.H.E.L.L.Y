@@ -4,7 +4,7 @@ import type { Bbox, Place } from "./types";
 import { DEFAULT_PLAYLIST, normalizePlaylist, type PlaylistEntry } from "./live/blocks";
 
 export const SEGMENT_IDS: SegmentId[] = [
-  "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade", "snowday",
+  "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade", "snowday", "lightning",
 ];
 export const MODES = ["auto", "kiosk", "web", "phone"] as const;
 export const THEMES = ["auto", "light", "dark"] as const;

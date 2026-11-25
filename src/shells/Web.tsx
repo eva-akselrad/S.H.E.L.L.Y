@@ -5,6 +5,7 @@ import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
 import { WatchLive } from "../components/WatchLive";
 import { SoundOutput } from "../components/SoundOutput";
+import { LightningChip } from "../components/LightningUi";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, loop, paused, segIndex } from "../state/store";
@@ -27,6 +28,7 @@ export function WebShell() {
         <ThemeToggle />
       </header>
       <ActionCard />
+      <LightningChip />
       <NearbyNotice />
       <InstallApp />
       <AppAlerts />

@@ -4,6 +4,8 @@ import { buildPackPrompt, hashKey, type LlmPack } from "../shared/live/llm";
 import { SPC_PHRASE } from "../shared/live/templates";
 import { getPack } from "./llm";
 import { liveLocalTimeoutMs, ttsAudio } from "./tts";
+import { lightningForRegion, isStale } from "../shared/lightning";
+import { readLightning } from "./lightning";
 import { regionAlerts } from "../shared/live/region";
 import { buildRundown, isWarning, type CityWx, type Rundown } from "../shared/live/rundown";
 import { buildSimAlert } from "../shared/simulate";
@@ -99,7 +101,10 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
   const lastWarningEndedAt = state.hadWarning && !warningNow ? new Date(now).toISOString() : state.lastWarningEndedAt;
   if (warningNow !== state.hadWarning) await writeLiveState(env, { hadWarning: warningNow, lastWarningEndedAt });
 
-  const intensity = computeIntensity({ alerts: inRegion, spc, lastWarningEndedAt, now });
+  // lightning near a region city: a nudge for the score and a template item, both from shared/lightning.ts
+  const lt = await readLightning(env).catch(() => null);
+  const lightning = lt ? lightningForRegion(lt.flashes, region.cities, now, isStale(lt.fileAt, now)) : null;
+  const intensity = computeIntensity({ alerts: inRegion, spc, lastWarningEndedAt, now, ...(lightning ? { lightning: lightning.state.level } : {}) });
   // LLM colour for calm/elevated periods only; any failure means templates
   let pack: LlmPack | null = null;
   if (live.llm.enabled && (intensity.level === "CALM" || intensity.level === "ELEVATED")) {
@@ -130,6 +135,7 @@ export async function produceRundown(env: Env, cfgIn?: SiteConfig): Promise<Rund
       cams: [],
       wx,
       control,
+      lightning,
       ...(pack ? { talkBreak: pack.talkBreak, headlines: pack.headlines } : {}),
     },
     live,
