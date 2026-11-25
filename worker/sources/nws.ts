@@ -82,6 +82,30 @@ export function normalizeAlert(f: RawAlertFeature): Alert {
 }
 
 /** All active US alerts (actual, non-test). */
+/** NWS zone shape (forecast zone "PAZ106" or county "PAC017"), or null. */
+export async function fetchZoneGeometry(env: Env, id: string): Promise<PolygonGeom | null> {
+  if (!/^[A-Z]{2}[ZC]\d{3}$/.test(id)) return null;
+  try {
+    const kind = id[2] === "C" ? "county" : "forecast";
+    const z = (await nwsFetch(env, `/zones/${kind}/${id}`)) as { geometry?: PolygonGeom | null };
+    const g = z.geometry;
+    return g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Join zone shapes into one MultiPolygon. */
+export function unionGeometry(parts: (PolygonGeom | null)[]): PolygonGeom | null {
+  const polys: number[][][][] = [];
+  for (const g of parts) {
+    if (!g) continue;
+    if (g.type === "Polygon") polys.push(g.coordinates as number[][][]);
+    else polys.push(...(g.coordinates as number[][][][]));
+  }
+  return polys.length ? { type: "MultiPolygon", coordinates: polys } : null;
+}
+
 export async function fetchActiveAlerts(env: Env): Promise<Alert[]> {
   const data = (await nwsFetch(env, "/alerts/active?status=actual&message_type=alert,update")) as {
     features?: RawAlertFeature[];

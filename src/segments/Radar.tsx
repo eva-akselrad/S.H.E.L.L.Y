@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "preact/hooks";
 import { reportTitle } from "../../shared/reports";
+import { alertLevel } from "../../shared/threat";
 import { nearby, place, radar, reportsNearby, threat } from "../state/store";
 
 const REPORT_COLOR = { tornado: "#ff3b3b", wind: "#5ec2ff", hail: "#3ecf9a" } as const;
@@ -10,6 +11,9 @@ export function Radar() {
   const p = place.value;
   const frames = radar.value;
   const primary = threat.value.rank >= 2 ? threat.value.primary : null;
+  // every active alert that covers you and isn't the urgent one: drawn in amber so you can see where it is
+  const others = threat.value.active.filter((a) => a.geometry && a.id !== primary?.id && alertLevel(a) !== "CALM");
+  const othersKey = others.map((a) => a.id).join("|");
   const reps = reportsNearby.value;
   const near = nearby.value;
   const repKey = reps.map((r) => r.time).join("|");
@@ -57,6 +61,12 @@ export function Radar() {
           .addTo(map);
       }
 
+      for (const a of others) {
+        L.geoJSON(a.geometry as never, { style: { color: "#ffb020", weight: 2, fillColor: "#ffb020", fillOpacity: 0.1 } })
+          .bindTooltip(a.event)
+          .addTo(map);
+      }
+
       if (primary?.geometry) {
         const poly = L.geoJSON(primary.geometry as never, {
           style: { color: "#ff3b3b", weight: 3, fillColor: "#ff3b3b", fillOpacity: 0.12 },
@@ -88,7 +98,7 @@ export function Radar() {
       if (timer) clearInterval(timer);
       cleanup();
     };
-  }, [p?.lat, p?.lon, frames, primary?.id, repKey, nearKey]);
+  }, [p?.lat, p?.lon, frames, primary?.id, repKey, nearKey, othersKey]);
 
   return <div class="radar" ref={el} role="img" aria-label="Animated weather radar map" />;
 }

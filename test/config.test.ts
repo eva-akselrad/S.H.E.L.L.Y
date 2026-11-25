@@ -141,7 +141,7 @@ describe("simulated alerts drive the real threat engine", () => {
     expect(level("tornado-warning")).toBe("WARNING");
     expect(level("severe-thunderstorm-warning")).toBe("WARNING");
     expect(level("flash-flood-warning")).toBe("WARNING");
-    expect(level("winter-storm-warning")).toBe("WARNING");
+    expect(level("winter-storm-warning")).toBe("ELEVATED"); // lasts a day or more: no takeover
     expect(level("tornado-watch")).toBe("ELEVATED");
     expect(level("heat-advisory")).toBe("ELEVATED");
   });

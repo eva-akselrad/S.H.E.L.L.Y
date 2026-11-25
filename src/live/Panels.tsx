@@ -49,7 +49,7 @@ export function IntensityGauge({ r }: { r: Rundown }) {
     <div class={`bc-gauge lvl-${r.level.toLowerCase()}`} title={r.drivers.join(", ")}>
       <div class="bc-gauge-top">
         <span class="bc-gauge-label">SHELLY INDEX</span>
-        <b>{r.score.toFixed(2)}</b>
+        <b>{Math.round(r.score * 100)}</b>
       </div>
       <div class="bc-gauge-bar"><i style={{ width: `${Math.round(r.score * 100)}%` }} /></div>
       <span class="bc-gauge-level">{LEVEL_NAME[r.level]}</span>

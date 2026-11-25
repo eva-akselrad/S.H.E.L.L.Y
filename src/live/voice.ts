@@ -86,7 +86,8 @@ const chimed = new Set<string>();
 
 export async function speakItem(item: RundownItem, ai: boolean): Promise<void> {
   // an alert item opens with the notification sound, once per item per page
-  if (item.kind === "alert" && item.speak && !chimed.has(item.key)) {
+  // (watches and advisories are read calmly, with no chime)
+  if (item.kind === "alert" && item.speak && /warning|emergency/i.test(item.headline) && !chimed.has(item.key)) {
     chimed.add(item.key);
     await playAlertChime(item.headline.toUpperCase().includes("TORNADO") ? "emergency" : "warning");
   }

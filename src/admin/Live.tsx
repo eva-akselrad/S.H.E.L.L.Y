@@ -211,7 +211,7 @@ export function Live() {
         {r ? (
           <>
             <p>
-              <Chip kind={r.level === "CALM" ? "ok" : r.level === "ELEVATED" ? "info" : "danger"}>{r.level}</Chip> Index {r.score.toFixed(2)} · {r.status} · {r.topAlert}
+              <Chip kind={r.level === "CALM" ? "ok" : r.level === "ELEVATED" ? "info" : "danger"}>{r.level}</Chip> Index {Math.round(r.score * 100)} · {r.status} · {r.topAlert}
             </p>
             {r.drivers.length > 0 && <p class="adm-hint">Because of: {r.drivers.join(", ")}</p>}
             {r.hold && <p><Chip kind="info">Holding: {r.hold}</Chip></p>}
