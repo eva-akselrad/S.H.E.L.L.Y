@@ -11,6 +11,7 @@ import { Music } from "./admin/Music";
 import { Note } from "./admin/Note";
 import { Overview } from "./admin/Overview";
 import { Simulator } from "./admin/Simulator";
+import { SnowDay } from "./admin/SnowDay";
 import { Studio } from "./admin/Studio";
 import { Toasts } from "./admin/ui";
 import "./styles/main.css";
@@ -22,6 +23,7 @@ const PAGES = [
   { id: "note", label: "Forecaster note", view: Note },
   { id: "simulate", label: "Alert simulator", view: Simulator },
   { id: "display", label: "Display", view: Display },
+  { id: "snowday", label: "Snow day odds", view: SnowDay },
   { id: "live", label: "SHELLY Live", view: Live },
   { id: "studio", label: "Forecaster Studio", view: Studio },
   { id: "music", label: "Music", view: Music },

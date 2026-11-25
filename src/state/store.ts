@@ -9,6 +9,7 @@ import { alertHealth } from "../../shared/health";
 import { localHour, localNow, rainNowcast } from "../../shared/nowcast";
 import type { StormReport } from "../../shared/reports";
 import { whatToWear } from "../../shared/wear";
+import { snowDayRelevance, type SnowDayResponse } from "../../shared/snowday";
 import { buildLoop } from "../../shared/scheduler";
 import type { StudioProduct } from "../../shared/studio";
 import { computeThreat } from "../../shared/threat";
@@ -48,6 +49,7 @@ export const studioProducts = signal<StudioProduct[]>([]);
 export const confidence = signal<Confidence | null>(load<Confidence>("confidence"));
 export const reports = signal<{ fetchedAt: string; reports: (StormReport & { distanceMi: number })[] } | null>(null);
 export const hazards = signal<Hazards | null>(load<Hazards>("hazards"));
+export const snowOdds = signal<SnowDayResponse | null>(load<SnowDayResponse>("snowday"));
 export const grade = signal<(GradeSummary & { history: GradedDay[] }) | null>(null);
 /** when this screen last got an answer from /api/alerts (ms epoch) */
 export const alertsOkAt = signal<number | null>(null);
@@ -150,6 +152,12 @@ export const gradeHere = computed(() => {
   return Math.abs(home.lat - p.lat) < 0.05 && Math.abs(home.lon - p.lon) < 0.05 ? g : null;
 });
 
+/** 0..1 for the snow day segment: Nov 1 to Apr 15 only */
+export const snowdayRelevance = computed(() => {
+  void minute.value;
+  return snowDayRelevance(snowOdds.value?.odds ?? null, localNow(tzNow()));
+});
+
 export const loop = computed(() =>
   buildLoop({
     forecast: forecast.value,
@@ -163,6 +171,7 @@ export const loop = computed(() =>
     reportsNearby: reportsNearby.value.length,
     hazards: hazardScore(hazards.value, snowDay.value),
     graded: gradeHere.value !== null,
+    snowday: snowdayRelevance.value,
   }),
 );
 
@@ -192,6 +201,7 @@ export async function setPlace(p: Place): Promise<void> {
   confidence.value = null;
   reports.value = null;
   hazards.value = null;
+  snowOdds.value = null;
   await refreshAll();
 }
 
@@ -327,6 +337,18 @@ export const refresh = {
         )
       : Promise.resolve();
   },
+  snowday: () => {
+    const p = place.value;
+    return p
+      ? guarded(
+          () => api.snowday(p),
+          (r) => {
+            snowOdds.value = r;
+            save("snowday", r);
+          },
+        )
+      : Promise.resolve();
+  },
   grade: () =>
     guarded(
       () => api.grade(),
@@ -357,6 +379,7 @@ export function startPollers(): void {
   every(60 * 60_000, refresh.confidence);
   every(3 * 60_000, refresh.reports);
   every(15 * 60_000, refresh.hazards);
+  every(15 * 60_000, refresh.snowday);
   every(30 * 60_000, refresh.grade);
   every(1_000, () => {
     now.value = Date.now();

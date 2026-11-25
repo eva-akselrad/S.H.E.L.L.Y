@@ -20,11 +20,15 @@ import {
   readControl,
   readRundown,
   readSim,
+  readSnowLog,
   writeAnnouncements,
   writeConfig,
   writeControl,
   writeSim,
+  writeSnowLog,
 } from "./store";
+import { snowDayAt } from "./snowday";
+import { OUTCOMES, snowRecord, SNOW_LOG_MAX, type SnowLogEntry, type SnowOutcome } from "../shared/snowday";
 import { handleStudioAdmin } from "./studio";
 import { handleTtsPreview, ttsUsage } from "./tts";
 
@@ -35,7 +39,7 @@ const iso = (v: unknown): string | null =>
   typeof v === "string" && Number.isFinite(Date.parse(v)) ? new Date(v).toISOString() : null;
 
 /** Handles /api/admin/* and announcement writes. Returns null for routes it doesn't own. */
-export async function handleAdmin(request: Request, env: Env, url: URL): Promise<Response | null> {
+export async function handleAdmin(request: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response | null> {
   const path = url.pathname;
   const method = request.method;
 
@@ -324,6 +328,56 @@ export async function handleAdmin(request: Request, env: Env, url: URL): Promise
     if (toWeb) result.web = await sendCustomPush(env, title, text);
     await audit(env, "notify.send", `"${title}" app=${result.app ?? "off"} web=${result.web ? result.web.sent : "off"}`);
     return json(result);
+  }
+
+  // ── snow day calibration log ──
+  if (path === "/api/admin/snowday/log" && method === "GET") {
+    const log = await readSnowLog(env);
+    return json({ log, record: snowRecord(log) });
+  }
+  if (path === "/api/admin/snowday/log" && method === "POST") {
+    // snapshot what SHELLY says right now for a district, to be graded later
+    const b = await body();
+    const cfg = (await readConfig(env)).snowDay;
+    const d = cfg.districts.find((x) => x.id === b.districtId);
+    if (!d) return json({ error: "unknown_district" }, 400);
+    const res = await snowDayAt(env, ctx, { lat: d.lat, lon: d.lon }, cfg, d.id);
+    if (!res.odds) return json({ error: "no_forecast" }, 502);
+    const id = `${res.odds.forDate}:${d.id}`;
+    const log = await readSnowLog(env);
+    const prev = log.find((e) => e.id === id);
+    const entry: SnowLogEntry = {
+      id,
+      forDate: res.odds.forDate,
+      districtId: d.id,
+      districtName: d.name,
+      band: res.odds.band,
+      closed: res.odds.closed,
+      delayed: res.odds.delayed,
+      actual: prev?.actual ?? null,
+    };
+    await writeSnowLog(env, [entry, ...log.filter((e) => e.id !== id)].sort((a, b2) => b2.forDate.localeCompare(a.forDate)).slice(0, SNOW_LOG_MAX));
+    await audit(env, "snowday.snapshot", `${d.name} ${entry.forDate} ${entry.band}`);
+    const out = await readSnowLog(env);
+    return json({ log: out, record: snowRecord(out) });
+  }
+  if (path === "/api/admin/snowday/log" && method === "PUT") {
+    const b = await body();
+    const actual = b.actual === null ? null : (b.actual as SnowOutcome);
+    if (actual !== null && !OUTCOMES.includes(actual)) return json({ error: "bad_outcome" }, 400);
+    const log = await readSnowLog(env);
+    const hit = log.find((e) => e.id === b.id);
+    if (!hit) return json({ error: "not_found" }, 404);
+    hit.actual = actual;
+    await writeSnowLog(env, log);
+    await audit(env, "snowday.outcome", `${hit.districtName} ${hit.forDate} ${actual ?? "cleared"}`);
+    return json({ log, record: snowRecord(log) });
+  }
+  if (path === "/api/admin/snowday/log" && method === "DELETE") {
+    const id = url.searchParams.get("id");
+    const log = (await readSnowLog(env)).filter((e) => e.id !== id);
+    await writeSnowLog(env, log);
+    return json({ log, record: snowRecord(log) });
   }
 
   if (path === "/api/admin/audit" && method === "GET") return json(await readAudit(env));

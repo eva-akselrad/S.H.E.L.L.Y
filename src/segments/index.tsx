@@ -11,6 +11,7 @@ import { Now } from "./Now";
 import { Outlook } from "./Outlook";
 import { Radar } from "./Radar";
 import { Reports } from "./Reports";
+import { SnowDay } from "./SnowDay";
 import { Studio } from "./Studio";
 import { Text } from "./Text";
 
@@ -28,4 +29,5 @@ export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
   reports: Reports,
   local: Local,
   grade: Grade,
+  snowday: SnowDay,
 };

@@ -3,7 +3,7 @@ import type { AirQuality, Forecast, Outlook, ThreatLevel } from "./types";
 
 export type SegmentId =
   | "now" | "hourly" | "daily" | "radar" | "outlook" | "air" | "almanac" | "text" | "note" | "studio"
-  | "reports" | "local" | "grade";
+  | "reports" | "local" | "grade" | "snowday";
 
 export interface SegmentCtx {
   forecast: Forecast | null;
@@ -24,6 +24,8 @@ export interface SegmentCtx {
   hazards?: number;
   /** SHELLY has graded at least one of its own forecasts */
   graded?: boolean;
+  /** snow day odds relevance 0..1, worked out by shared/snowday.ts */
+  snowday?: number;
 }
 
 interface SegmentDef {
@@ -37,6 +39,7 @@ export const SEGMENTS: SegmentDef[] = [
   { id: "now", title: "Right now", seconds: 12, relevance: () => 1 },
   { id: "note", title: "From the forecaster", seconds: 14, relevance: (c) => (c.note ? 1 : 0) },
   { id: "studio", title: "Forecaster graphics", seconds: 16, relevance: (c) => (c.studio ? 1 : 0) },
+  { id: "snowday", title: "Snow day odds", seconds: 14, relevance: (c) => c.snowday ?? 0 },
   {
     id: "radar",
     title: "Radar",

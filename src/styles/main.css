@@ -358,3 +358,36 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 .phone-live { display: flex; padding: 0 12px; }
 .phone-live:empty { display: none; }
 .phone-live .watch-live { flex: 1; justify-content: center; }
+
+/* snow day odds */
+.seg-snowday { display: grid; gap: 14px; }
+.sdo-kicker { margin: 0; color: var(--muted); font-size: .95em; }
+.sdo-main { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 20px; align-items: center; }
+.sdo-gauge { display: grid; gap: 4px; justify-items: start; }
+.sdo-num { font-family: var(--display); font-size: 3.4em; line-height: 1; color: #cfe3ff; }
+.sdo-sub { color: var(--muted); font-size: .9em; }
+.sdo-bar { display: flex; gap: 4px; margin-top: 6px; }
+.sdo-bar i { width: 26px; height: 8px; border-radius: 4px; background: var(--panel-2); }
+.sdo-bar i.on { background: #8fb8ff; }
+.sdo-tone-4 .sdo-bar i.on, .sdo-tone-5 .sdo-bar i.on { background: #ffd166; }
+.sdo-tone-5 .sdo-num { color: #ffe3a3; }
+.sdo-detail { display: grid; gap: 8px; }
+.sdo-reasons { margin: 0; padding-left: 1.1em; display: grid; gap: 3px; }
+.sdo-delay, .sdo-range, .sdo-note { margin: 0; }
+.sdo-range { color: var(--muted); font-size: .9em; }
+.sdo-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sdo-chips li { background: var(--panel-2); border-radius: 999px; padding: 3px 11px; font-size: .88em; }
+.sdo-label { margin: 0; color: var(--muted); font-size: .85em; }
+.stage .seg-snowday { gap: 34px; padding-top: 20px; }
+.stage .sdo-main { grid-template-columns: 560px 1fr; gap: 72px; }
+.stage .sdo-delay, .stage .sdo-range, .stage .sdo-note { font-size: 1.3em; }
+.stage .sdo-num { font-size: 9em; }
+.stage .sdo-sub { font-size: 1.4em; }
+.stage .sdo-bar i { width: 48px; height: 12px; }
+.stage .sdo-reasons { font-size: 1.7em; gap: 8px; }
+.stage .sdo-kicker { font-size: 1.7em; }
+.stage .sdo-label { font-size: 1.3em; }
+.stage .sdo-chips li { font-size: 1.3em; padding: 6px 20px; }
+@container (max-width: 520px) { .sdo-main { grid-template-columns: 1fr; gap: 12px; } }
+.card .sdo-chips li { background: var(--panel-2); }
+.phone .sdo-main { grid-template-columns: 1fr; gap: 12px; }

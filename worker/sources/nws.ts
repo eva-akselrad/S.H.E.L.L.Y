@@ -1,3 +1,4 @@
+import type { RawGridData } from "../../shared/gridpoint";
 import type { Alert, AlertParams, Place, PolygonGeom } from "../../shared/types";
 
 const BASE = "https://api.weather.gov";
@@ -156,4 +157,10 @@ export async function fetchForecastText(
     properties?: { periods?: { name: string; detailedForecast: string }[] };
   };
   return (d.properties?.periods ?? []).map((p) => ({ name: p.name, detailed: p.detailedForecast }));
+}
+
+/** Raw gridpoint data (the forecaster's hourly snow, ice, temperature and wind chill). */
+export async function fetchGridData(env: Env, office: string, x: number, y: number): Promise<RawGridData> {
+  if (!/^[A-Z]{3,4}$/.test(office)) throw new Error("bad office");
+  return (await nwsFetch(env, `/gridpoints/${office}/${Math.trunc(x)},${Math.trunc(y)}`)) as RawGridData;
 }

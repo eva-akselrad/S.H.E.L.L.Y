@@ -22,6 +22,7 @@ const TITLES: Record<SegmentId, string> = {
   reports: "Storm reports near you",
   local: "Local hazards (rivers, tides, tropical, snow day)",
   grade: "How SHELLY did (forecast report card)",
+  snowday: "Snow day odds (winter only)",
 };
 const DEFAULT_SECONDS = Object.fromEntries(SEGMENTS.map((s) => [s.id, s.seconds])) as Record<SegmentId, number>;
 

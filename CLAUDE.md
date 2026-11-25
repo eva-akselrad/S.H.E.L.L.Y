@@ -14,6 +14,10 @@
   card, storm ETA, stale-data banner, alert latency, freshness, rain nowcast, storm reports,
   confidence, self-grading, local hazards, what to wear, polygon-precise push. Push needs the
   `VAPID_*` secrets; self-grading needs a default location set in admin.
+- **Feature batch 2** (plan: **[docs/FEATURE_BATCH_2.md](docs/FEATURE_BATCH_2.md)**): snow day odds,
+  storm damage report, future radar, lightning proximity, built in that order with a STOP after
+  each. **Snow day odds (part S) is built and deployed**; it still needs the user's real school
+  districts in admin. Parts D, R and L are next.
 - **SHELLY Android app: shipped (A1 to A6), signed release 1.0.2 is live (2.0.0 is next, versionCode 4)** at `/get-android/` with in-app update checks. Admin simulator has custom test alerts and custom notifications. Release runbook: **[docs/ANDROID.md](docs/ANDROID.md)** (run `node scripts/android-release.mjs --upload`; always bump `versionCode`). Still the user's: Android Developer Console package registration, backups of the keystore and Firebase key. Open: widget not checked on a real launcher, test notifications not confirmed on the phone. The full build plan is
   **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
   stop points. The user decided all of this on 2026-11-17 (don't re-ask):
