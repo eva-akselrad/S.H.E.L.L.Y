@@ -146,3 +146,19 @@ export function buildLoop(ctx: SegmentCtx): LoopItem[] {
   if (items.length === 0) items = [{ id: "now", title: "Right now", seconds: 12 }];
   return items;
 }
+
+/** One tab per segment, in loop order. The loop repeats radar while elevated; the tab bar shouldn't. */
+export function loopTabs(items: LoopItem[]): LoopItem[] {
+  const seen = new Set<SegmentId>();
+  return items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
+}
+
+/** Index of the next loop item with this id, starting at `from` (wrapping), or -1 if it isn't in the loop. */
+export function nextIndexOf(items: LoopItem[], id: SegmentId, from: number): number {
+  const n = items.length;
+  for (let k = 0; k < n; k++) {
+    const i = (((from + k) % n) + n) % n;
+    if (items[i]!.id === id) return i;
+  }
+  return -1;
+}

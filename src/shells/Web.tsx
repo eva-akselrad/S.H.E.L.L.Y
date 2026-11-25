@@ -8,6 +8,7 @@ import { SoundOutput } from "../components/SoundOutput";
 import { LightningChip } from "../components/LightningUi";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
+import { loopTabs, nextIndexOf } from "../../shared/scheduler";
 import { currentSegment, goTo, loop, paused, segIndex } from "../state/store";
 
 /** Desktop browser: same segments, but you can drive them. */
@@ -34,8 +35,17 @@ export function WebShell() {
       <AppAlerts />
       <AnnouncementBar />
       <nav class="web-nav" aria-label="Segments">
-        {loop.value.map((s, i) => (
-          <button key={`${s.id}-${i}`} type="button" aria-current={i === segIndex.value % loop.value.length} onClick={() => (segIndex.value = i)}>
+        {loopTabs(loop.value).map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-current={s.id === seg.id}
+            onClick={() => {
+              if (s.id === seg.id) return;
+              const i = nextIndexOf(loop.value, s.id, segIndex.value % loop.value.length);
+              if (i >= 0) segIndex.value = i;
+            }}
+          >
             {s.title}
           </button>
         ))}

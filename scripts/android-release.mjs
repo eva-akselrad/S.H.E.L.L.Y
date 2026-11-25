@@ -103,7 +103,8 @@ const env = {
 const apkOut = join(android, "app", "build", "outputs", "apk", "release", "app-release.apk");
 if (!flag("--skip-build")) {
   console.log("\nBuilding the signed release APK…");
-  const gw = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
+  // full path: with NoDefaultCurrentDirectoryInExePath set, Windows won't run a bare "gradlew.bat" from the cwd
+  const gw = process.platform === "win32" ? `"${join(android, "gradlew.bat")}"` : "./gradlew";
   const r = spawnSync(gw, ["clean", "test", "assembleRelease"], { cwd: android, env, stdio: "inherit", shell: process.platform === "win32" });
   if (r.status !== 0) fail("The Gradle build failed (see above). A wrong keystore password is the usual cause.");
 }
