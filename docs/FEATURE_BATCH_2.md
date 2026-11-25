@@ -1,6 +1,6 @@
 # SHELLY v2: Feature Batch 2 (build plan)
 
-Status: **planned 2026-11-25, nothing built yet.** The user picked these four from the feature
+Status: **planned 2026-11-25. Part S built and deployed; part D (damage report) built, awaiting the user (not committed).** The user picked these four from the feature
 brainstorm. This doc is written so a builder (Sonnet) can work through it top to bottom.
 
 | # | Feature | Size | Why this order |
@@ -151,7 +151,7 @@ Made for insurance claims and contractors.
   with `sts`/`ets` (UTC) and a bbox or WFO. **Verify** current parameter names on its `?help=` page.
   Reports carry type (hail, tstm wind, tornado, wind damage, flood), magnitude, remarks, and
   since 2024 a measured / estimated qualifier. Show that qualifier.
-- **IEM storm-based warnings** (`/geojson/sbw.py`, with `sts`/`ets`): which warning polygons
+- **IEM storm-based warnings** (`/geojson/sbw.geojson`, with `wfo` + `sts`/`ets`; the old `sbw.py` name is gone, verified 2026-11-25): which warning polygons
   covered the point and when. **Verify** params.
 - **Peak gusts:** IEM ASOS download service (`/cgi-bin/request/asos.py`, `data=gust` or `peak_wind_gust`)
   for the 3 nearest stations within 30 mi. The NWS `/stations/.../observations` API only keeps about

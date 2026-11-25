@@ -247,3 +247,15 @@ describe("SHELLY Live on-air controls", () => {
     expect(d).toMatchObject({ ok: false, error: "no_api_key" });
   });
 });
+
+describe("storm damage report is admin-only", () => {
+  const path = "/api/damage?lat=39.98&lon=-75.82&date=2023-09-07";
+  test("401 without the admin cookie", async () => {
+    expect((await call(path)).status).toBe(401);
+  });
+  test("with the cookie the request gets past auth into validation", async () => {
+    const r = await authed("GET", "/api/damage?lat=0&lon=0&date=2023-09-07");
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "bad_location" });
+  });
+});

@@ -4,6 +4,7 @@ import { handleAndroid } from "./android";
 import { fanOutFcm } from "./fcm";
 import { coords, loadForecast, loadPlace } from "./loaders";
 import { cached, round } from "./cache";
+import { handleDamage } from "./damage";
 import { handleSnowDay } from "./snowday";
 import { handleLiveTts, prepareRundownVoice, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
@@ -181,6 +182,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
   }
 
   if (path === "/api/snowday") return handleSnowDay(env, ctx, url);
+  if (path === "/api/damage") return handleDamage(request, env, ctx, url);
 
   if (path === "/api/grade") return json(await gradeSummary(env), 200, 600);
 
