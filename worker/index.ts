@@ -15,7 +15,7 @@ import { fetchConfidence, fetchHazards, fetchStormReports } from "./sources/extr
 import { nearbyReports, type StormReport } from "../shared/reports";
 import { publicProducts } from "./studio";
 import { fetchAirQuality } from "./sources/openmeteo";
-import { fetchRadarFrames } from "./sources/rainviewer";
+import { fetchRadarFrames, tileUpstream } from "./sources/iemradar";
 import { fetchOutlook } from "./sources/spc";
 import { readAlerts, readAnnouncements, readConfig, readRundown, readSim } from "./store";
 import { handleTts } from "./tts";
@@ -189,6 +189,23 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
   if (path === "/api/radar") {
     const { data } = await cached(ctx, "radar", 120, fetchRadarFrames);
     return json(data, 200, 60);
+  }
+
+  // same-origin radar tiles for the future-radar canvas (it reads pixels). Not an open proxy: known frames, z <= 7.
+  const tile = /^\/api\/radar\/tile\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/.exec(path);
+  if (tile && request.method === "GET") {
+    const [, frame, z, x, y] = tile as unknown as [string, string, string, string, string];
+    const upstream = tileUpstream(Math.floor(Date.now() / 1000), frame, z, x, y);
+    if (!upstream) return json({ error: "bad_tile" }, 400);
+    const cache = caches.default;
+    const key = new Request(`https://cache.shelly.internal/radar-tile/${frame}/${z}/${x}/${y}`);
+    const hit = await cache.match(key);
+    if (hit) return hit;
+    const res = await fetch(upstream);
+    if (!res.ok) return json({ error: "upstream_failed" }, 502);
+    const out = new Response(res.body, { headers: { "content-type": "image/png", "cache-control": "public, max-age=600" } });
+    ctx.waitUntil(cache.put(key, out.clone()));
+    return out;
   }
 
   if (path === "/api/announcements" && request.method === "GET") return json(await readAnnouncements(env), 200, 15);

@@ -5,7 +5,7 @@ import { detectMode } from "../src/mode";
 import type { Alert, Forecast, Place } from "../shared/types";
 
 vi.stubGlobal("fetch", () => Promise.resolve(new Response("{}", { status: 500 })));
-vi.mock("../src/segments/Radar", () => ({ Radar: () => <div class="radar-stub" /> }));
+vi.mock("../src/segments/Radar", () => ({ Radar: () => <div class="radar-stub" />, RadarSegment: () => <div class="radar-stub" /> }));
 
 const place: Place = {
   lat: 31, lon: -97, name: "Waco", state: "TX", tz: "America/Chicago", office: "FWD", gridX: 1, gridY: 1,

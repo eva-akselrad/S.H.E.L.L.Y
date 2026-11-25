@@ -445,3 +445,23 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 
 .rep-link { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 600; }
 .kiosk-frame .rep-link { display: none; }
+
+/* future radar: Past | Now | Future timeline and the estimate badge (a Leaflet control) */
+.fr-control { margin: 8px 0 0 8px; display: grid; gap: 4px; width: min(260px, 70%); font-size: 12px; color: #f3ede4; pointer-events: auto; }
+.fr-badge { justify-self: start; white-space: nowrap; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: rgba(11, 18, 32, .85); border: 1px dashed #ffd54f; color: #ffd54f; font-weight: 700; }
+.fr-top { display: flex; align-items: center; gap: 6px; }
+.fr-q { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #ffd54f; background: transparent; color: #ffd54f; font-weight: 800; cursor: pointer; padding: 0; line-height: 1; }
+.fr-tip, .fr-explain { padding: 6px 8px; border-radius: 8px; background: rgba(11, 18, 32, .92); line-height: 1.35; }
+.fr-bar { display: flex; gap: 2px; height: 8px; }
+.fr-cell { flex: 1; border-radius: 2px; background: rgba(255, 255, 255, .28); }
+.fr-cell.future { background: transparent; border: 1px dashed rgba(255, 213, 79, .7); }
+.fr-cell.now { background: #fff; }
+.fr-cell.on { outline: 2px solid #ff7a59; background: #ff7a59; }
+.fr-cell.future.on { background: rgba(255, 213, 79, .8); outline-color: #ffd54f; }
+.fr-labels { display: flex; justify-content: space-between; font-size: 11px; opacity: .85; text-shadow: 0 1px 2px #000; }
+.bc-radar .fr-control { font-size: 22px; width: 520px; margin: 24px 0 0 24px; gap: 8px; }
+.bc-radar .fr-bar { height: 14px; }
+.bc-radar .fr-labels { font-size: 20px; }
+.stage .fr-control { font-size: 20px; width: 440px; }
+.stage .fr-bar { height: 12px; }
+.stage .fr-labels { font-size: 18px; }

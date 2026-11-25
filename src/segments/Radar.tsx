@@ -1,12 +1,16 @@
 import { useEffect, useRef } from "preact/hooks";
+import { futureLeads } from "../components/FutureRadar";
+import { IEM_CREDIT, startRadarLoop } from "../components/radarLoop";
+import { parseMotion } from "../../shared/live/track";
+import { detectMode } from "../mode";
 import { reportTitle } from "../../shared/reports";
 import { alertLevel } from "../../shared/threat";
 import { nearby, place, radar, reportsNearby, threat } from "../state/store";
 
 const REPORT_COLOR = { tornado: "#ff3b3b", wind: "#5ec2ff", hail: "#3ecf9a" } as const;
 
-/** Animated RainViewer radar. When a warning covers the user, the map locks on its polygon. */
-export function Radar() {
+/** Animated radar (Iowa Environmental Mesonet) plus an estimated future. When a warning covers the user, the map locks on its polygon. */
+export function Radar({ future = true }: { future?: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   const p = place.value;
   const frames = radar.value;
@@ -84,23 +88,19 @@ export function Radar() {
         map.fitBounds(poly.getBounds().pad(0.6));
       }
 
-      const layers = (frames?.frames ?? []).map((fr) =>
-        L.tileLayer(`${frames!.host}${fr.path}/256/{z}/{x}/{y}/6/1_1.png`, {
-          opacity: 0,
-          maxNativeZoom: 6,
-          zIndex: 200,
-        }).addTo(map),
-      );
-      let i = Math.max(0, layers.length - 1);
-      const show = () => layers.forEach((l, n) => l.setOpacity(n === i ? 0.75 : 0));
-      show();
-      if (layers.length > 1) {
-        timer = setInterval(() => {
-          i = (i + 1) % layers.length;
-          show();
-        }, 700);
-      }
-      cleanup = () => map.remove();
+      // future frames are never drawn on the warning takeover map: there the real polygon is the truth
+      const stop = startRadarLoop(L, map, frames, {
+        opacity: 0.75,
+        intervalMs: 700,
+        leads: primary || !future ? null : futureLeads(detectMode()),
+        motion: threat.value.active.map((x) => parseMotion(x.params.eventMotionDescription)).find((m) => m) ?? null,
+        explain: "button",
+        attribution: IEM_CREDIT,
+      });
+      cleanup = () => {
+        stop();
+        map.remove();
+      };
     })();
 
     return () => {
@@ -108,7 +108,10 @@ export function Radar() {
       if (timer) clearInterval(timer);
       cleanup();
     };
-  }, [p?.lat, p?.lon, frames, primary?.id, repKey, nearKey, othersKey]);
+  }, [p?.lat, p?.lon, frames, future, primary?.id, repKey, nearKey, othersKey]);
 
   return <div class="radar" ref={el} role="img" aria-label="Animated weather radar map" />;
 }
+
+/** the radar segment in the rotation: future frames allowed (the takeover uses <Radar future={false} />) */
+export const RadarSegment = () => <Radar future />;

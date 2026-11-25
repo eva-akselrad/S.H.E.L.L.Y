@@ -18,7 +18,7 @@ function sourceFor(id: SegmentId): Src | null {
       return { source: "National Weather Service", at: forecast.value?.fetchedAt ?? null };
     case "radar": {
       const last = radar.value?.frames.at(-1)?.time;
-      return { source: "RainViewer radar", at: last ? last * 1000 : null };
+      return { source: "Iowa Environmental Mesonet radar", at: last ? last * 1000 : null };
     }
     case "outlook":
       return { source: "NOAA Storm Prediction Center", at: outlook.value?.fetchedAt ?? null };

@@ -9,7 +9,7 @@ import { Local } from "./Local";
 import { Note } from "./Note";
 import { Now } from "./Now";
 import { Outlook } from "./Outlook";
-import { Radar } from "./Radar";
+import { RadarSegment } from "./Radar";
 import { Reports } from "./Reports";
 import { SnowDay } from "./SnowDay";
 import { Studio } from "./Studio";
@@ -17,7 +17,7 @@ import { Text } from "./Text";
 
 export const SEGMENT_VIEWS: Record<SegmentId, ComponentType> = {
   now: Now,
-  radar: Radar,
+  radar: RadarSegment,
   hourly: Hourly,
   daily: Daily,
   text: Text,
