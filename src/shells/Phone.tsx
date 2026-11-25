@@ -6,6 +6,7 @@ import { PushToggle } from "../components/PushToggle";
 import { WatchLive } from "../components/WatchLive";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
+import { ReportLink } from "../segments/Reports";
 import { loop, threat } from "../state/store";
 
 /** Phone: threat pinned on top, segments as scrollable cards (no slideshow). */
@@ -41,7 +42,7 @@ export function PhoneShell() {
           );
         })}
       </main>
-      <footer class="botbar"><StatusLine /></footer>
+      <footer class="botbar"><StatusLine /><ReportLink /></footer>
     </div>
   );
 }

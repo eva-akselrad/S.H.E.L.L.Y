@@ -1,5 +1,19 @@
 import { reportTitle } from "../../shared/reports";
+import { checkAdmin, isAdmin } from "../adminSession";
 import { place, reportsNearby } from "../state/store";
+
+/** Link to the printable storm damage report for the current place (hidden on the kiosk, which has no pointer). */
+export function ReportLink() {
+  checkAdmin();
+  if (!isAdmin.value) return null; // admin-only for now
+  const p = place.value;
+  const href = p ? `/report/?lat=${p.lat}&lon=${p.lon}&name=${encodeURIComponent(p.name)}` : "/report/";
+  return (
+    <a class="rep-link" href={href}>
+      Get a report for your address
+    </a>
+  );
+}
 
 const ICON = { tornado: "T", wind: "W", hail: "H" } as const;
 
@@ -7,7 +21,13 @@ const ICON = { tornado: "T", wind: "W", hail: "H" } as const;
 export function Reports() {
   const list = reportsNearby.value;
   const tz = place.value?.tz;
-  if (!list.length) return <p class="muted">No storm reports within 100 miles in the last 12 hours.</p>;
+  if (!list.length)
+    return (
+      <>
+        <p class="muted">No storm reports within 100 miles in the last 12 hours.</p>
+        <ReportLink />
+      </>
+    );
   const counts = { tornado: 0, wind: 0, hail: 0 };
   for (const r of list) counts[r.kind]++;
   return (

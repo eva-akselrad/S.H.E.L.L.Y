@@ -391,3 +391,57 @@ input { background: var(--panel); border: 1px solid var(--line); border-radius: 
 @container (max-width: 520px) { .sdo-main { grid-template-columns: 1fr; gap: 12px; } }
 .card .sdo-chips li { background: var(--panel-2); }
 .phone .sdo-main { grid-template-columns: 1fr; gap: 12px; }
+
+/* Storm damage report (/report) */
+.report-page { max-width: 820px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 16px; }
+.rp-top { display: flex; justify-content: space-between; align-items: center; }
+.rp-form { display: grid; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.rp-form h1, .rp-sheet h1 { margin: 0; font-family: var(--display); }
+.rp-form label { display: grid; gap: 4px; font-size: .9em; color: var(--muted); }
+.rp-form input, .rp-form select { min-height: 44px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; }
+.rp-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.rp-row > label { flex: 1 1 160px; }
+.rp-privacy { margin: 0; font-size: .85em; }
+.rp-err { color: #e57373; }
+.rp-actions { display: flex; justify-content: center; }
+.rp-sheet { display: grid; gap: 10px; padding: 18px 20px; border-radius: 12px; background: #fff; color: #111; border: 1px solid var(--line); font-size: 13px; line-height: 1.4; }
+.rp-sheet h1 { font-size: 20px; }
+.rp-sheet h2 { margin: 8px 0 4px; font-size: 13px; text-transform: none; border-bottom: 1px solid #999; padding-bottom: 2px; color: #111; }
+.rp-sub { margin: 2px 0 0; color: #444; font-size: 11px; }
+.rp-summary { margin: 0; font-size: 14px; padding: 8px 10px; border: 1px solid #999; }
+.rp-cols { display: grid; grid-template-columns: 1fr 250px; gap: 14px; align-items: start; }
+.rp-list { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.rp-none { margin: 2px 0; color: #444; }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rp-table th, .rp-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #bbb; vertical-align: top; }
+.rp-remark { color: #444; font-size: 11px; }
+.rp-foot { margin-top: 8px; padding-top: 6px; border-top: 1px solid #999; font-size: 11px; color: #222; }
+.rp-foot p { margin: 2px 0; }
+.rp-foot a { color: #111; word-break: break-all; }
+.rp-map { margin: 0; }
+.rp-map svg { width: 100%; height: auto; display: block; border: 1px solid #777; }
+.rp-map figcaption { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; color: #333; margin-top: 3px; }
+.rm-bg { fill: #fff; }
+.rm-ring { fill: none; stroke: #888; stroke-width: .8; stroke-dasharray: 3 3; }
+.rm-lbl { font: 8px sans-serif; fill: #444; }
+.rm-warn { fill: #00000014; stroke: #111; stroke-width: 1.4; }
+.rm-gust { stroke: #111; stroke-width: 1.5; fill: none; }
+.rm-r path, .rm-r rect, .rm-r polygon { fill: #111; stroke: #fff; stroke-width: .8; }
+.rm-hail rect { fill: #fff; stroke: #111; stroke-width: 1.5; }
+.rm-flood path { fill: #fff; stroke: #111; stroke-width: 1.5; }
+.rm-num { font: bold 9px sans-serif; fill: #111; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.rm-home-o { fill: #fff; stroke: #111; stroke-width: 2; }
+.rm-home { fill: #111; }
+.rm-n { font: bold 11px sans-serif; fill: #111; text-anchor: end; }
+@media (max-width: 640px) { .rp-cols { grid-template-columns: 1fr; } }
+@media print {
+  @page { size: letter portrait; margin: 0.5in; }
+  html, body { background: #fff !important; color: #000 !important; }
+  .no-print { display: none !important; }
+  .report-page { padding: 0; max-width: none; }
+  .rp-sheet { border: 0; padding: 0; border-radius: 0; break-inside: avoid; }
+  .rp-cols { grid-template-columns: 1fr 240px; }
+}
+
+.rep-link { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 600; }
+.kiosk-frame .rep-link { display: none; }
