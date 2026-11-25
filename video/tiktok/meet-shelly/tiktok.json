@@ -1,0 +1,27 @@
+{
+  "badge": "HI, TIKTOK",
+  "hook": ["MEET", "SHELLY"],
+  "hook_color": [70, 215, 160],
+  "host_open": "host_shades_happy",
+  "headline": ["PHILLY AREA", "WEATHER, LIVE"],
+  "tagline": "PHILLY  •  SOUTH JERSEY  •  DELAWARE",
+  "when_line": "FORECASTS BY EVA AKSELRAD",
+  "bullets_title": "WHAT YOU GET",
+  "bullets": [
+    "Live weather coverage on YouTube when storms hit",
+    "Warnings straight from the National Weather Service",
+    "Storm forecasts and maps I make myself",
+    "A free website and Android app"
+  ],
+  "graphic": "broadcast.jpg",
+  "graphic_focus": [0.85, 0.75],
+  "graphic_label": "Hosted by a sea turtle, obviously",
+  "thumbnail": "thumbnail.png",
+  "cta": ["FOLLOW FOR", "STORM UPDATES"],
+  "cta_sub": "weather.evaakselrad.com",
+  "cta_note": "Free, every day",
+  "host_close": "host_none_happy",
+  "music": "Catch the Sun",
+  "music_start": 16,
+  "caption": "Hi TikTok, meet SHELLY. It's my weather project for Philly, South Jersey, the shore and Delaware: a live YouTube stream when storms hit, real National Weather Service warnings, and storm forecasts and maps I make myself. The sea turtle hosts. Follow for storm updates.\n\nweather.evaakselrad.com\n\n#weather #philly #philadelphia #newjersey #southjersey #jerseyshore #delaware #weathertok #forecast #storm #meteorology #shellyweather"
+}

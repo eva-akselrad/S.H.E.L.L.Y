@@ -19,7 +19,8 @@
     "video:capture": "node scripts/video-capture.mjs",
     "video:record": "node scripts/video-record.mjs",
     "video:forecast": "python scripts/video-forecast.py",
-    "video:release": "python scripts/video-release.py"
+    "video:release": "python scripts/video-release.py",
+    "video:tiktok": "python scripts/video-tiktok.py"
   },
   "dependencies": {
     "@preact/signals": "^2.11.4",
