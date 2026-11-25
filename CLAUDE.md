@@ -19,8 +19,9 @@
   each. **Snow day odds (part S) is built and deployed**; it still needs the user's real school
   districts in admin. **Storm damage report (part D) is built, admin-only for now, not deployed.**
   **Future radar (part R) is built on IEM tiles** (the radar loop moved off RainViewer), not deployed.
-  Part L (lightning) is next.
-- **SHELLY Android app: shipped (A1 to A6), signed release 1.0.2 is live (2.0.0 is next, versionCode 4)** at `/get-android/` with in-app update checks. Admin simulator has custom test alerts and custom notifications. Release runbook: **[docs/ANDROID.md](docs/ANDROID.md)** (run `node scripts/android-release.mjs --upload`; always bump `versionCode`). Still the user's: Android Developer Console package registration, backups of the keystore and Firebase key. Open: widget not checked on a real launcher, test notifications not confirmed on the phone. The full build plan is
+  **Lightning proximity (part L) is built**: Philly region only, GOES-19 GLM parsed in the cron, opt-in
+  Android push in app 2.1.0. Not deployed. Batch 2 is complete.
+- **SHELLY Android app: shipped (A1 to A6), signed release 2.0.1 (versionCode 5) is live; 2.1.0 (versionCode 6, adds the opt-in lightning push) is built, not released** at `/get-android/` with in-app update checks. Admin simulator has custom test alerts and custom notifications. Release runbook: **[docs/ANDROID.md](docs/ANDROID.md)** (run `node scripts/android-release.mjs --upload`; always bump `versionCode`). Still the user's: Android Developer Console package registration, backups of the keystore and Firebase key. Open: widget not checked on a real launcher, test notifications not confirmed on the phone. The full build plan is
   **[docs/ANDROID_PLAN.md](docs/ANDROID_PLAN.md)**. Start at phase A1 and follow its order and
   stop points. The user decided all of this on 2026-11-17 (don't re-ask):
   - Native app, **sideloaded** from the website with a **self-updater**. **Not on the Play Store.**

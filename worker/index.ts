@@ -1,10 +1,11 @@
 import { buildSimAlert } from "../shared/simulate";
 import { handleAdmin } from "./admin";
 import { handleAndroid } from "./android";
-import { fanOutFcm } from "./fcm";
+import { fanOutFcm, fanOutLightningFcm } from "./fcm";
 import { coords, loadForecast, loadPlace } from "./loaders";
 import { cached, round } from "./cache";
 import { handleDamage } from "./damage";
+import { handleLightning, ingestLightning, regionZoneOutlines } from "./lightning";
 import { handleSnowDay } from "./snowday";
 import { handleLiveTts, prepareRundownVoice, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
@@ -183,6 +184,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
 
   if (path === "/api/snowday") return handleSnowDay(env, ctx, url);
   if (path === "/api/damage") return handleDamage(request, env, ctx, url);
+  if (path === "/api/lightning") return handleLightning(env, url);
 
   if (path === "/api/grade") return json(await gradeSummary(env), 200, 600);
 
@@ -232,6 +234,14 @@ export default {
         await fanOutPushes(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "push_fanout_failed", err: String(err) })));
         await fanOutFcm(env, alerts).catch((err) => console.error(JSON.stringify({ msg: "fcm_fanout_failed", err: String(err) })));
       }
+      // lightning after the alert fan-outs, with its own catch: a GLM failure must never delay or block alerts
+      await ingestLightning(env)
+        .then(async (r) => {
+          console.log(JSON.stringify({ msg: "lightning_ingest", files: r.files, flashes: r.flashes, wrote: r.wrote, ms: r.ms }));
+          // Android lightning push (opt-in on the phone): one message per zone per 30 min, after the alert fan-outs
+          await fanOutLightningFcm(env, r.fresh, () => regionZoneOutlines(env, ctx)).catch((err) => console.error(JSON.stringify({ msg: "lightning_fcm_failed", err: String(err) })));
+        })
+        .catch((err) => console.error(JSON.stringify({ msg: "lightning_ingest_failed", err: String(err) })));
       await produceRundown(env);
     };
     ctx.waitUntil(

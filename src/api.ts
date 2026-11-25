@@ -2,6 +2,7 @@ import type { Confidence } from "../shared/confidence";
 import type { SiteConfig } from "../shared/config";
 import type { GradedDay, GradeSummary } from "../shared/grade";
 import type { Hazards } from "../shared/hazards";
+import type { LightningResponse } from "../shared/lightning";
 import type { SnowDayResponse } from "../shared/snowday";
 import type { StormReport } from "../shared/reports";
 import type { StudioProduct } from "../shared/studio";
@@ -34,6 +35,7 @@ export const api = {
   confidence: (p: Place) => get<Confidence>(`/api/confidence?${q(p)}`),
   reports: (p: Place) => get<{ fetchedAt: string; reports: (StormReport & { distanceMi: number })[] }>(`/api/reports?${q(p)}`),
   hazards: (p: Place) => get<Hazards>(`/api/hazards?${q(p)}`),
+  lightning: (p: Place) => get<LightningResponse>(`/api/lightning?${q(p)}`),
   snowday: (p: Place) => get<SnowDayResponse>(`/api/snowday?${q(p)}`),
   grade: () => get<GradeSummary & { history: GradedDay[] }>("/api/grade"),
 };

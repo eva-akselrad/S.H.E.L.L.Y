@@ -24,6 +24,8 @@ object Notifier {
     const val CH_WATCHES = "watches"
     const val CH_APP = "app"
     const val CH_ANNOUNCE = "announcements"
+    const val CH_LIGHTNING = "lightning"
+    private const val LIGHTNING_ID = 7800
     private const val ANNOUNCE_ID = 7700
     private const val TEST_ID = 7001
 
@@ -52,7 +54,11 @@ object Notifier {
         val announce = NotificationChannel(CH_ANNOUNCE, "Announcements", NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = "Messages from SHELLY"
         }
-        nm.createNotificationChannels(listOf(warnings, watches, app, announce))
+        // opt-in, below the warning channel on purpose: no alarm sound, no Do Not Disturb bypass, never full screen
+        val lightning = NotificationChannel(CH_LIGHTNING, "Lightning nearby", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Optional: lightning seen from satellite within about 10 miles of you"
+        }
+        nm.createNotificationChannels(listOf(warnings, watches, app, announce, lightning))
     }
 
     private fun canPost(context: Context): Boolean =
@@ -152,6 +158,30 @@ object Notifier {
             .build()
         try {
             NotificationManagerCompat.from(context).notify(ANNOUNCE_ID, n)
+        } catch (_: SecurityException) {
+        }
+    }
+
+    /** Lightning within about 10 miles of this phone (opt-in). Template text from LightningDecider; replaces the last one. */
+    fun showLightning(context: Context, distanceMi: Double) {
+        if (!canPost(context)) return
+        val body = LightningDecider.body(distanceMi)
+        val n = NotificationCompat.Builder(context, CH_LIGHTNING)
+            .setSmallIcon(R.drawable.ic_stat_shelly)
+            .setContentTitle("Lightning nearby")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(openApp(context, LIGHTNING_ID))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setTimeoutAfter(30 * 60_000L)
+            .setColor(0xFFFF8A65.toInt())
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(LIGHTNING_ID, n)
         } catch (_: SecurityException) {
         }
     }

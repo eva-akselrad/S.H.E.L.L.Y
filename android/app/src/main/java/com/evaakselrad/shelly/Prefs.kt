@@ -4,15 +4,16 @@ import android.content.Context
 import org.json.JSONObject
 
 /** Alert preferences. Same shape as PushPrefs on the website (shared/push.ts). */
-data class AlertPrefs(val watches: Boolean, val quietStart: Int?, val quietEnd: Int?) {
+data class AlertPrefs(val watches: Boolean, val quietStart: Int?, val quietEnd: Int?, val lightning: Boolean = false) {
     fun toJson(): String = JSONObject()
         .put("watches", watches)
         .put("quietStart", quietStart ?: JSONObject.NULL)
         .put("quietEnd", quietEnd ?: JSONObject.NULL)
+        .put("lightning", lightning)
         .toString()
 
     companion object {
-        val DEFAULT = AlertPrefs(watches = false, quietStart = 22, quietEnd = 7)
+        val DEFAULT = AlertPrefs(watches = false, quietStart = 22, quietEnd = 7, lightning = false)
 
         /** Parses and validates JSON from the website. Returns null if it is not usable. */
         fun parse(json: String): AlertPrefs? = try {
@@ -23,7 +24,7 @@ data class AlertPrefs(val watches: Boolean, val quietStart: Int?, val quietEnd: 
                 require(v in 0..23)
                 return v
             }
-            AlertPrefs(o.optBoolean("watches", false), hour("quietStart"), hour("quietEnd"))
+            AlertPrefs(o.optBoolean("watches", false), hour("quietStart"), hour("quietEnd"), o.optBoolean("lightning", false))
         } catch (_: Exception) {
             null
         }
@@ -50,6 +51,11 @@ class Prefs(context: Context) {
     var lastGlance: String?
         get() = sp.getString("lastGlance", null)
         set(v) = sp.edit().putString("lastGlance", v).apply()
+
+    /** when the last lightning notification was shown (ms), for the 30-minute pause */
+    var lastLightningMs: Long
+        get() = sp.getLong("lastLightningMs", 0)
+        set(v) = sp.edit().putLong("lastLightningMs", v).apply()
 
     /** FCM topics this phone is subscribed to (zones). Stays on the phone. */
     var topics: Set<String>

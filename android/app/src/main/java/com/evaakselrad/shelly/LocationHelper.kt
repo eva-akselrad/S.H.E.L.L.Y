@@ -53,6 +53,20 @@ object LocationHelper {
         return Fix(saved.first, saved.second, nowMs - saved.third)
     }
 
+    /**
+     * Quick, for an FCM handler (it has about 20 s): the fused last position if there is one, else the one saved
+     * by the last refresh. Never starts a new fix.
+     */
+    @Suppress("MissingPermission")
+    fun lastKnown(context: Context, nowMs: Long = System.currentTimeMillis()): Triple<Double, Double, Long>? {
+        if (hasPermission(context)) {
+            val last = try { Tasks.await(LocationServices.getFusedLocationProviderClient(context).lastLocation, 5, TimeUnit.SECONDS) } catch (_: Exception) { null }
+            if (last != null) return Triple(last.latitude, last.longitude, nowMs - last.time)
+        }
+        val saved = Prefs(context).lastLocation() ?: return null
+        return Triple(saved.first, saved.second, nowMs - saved.third)
+    }
+
     private fun save(prefs: Prefs, lat: Double, lon: Double, fixMs: Long, nowMs: Long): Fix {
         prefs.saveLocation(lat, lon, fixMs)
         return Fix(lat, lon, nowMs - fixMs)

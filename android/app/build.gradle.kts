@@ -24,8 +24,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Bump versionCode on every release: the self-updater compares it.
-        versionCode = 5
-        versionName = "2.0.1"
+        versionCode = 6
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SITE_URL", "\"https://shelly.evaakselrad.com\"")

@@ -1,6 +1,7 @@
 import type { LiveCity, LiveConfig } from "../config";
 import type { SegmentId } from "../scheduler";
 import { alertScript, isSpokenAlert } from "../script";
+import { liveLightningLine, type RegionLightning } from "../lightning";
 import { isEmergency } from "../threat";
 import type { Alert, SpcCategory, ThreatLevel } from "../types";
 import { productActive, type StudioProduct } from "../studio";
@@ -56,6 +57,8 @@ export interface RundownData {
   wx?: RegionWx | null;
   /** forecaster's on-air controls */
   control?: LiveControl | null;
+  /** lightning near a region city (GLM satellite), or null. Deterministic template only. */
+  lightning?: RegionLightning | null;
 }
 
 export interface Rundown {
@@ -175,6 +178,13 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
     const text = data.talkBreak || talkBreak(bucket, region.name);
     return { key: key("host"), kind: "host", text, source: data.talkBreak ? "llm" : "template", headline: cfg.host.name.toUpperCase(), speak: text, durationSec: Math.max(s ?? secs("host"), speakSecs(text, 3)) };
   };
+  /** "Lightning about 6 miles from Norristown, moving closer." Words come from shared/lightning.ts, never the LLM. */
+  const lightningItem = (): RundownItem[] => {
+    const lt = data.lightning;
+    if (!lt) return [];
+    const text = liveLightningLine(lt);
+    return [{ key: key("lightning"), kind: "host", text, source: "template", headline: `LIGHTNING NEAR ${lt.city.toUpperCase()}`, speak: text, durationSec: Math.max(secs("host"), speakSecs(text, 3)) }];
+  };
   const bulletinItem = (b: Bulletin): RundownItem => {
     const speak = bulletinSpeech(b);
     return {
@@ -242,7 +252,7 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
     for (const a of list) items.push(alertItem(a), warnRadar(a));
   } else if (level === "WARNING" && top) {
     // warnings lead and repeat every three content items; the forecaster's playlist fills the gaps
-    const fill = [...bulletins.map(bulletinItem), ...content(true)];
+    const fill = [...bulletins.map(bulletinItem), ...lightningItem(), ...content(true)];
     if (!fill.some((i) => i.kind === "outlook")) fill.push(outlookItem());
     const cycle = warnings.slice(0, 3);
     items.push(alertItem(top), warnRadar(top));
@@ -254,14 +264,14 @@ export function buildRundown(intensity: Intensity, data: RundownData, cfg: LiveC
   } else if (level === "ELEVATED") {
     // watches and the outlook first, then the playlist with radar after every other item
     const body = content(false).filter((i) => !(i.kind === "radar" && i.view === "region") && i.kind !== "outlook");
-    const lead: RundownItem[] = [...bulletins.map(bulletinItem), outlookItem(), ...watches.slice(0, 3).map(alertItem)];
+    const lead: RundownItem[] = [...bulletins.map(bulletinItem), outlookItem(), ...lightningItem(), ...watches.slice(0, 3).map(alertItem)];
     [...lead, ...body].forEach((c, i) => {
       items.push(c);
       if (i % 2 === 0) items.push(regionRadar());
     });
   } else {
     // CALM: the forecaster's playlist, bulletins every few items
-    const body = content(false);
+    const body = [...lightningItem(), ...content(false)];
     if (bulletins.length) {
       const b = bulletins.map(bulletinItem);
       items.push(...b);

@@ -4,6 +4,7 @@ import { InstallApp } from "../components/InstallApp";
 import { AppAlerts } from "../components/AppAlerts";
 import { PushToggle } from "../components/PushToggle";
 import { WatchLive } from "../components/WatchLive";
+import { LightningChip } from "../components/LightningUi";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { ReportLink } from "../segments/Reports";
@@ -25,6 +26,7 @@ export function PhoneShell() {
         <div class={`pin lvl-${t.level.toLowerCase()}`} role="status">{t.reasons.join(" • ")}</div>
       )}
       <ActionCard />
+      <LightningChip />
       <NearbyNotice />
       <InstallApp />
       <div class="phone-live"><WatchLive /></div>

@@ -1,6 +1,6 @@
 import { agoText } from "../../shared/health";
 import type { SegmentId } from "../../shared/scheduler";
-import { air, confidence, forecast, gradeHere, hazards, now, outlook, radar, reports, snowOdds } from "../state/store";
+import { air, confidence, forecast, gradeHere, hazards, lightning, now, outlook, radar, reports, snowOdds } from "../state/store";
 
 interface Src {
   source: string;
@@ -28,6 +28,8 @@ function sourceFor(id: SegmentId): Src | null {
       return { source: "NOAA SPC preliminary reports", at: reports.value?.fetchedAt ?? null };
     case "local":
       return { source: "NWS water, NOAA tides, NHC", at: hazards.value?.fetchedAt ?? null };
+    case "lightning":
+      return { source: "NOAA GOES-19 lightning mapper", at: lightning.value?.updated ?? null };
     case "snowday":
       return { source: snowOdds.value?.source === "model" ? "Open-Meteo + NWS alerts" : "NWS forecast grid + GFS ensemble", at: snowOdds.value?.fetchedAt ?? null };
     case "grade": {

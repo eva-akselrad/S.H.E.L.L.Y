@@ -17,11 +17,31 @@ class ShellyMessagingService : FirebaseMessagingService() {
                 val body = message.data["body"].orEmpty()
                 if (title.isNotBlank() && body.isNotBlank()) Notifier.showAnnouncement(applicationContext, title, body)
             }
+            "lightning" -> handleLightning(message.data)
             "test" -> {
                 Notifier.createChannels(applicationContext)
                 Notifier.showTest(applicationContext)
             }
         }
+    }
+
+    /**
+     * Opt-in lightning near this phone. The message only says where a flash was; whether it matters is decided
+     * here from the phone's own position and settings, and nothing about the phone's position is sent anywhere.
+     */
+    private fun handleLightning(data: Map<String, String>) {
+        val app = applicationContext
+        val prefs = Prefs(app)
+        if (!prefs.alertPrefs.lightning) return
+        val msg = LightningMsg.parse(data) ?: return
+        val now = System.currentTimeMillis()
+        val fix = LocationHelper.lastKnown(app, now)
+        val hour = java.time.ZonedDateTime.now().hour
+        val verdict = LightningDecider.decide(msg, prefs.alertPrefs, hour, fix, prefs.lastLightningMs, now)
+        if (verdict != LightningVerdict.SHOW || fix == null) return
+        Notifier.createChannels(app)
+        Notifier.showLightning(app, LightningDecider.distanceMi(fix.first, fix.second, msg.lat, msg.lon))
+        prefs.lastLightningMs = now
     }
 
     /** Topics are tied to the install, not the token, so only a refresh is needed. */

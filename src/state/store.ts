@@ -9,6 +9,7 @@ import { alertHealth } from "../../shared/health";
 import { localHour, localNow, rainNowcast } from "../../shared/nowcast";
 import type { StormReport } from "../../shared/reports";
 import { whatToWear } from "../../shared/wear";
+import { lightningNear, lightningRelevance, type LightningResponse, type LightningState } from "../../shared/lightning";
 import { snowDayRelevance, type SnowDayResponse } from "../../shared/snowday";
 import { buildLoop } from "../../shared/scheduler";
 import type { StudioProduct } from "../../shared/studio";
@@ -50,6 +51,7 @@ export const confidence = signal<Confidence | null>(load<Confidence>("confidence
 export const reports = signal<{ fetchedAt: string; reports: (StormReport & { distanceMi: number })[] } | null>(null);
 export const hazards = signal<Hazards | null>(load<Hazards>("hazards"));
 export const snowOdds = signal<SnowDayResponse | null>(load<SnowDayResponse>("snowday"));
+export const lightning = signal<LightningResponse | null>(null);
 export const grade = signal<(GradeSummary & { history: GradedDay[] }) | null>(null);
 /** when this screen last got an answer from /api/alerts (ms epoch) */
 export const alertsOkAt = signal<number | null>(null);
@@ -158,6 +160,20 @@ export const snowdayRelevance = computed(() => {
   return snowDayRelevance(snowOdds.value?.odds ?? null, localNow(tzNow()));
 });
 
+/** Lightning around the viewer, worked out here from the flashes so it ages by the second without a refetch. */
+export const lightningState = computed<LightningState | null>(() => {
+  const r = lightning.value;
+  const p = place.value;
+  if (!r || !r.available || !p) return null;
+  void minute.value; // re-age once a minute, not every second
+  const t = Date.now();
+  // the feed counts as behind when its newest file is old, measured on this screen's clock
+  const stale = r.updated === null || t - r.updated > 5 * 60_000;
+  return lightningNear(r.flashes, p.lat, p.lon, t, { stale });
+});
+
+const lightningRel = computed(() => lightningRelevance(lightningState.value));
+
 export const loop = computed(() =>
   buildLoop({
     forecast: forecast.value,
@@ -172,6 +188,7 @@ export const loop = computed(() =>
     hazards: hazardScore(hazards.value, snowDay.value),
     graded: gradeHere.value !== null,
     snowday: snowdayRelevance.value,
+    lightning: lightningRel.value,
   }),
 );
 
@@ -202,6 +219,7 @@ export async function setPlace(p: Place): Promise<void> {
   reports.value = null;
   hazards.value = null;
   snowOdds.value = null;
+  lightning.value = null;
   await refreshAll();
 }
 
@@ -349,6 +367,17 @@ export const refresh = {
         )
       : Promise.resolve();
   },
+  lightning: () => {
+    const p = place.value;
+    return p
+      ? guarded(
+          () => api.lightning(p),
+          (r) => {
+            lightning.value = r;
+          },
+        )
+      : Promise.resolve();
+  },
   grade: () =>
     guarded(
       () => api.grade(),
@@ -380,6 +409,7 @@ export function startPollers(): void {
   every(3 * 60_000, refresh.reports);
   every(15 * 60_000, refresh.hazards);
   every(15 * 60_000, refresh.snowday);
+  every(30_000, refresh.lightning);
   every(30 * 60_000, refresh.grade);
   every(1_000, () => {
     now.value = Date.now();

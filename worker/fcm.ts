@@ -2,6 +2,7 @@
 // Off (a no-op) until the FCM_SERVICE_ACCOUNT secret is set. FCM only delivers; the Worker decides.
 import { decideFcmSends, topicConditions, updateFcmSent, type FcmDecision, type FcmSent } from "../shared/fcm";
 import type { Alert } from "../shared/types";
+import { lightningData, markPushed, decideLightningPush, type LightningPush, type LightningSent, type ZoneOutline } from "../shared/lightningPush";
 import { b64urlEncode } from "./webpush";
 
 const SENT_KEY = "fcm:sent";
@@ -67,7 +68,7 @@ interface Target {
   topic?: string;
 }
 
-async function send(token: string, sa: ServiceAccount, target: Target, data: Record<string, string>, high: boolean, notification?: { title: string; body: string }): Promise<{ ok: boolean; status: number }> {
+async function send(token: string, sa: ServiceAccount, target: Target, data: Record<string, string>, high: boolean, notification?: { title: string; body: string }, ttl?: string): Promise<{ ok: boolean; status: number }> {
   const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -80,7 +81,7 @@ async function send(token: string, sa: ServiceAccount, target: Target, data: Rec
         ...(notification ? { notification } : {}),
         android: {
           priority: high ? "HIGH" : "NORMAL",
-          ttl: high ? "1800s" : "10800s",
+          ttl: ttl ?? (high ? "1800s" : "10800s"),
           ...(notification ? { notification: { channel_id: "announcements" } } : {}),
         },
       },
@@ -144,4 +145,42 @@ export async function sendCustomFcm(env: Env, title: string, body: string): Prom
   if (!sa) return false;
   const token = await accessToken(env, sa);
   return (await send(token, sa, { topic: "all" }, { type: "custom", title, body }, true, { title, body })).ok;
+}
+
+const LIGHTNING_KEY = "fcm:lightning";
+
+/**
+ * Lightning near a zone (L4). Normal priority, short time to live, data only: the phone checks its own GPS and its
+ * own settings. At most one message per zone per 30 minutes; the dedupe memory is the single KV key `fcm:lightning`.
+ * Runs after the alert fan-outs, and the caller catches everything, so it can never delay an alert.
+ */
+export async function fanOutLightningFcm(env: Env, fresh: import("../shared/lightning").Flash[], zones: () => Promise<ZoneOutline[]>, now = Date.now()): Promise<{ sent: number; failed: number }> {
+  const result = { sent: 0, failed: 0 };
+  const sa = serviceAccount(env);
+  if (!sa || !fresh.length) return result;
+  const prior = (await env.STATE.get<LightningSent>(LIGHTNING_KEY, "json")) ?? {};
+  const { pushes, next } = decideLightningPush(fresh, await zones(), prior, now);
+  if (!pushes.length) {
+    if (Object.keys(next).length !== Object.keys(prior).length) await env.STATE.put(LIGHTNING_KEY, JSON.stringify(next), { expirationTtl: 3600 });
+    return result;
+  }
+  const token = await accessToken(env, sa, now);
+  const delivered: LightningPush[] = [];
+  for (const p of pushes) {
+    try {
+      const r = await send(token, sa, { topic: `z_${p.zone}` }, lightningData(p), false, undefined, "600s");
+      if (r.ok) {
+        result.sent++;
+        delivered.push(p);
+      } else {
+        result.failed++;
+        console.error(JSON.stringify({ msg: "fcm_lightning_failed", status: r.status }));
+      }
+    } catch (err) {
+      result.failed++;
+      console.error(JSON.stringify({ msg: "fcm_lightning_error", err: String(err) }));
+    }
+  }
+  await env.STATE.put(LIGHTNING_KEY, JSON.stringify(markPushed(next, delivered, now)), { expirationTtl: 3600 });
+  return result;
 }

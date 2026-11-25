@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { AnnouncementBar, Logo, StatusLine, ThreatBadge } from "../components/Chrome";
 import { Freshness } from "../components/Freshness";
 import { SoundOutput } from "../components/SoundOutput";
+import { LightningChip } from "../components/LightningUi";
 import { ActionCard, NearbyNotice, StaleBanner } from "../components/Safety";
 import { SEGMENT_VIEWS } from "../segments";
 import { currentSegment, goTo, paused } from "../state/store";
@@ -44,6 +45,7 @@ export function KioskShell() {
         <div class="kiosk-notices">
           <StaleBanner />
           <ActionCard compact />
+          <LightningChip compact />
           <NearbyNotice />
           <AnnouncementBar />
         </div>

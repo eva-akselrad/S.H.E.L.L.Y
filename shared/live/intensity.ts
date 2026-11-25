@@ -1,4 +1,5 @@
 import { alertLevel, isEmergency } from "../threat";
+import type { LightningLevel } from "../lightning";
 import type { Alert, SpcCategory, ThreatLevel } from "../types";
 
 export interface IntensityInput {
@@ -10,6 +11,8 @@ export interface IntensityInput {
   /** when the last warning in the region ended (decay window), ISO or null */
   lastWarningEndedAt?: string | null;
   now?: number;
+  /** worst lightning level over the region (GLM satellite). Only nudges the score; never changes the level. */
+  lightning?: LightningLevel;
 }
 
 export interface Counters {
@@ -26,6 +29,9 @@ export interface Intensity {
   counters: Counters;
 }
 
+/** Lightning is not an NWS alert: it can add a little to the score, but never past this, which sits below the warning floor (0.5). */
+export const LIGHTNING_NUDGE: Record<LightningLevel, number> = { clear: 0, nearby: 0.03, danger: 0.06 };
+export const LIGHTNING_CAP = 0.45;
 export const DECAY_MS = 30 * 60 * 1000;
 const FRESH_MS = 10 * 60 * 1000;
 const SPC_WEIGHT: Record<SpcCategory, number> = { NONE: 0, TSTM: 0.02, MRGL: 0.05, SLGT: 0.15, ENH: 0.3, MDT: 0.5, HIGH: 0.7 };
@@ -125,6 +131,12 @@ export function computeIntensity(input: IntensityInput): Intensity {
   if (newestWarning && now - newestWarning < FRESH_MS) {
     score += 0.1;
     drivers.push("a newly issued warning");
+  }
+  // lightning nudge: calm and elevated only, small, and capped under the warning floor so it can't outrank a warning
+  const lt = input.lightning ?? "clear";
+  if (lt !== "clear" && level !== "WARNING" && level !== "EMERGENCY" && !emergency) {
+    score = Math.min(score + LIGHTNING_NUDGE[lt], Math.max(score, LIGHTNING_CAP));
+    drivers.push("lightning nearby");
   }
   if (emergency) {
     level = "EMERGENCY";
