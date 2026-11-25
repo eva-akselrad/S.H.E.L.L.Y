@@ -23,6 +23,18 @@ describe("computeThreat", () => {
     expect(t.level).toBe("WARNING");
     expect(t.primary?.event).toBe("Tornado Warning");
   });
+  test("long-lasting warnings do not take over the screen", () => {
+    for (const event of ["High Wind Warning", "Coastal Flood Warning", "Winter Storm Warning", "Excessive Heat Warning"]) {
+      const t = computeThreat({ alerts: [mk({ event, severity: "Severe", urgency: "Expected" })], point: inside });
+      expect(t.level, event).toBe("ELEVATED");
+      expect(t.rank).toBe(1);
+    }
+  });
+  test("a high wind warning does not hide a tornado warning", () => {
+    const t = computeThreat({ alerts: [mk({ id: "w", event: "High Wind Warning" }), mk({ id: "t" })], point: inside });
+    expect(t.level).toBe("WARNING");
+    expect(t.primary?.event).toBe("Tornado Warning");
+  });
   test("warning elsewhere is ignored", () => {
     expect(computeThreat({ alerts: [mk({})], point: outside }).level).toBe("CALM");
   });

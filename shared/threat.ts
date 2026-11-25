@@ -34,10 +34,19 @@ export function isEmergency(a: Alert): boolean {
   return false;
 }
 
+/** Warnings about danger in the next minutes to an hour. Only these take over the screen. Long-lasting warnings
+ *  (high wind, coastal flood, winter storm, hurricane, ...) are real but not urgent, so they rank as ELEVATED. */
+const URGENT_WARNING = /tornado|severe thunderstorm|flash flood|extreme wind|snow squall|dust storm|special marine|tsunami|shelter in place|civil danger|evacuation|nuclear|radiological|hazardous materials|avalanche|earthquake|volcano|ashfall/;
+export const isUrgentWarning = (a: Alert): boolean => {
+  const e = a.event.toLowerCase();
+  return e.endsWith("warning") && URGENT_WARNING.test(e);
+};
+
 export function alertLevel(a: Alert): ThreatLevel {
   if (isEmergency(a)) return "EMERGENCY";
   const e = a.event.toLowerCase();
-  if (e.endsWith("warning")) return "WARNING";
+  if (isUrgentWarning(a)) return "WARNING";
+  if (e.endsWith("warning")) return "ELEVATED"; // long-lasting: shown on the page and map, but no takeover
   if (e.endsWith("watch") || e.endsWith("advisory") || e.endsWith("statement")) return "ELEVATED";
   return a.severity === "Extreme" || a.severity === "Severe" ? "ELEVATED" : "CALM";
 }

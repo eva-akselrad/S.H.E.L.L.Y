@@ -8,6 +8,7 @@ import { handleLiveTts, prepareRundownVoice, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
 import { pollAlerts } from "./poll";
 import { fanOutPushes, handlePush } from "./push";
+import { fetchZoneGeometry, unionGeometry } from "./sources/nws";
 import { fetchConfidence, fetchHazards, fetchStormReports } from "./sources/extra";
 import { nearbyReports, type StormReport } from "../shared/reports";
 import { publicProducts } from "./studio";
@@ -115,6 +116,20 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     if (!updated || Date.now() - new Date(updated).getTime() > 180_000) ctx.waitUntil(pollAlerts(env));
     // Return alerts that name one of the zones, or that carry a polygon (client does the exact test).
     const relevant = alerts.filter((a) => a.geometry || a.zones.some((z) => zones.includes(z)));
+    // Zone-based alerts (high wind, coastal flood, winter storm...) have no polygon from NWS: draw their zones instead.
+    for (const a of relevant) {
+      if (a.geometry || !a.zones.some((z) => zones.includes(z))) continue;
+      const shapes = await Promise.all(
+        a.zones.slice(0, 40).map((z) =>
+          cached(ctx, `zone:${z}`, 7 * 86400, async () => {
+            const g = await fetchZoneGeometry(env, z);
+            if (!g) throw new Error("no zone shape"); // so a failure is not cached
+            return g;
+          }).then((r) => r.data, () => null),
+        ),
+      );
+      a.geometry = unionGeometry(shapes);
+    }
     // Admin-started test alerts, built around this viewer's location.
     const c = coords(url);
     const sim = c ? (await readSim(env)).map((s) => buildSimAlert(s, { ...c, zones })) : [];
