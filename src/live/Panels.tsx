@@ -204,7 +204,7 @@ export function RightRail({ r, region }: { r: Rundown; region: Region }) {
       <div class="bc-rail-box bc-next">
         <p class="bc-kicker">Up next{r.hold ? <span class="bc-hold">Holding: {r.hold}</span> : null}</p>
         <ul>{upNext.value.map((i) => <li key={i.key}>{i.headline}</li>)}</ul>
-        <p class="bc-credit">Data: NWS · NOAA SPC · RainViewer · Open-Meteo</p>
+        <p class="bc-credit">Data: NWS · NOAA SPC · Iowa Environmental Mesonet · Open-Meteo</p>
       </div>
       <div class="bc-hostbox">{!(current.value?.kind === "block" && current.value.block === "ident") && <Host level={r.level} />}</div>
     </aside>

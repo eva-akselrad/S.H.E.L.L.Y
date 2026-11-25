@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "preact/hooks";
 import type { Bbox, PolygonGeom } from "../../shared/types";
+import { futureLeads } from "../components/FutureRadar";
+import { startRadarLoop } from "../components/radarLoop";
 import { radar } from "./state";
 
-/** Animated RainViewer radar framed on the region, or locked onto a warning polygon. */
+/** Animated radar (Iowa Environmental Mesonet, plus an estimated future) framed on the region, or locked onto a warning polygon. */
 export interface RadarTrack {
   origin: [number, number];
   end: [number, number];
@@ -43,19 +45,17 @@ export function LiveRadar({ bbox, polygon, track }: { bbox: Bbox; polygon?: Poly
         map.fitBounds([[bbox.south, bbox.west], [bbox.north, bbox.east]]);
       }
 
-      const layers = (frames?.frames ?? []).map((fr) =>
-        L.tileLayer(`${frames!.host}${fr.path}/256/{z}/{x}/{y}/6/1_1.png`, { opacity: 0, maxNativeZoom: 6, zIndex: 200 }).addTo(map),
-      );
-      let i = Math.max(0, layers.length - 1);
-      const show = () => layers.forEach((l, n) => l.setOpacity(n === i ? 0.78 : 0));
-      show();
-      if (layers.length > 1) {
-        timer = setInterval(() => {
-          i = (i + 1) % layers.length;
-          show();
-        }, 600);
-      }
-      cleanup = () => map.remove();
+      const stop = startRadarLoop(L, map, frames, {
+        opacity: 0.78,
+        intervalMs: 600,
+        leads: polygon ? null : futureLeads("broadcast"),
+        motion: null,
+        explain: "line",
+      });
+      cleanup = () => {
+        stop();
+        map.remove();
+      };
     })();
 
     return () => {

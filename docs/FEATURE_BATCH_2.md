@@ -1,6 +1,6 @@
 # SHELLY v2: Feature Batch 2 (build plan)
 
-Status: **planned 2026-11-25. Part S built and deployed; part D (damage report) built, awaiting the user (not committed).** The user picked these four from the feature
+Status: **planned 2026-11-25. Part S built and deployed; part D (damage report) built; part R (future radar, on IEM tiles) built, awaiting the user (not committed).** The user picked these four from the feature
 brainstorm. This doc is written so a builder (Sonnet) can work through it top to bottom.
 
 | # | Feature | Size | Why this order |
@@ -269,6 +269,50 @@ Works on plain `Uint8ClampedArray` RGBA buffers so it's testable in Node.
 - **STOP:** screenshot of the loop on phone and TV, and the source comparison from R0.
 
 KV budget: none.
+
+### R0 result: source comparison (checked 2026-11-25 on the providers' own pages and live endpoints)
+
+| | RainViewer (current) | IEM NEXRAD mosaic (`ridge::USCOMP-N0Q-…`) |
+|---|---|---|
+| **Terms vs. a sponsor line** | api.html: "available for personal and educational use only"; the FAQ says free tier is for "personal, educational, and small community projects" and commercial use is "bespoke terms... case-by-case". A "presented by" line makes SHELLY arguably commercial, so this is the real risk. | disclaimer.php: material is "in the public domain and may be used freely by anyone for any lawful purpose". Nothing about commercial use specifically, nothing blocking it. Not legal advice. |
+| **CORS on tiles** | Yes, `access-control-allow-origin: *` (tested). | Yes, `Access-Control-Allow-Origin: *` (tested). |
+| **Max zoom** | 7, hard cap since 2026-01-01 (docs). | Not stated in docs. Tiles returned 200 at z7 to z10. Source is 1 km NEXRAD, so more zoom adds blur, not detail. We cap at 7 either way. |
+| **Frame spacing / history** | 10 min, 13 past frames (about 2 h). `nowcast` is empty now. | 5 min, any past time by timestamp (`…-YYYYMMDDHHMI`, minute divisible by 5). Layer exists: `/json/tms.json` lists `ridge::USCOMP-N0Q-202611252055`. Note: `?operation=available` on the tile URL just returns a PNG, and the TMS listing doesn't name it; `tms.json` is the real check. |
+| **Rate limits** | Docs conflict: FAQ says 100 requests/IP/minute, api.html says no hard limits, "cache aggressively". Our proxy makes this per Cloudflare colo IP, so the Cache API matters. | No number. Page asks not to use it in apps with "thousands of simultaneous users". Tiles are cacheable 14 days (`/c/`) so our proxy cache cuts load a lot. Fine for us; it is a university server with no SLA ("as-is"). |
+| **Color scheme** | Only Universal Blue now. | One fixed NEXRAD palette. Whichever we pick, motion math uses alpha × luminance, so it doesn't care. |
+| **Attribution** | Mandatory under free terms: "Weather data by RainViewer" with link. | "Would be appreciated": credit Iowa Environmental Mesonet. |
+| **Other** | Owners can change or remove the data; no uptime promise. | Same "as-is" caveat. Two feeds would also let us fall back from one to the other. |
+
+**Recommendation:** switch the radar map and the motion frames to IEM. The reason is the sponsor line: RainViewer's free
+tier is personal/educational and the user wants a "presented by" slot later. IEM is public domain, has finer 5-min steps
+(better motion estimates), and is already CORS-open. The cost is a different look (NEXRAD palette instead of Universal
+Blue), no 2 h history in one call (we generate timestamps ourselves, which is simple), and a university server with no SLA.
+**Middle option:** keep RainViewer as the displayed map for now and use IEM only for motion and future frames. That mixes
+two palettes on one map, so I don't recommend it. **Default if the user doesn't care: keep RainViewer.**
+
+**Decision (2026-11-25): the user chose IEM for everything.** The normal loop, the future frames and the credit
+("Radar: Iowa Environmental Mesonet") all use IEM; `worker/sources/rainviewer.ts` is gone and RainViewer is no longer
+credited. Built as:
+- `worker/sources/iemradar.ts`: reads `/json/tms.json` for the newest `ridge_uscomp_n0q` time, then lists 12 frames
+  5 minutes apart (55 min). `/api/radar` keeps its shape (`host` + `frames[{time,path}]`); clients load
+  `${host}${path}/{z}/{x}/{y}.png` straight from IEM's `/c/` tiles (cached 14 days, CORS open), maxNativeZoom 7.
+- `GET /api/radar/tile/{unixTime}/{z}/{x}/{y}`: same-origin proxy for the future canvas only, Cache API, z ≤ 7. "Known
+  frames" is checked by arithmetic (time on the 5-minute grid and within the last 2 hours), not against the cached list,
+  so a tile never waits on a second upstream call.
+- `shared/radarflow.ts` (pure, `test/radarflow.test.ts`), `src/workers/radarflow.worker.ts`, `src/components/FutureRadar.ts`
+  (tiles, stitching, worker, 8 s worker cap and 10 s total cap, remembered per frame time), `radarLoop.ts` (shared loop for
+  `Radar.tsx` and `LiveRadar.tsx`) and `futureRadarUi.ts` (Past | Now | Future bar, "Future (estimate)" badge, "?").
+- Differences from the plan text: motion uses 2 frames 10 minutes apart (not 3); the stitched area is capped at 5×4 tiles
+  centred on the view (a dashed box shows where the estimate covers), at the map's own zoom up to 7; the "?" is always
+  visible (not only on future frames) and Live prints the explainer as a line since nobody can click there.
+- Not shown on the warning takeover map (`<Radar future={false} />`) or when `LiveRadar` is locked on a warning polygon.
+- Measured (dev, desktop Chrome, 1280×1024 stitched): worker 0.8 to 1.0 s; tiles+stitch+encode 0.2 to 0.6 s with warm
+  tile cache (a cold dev run took 12 s before the proxy stopped re-fetching the frame list for every tile). Not measured
+  on a Fire TV.
+
+Side finding: both sources send CORS `*`, so the R1 proxy is not strictly needed to read pixels. It is still worth
+building as written (it caps load on a free server, caches per colo, and stops being an open proxy), but it could be
+dropped if the user prefers less code.
 
 ---
 

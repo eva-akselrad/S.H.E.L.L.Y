@@ -65,7 +65,7 @@ export function Takeover() {
       </header>
       <LocationBar />
       <div class="tk-body">
-        {!emergency && <div class="tk-map"><Radar /></div>}
+        {!emergency && <div class="tk-map"><Radar future={false} /></div>}
         <div class="tk-info">
           <EtaBanner />
           <p class="tk-label">{emergency ? "Take action now" : "What to do"}</p>

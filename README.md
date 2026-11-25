@@ -103,7 +103,7 @@ the keys later means every device has to tap "Alert me" again. On iPhone, push o
 NWS (alerts, points, forecast text, station observations), Open-Meteo (forecast, nowcast, GFS
 ensemble, air quality, pollen, geocoding), NOAA SPC (convective outlook, preliminary storm
 reports), NWS National Water Prediction Service (river gauges), NOAA CO-OPS (tides), NHC (active
-tropical storms), RainViewer (radar tiles), Esri (basemap). Clients never call these
+tropical storms), Iowa Environmental Mesonet (NEXRAD radar tiles), Esri (basemap). Clients never call these
 directly except map and radar tiles. NWS requests carry
 `SHELLY/2.0 (https://evaakselrad.com, nws@evaakselrad.com)`. 
 
