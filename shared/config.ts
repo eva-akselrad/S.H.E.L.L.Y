@@ -4,7 +4,7 @@ import type { Bbox, Place } from "./types";
 import { DEFAULT_PLAYLIST, normalizePlaylist, type PlaylistEntry } from "./live/blocks";
 
 export const SEGMENT_IDS: SegmentId[] = [
-  "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade",
+  "now", "radar", "hourly", "daily", "text", "outlook", "air", "almanac", "note", "studio", "reports", "local", "grade", "snowday",
 ];
 export const MODES = ["auto", "kiosk", "web", "phone"] as const;
 export const THEMES = ["auto", "light", "dark"] as const;
@@ -82,6 +82,24 @@ export interface StudioConfig {
   forecasterName: string;
 }
 
+export interface District {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  /** 0 closes at the first flurry .. 1 hardly ever closes */
+  toughness: number;
+  /** wind chill (°F) at or below this adds cold points */
+  coldWindChillF: number;
+}
+
+export interface SnowDayConfig {
+  enabled: boolean;
+  districts: District[];
+  /** local dates (YYYY-MM-DD) with no school */
+  daysOff: string[];
+}
+
 export interface SiteConfig {
   defaultLocation: Place | null;
   defaultMode: (typeof MODES)[number];
@@ -100,7 +118,14 @@ export interface SiteConfig {
   safety: SafetyPlan;
   /** "what to wear" line on calm days */
   wear: boolean;
+  snowDay: SnowDayConfig;
 }
+
+/** Starting guesses for the two Bucks County districts the owner asked for; tune the toughness from the snow day record in admin. Points are each district office. */
+const STARTER_DISTRICTS: District[] = [
+  { id: "council-rock", name: "Council Rock", lat: 40.2293, lon: -74.9365, toughness: 0.5, coldWindChillF: -10 },
+  { id: "central-bucks", name: "Central Bucks", lat: 40.3156, lon: -75.1299, toughness: 0.4, coldWindChillF: -10 },
+];
 
 export const DEFAULT_LIVE: LiveConfig = {
   enabled: false,
@@ -152,6 +177,7 @@ export const DEFAULT_CONFIG: SiteConfig = {
   studio: DEFAULT_STUDIO,
   safety: { shelter: "", evacuation: "" },
   wear: true,
+  snowDay: { enabled: true, districts: STARTER_DISTRICTS, daysOff: [] },
 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -259,6 +285,36 @@ function normalizeLocalVoice(raw: unknown): VoiceConfig["local"] {
   return { enabled: l.enabled === true && baseUrl !== "", baseUrl, voice };
 }
 
+function normalizeSnowDay(v: unknown): SnowDayConfig {
+  const r = isObj(v) ? v : {};
+  const seen = new Set<string>();
+  const districts: District[] = [];
+  const raw = Array.isArray(r.districts) ? r.districts : null;
+  for (const d of (raw ?? []).slice(0, 12)) {
+    if (!isObj(d)) continue;
+    const name = str(d.name, 60).trim();
+    const lat = Number(d.lat);
+    const lon = Number(d.lon);
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < 17 || lat > 72 || lon < -180 || lon > -64) continue;
+    let id = str(d.id, 40).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "district";
+    while (seen.has(id)) id = `${id}-2`;
+    seen.add(id);
+    districts.push({
+      id,
+      name,
+      lat: Math.round(lat * 10000) / 10000,
+      lon: Math.round(lon * 10000) / 10000,
+      toughness: clamp(num(d.toughness, 0.5), 0, 1),
+      coldWindChillF: Math.round(clamp(num(d.coldWindChillF, -10), -60, 20)),
+    });
+  }
+  if (!raw) districts.push(...STARTER_DISTRICTS.map((d) => ({ ...d })));
+  const daysOff = Array.isArray(r.daysOff)
+    ? [...new Set(r.daysOff.filter((d): d is string => typeof d === "string" && /^\d{4}-\d\d-\d\d$/.test(d) && Number.isFinite(Date.parse(d))))].sort().slice(0, 120)
+    : [];
+  return { enabled: r.enabled !== false, districts, daysOff };
+}
+
 /** Validate and clamp untrusted config JSON. Never throws; unknown input yields defaults. */
 export function normalizeConfig(raw: unknown): SiteConfig {
   const r = isObj(raw) ? raw : {};
@@ -277,8 +333,9 @@ export function normalizeConfig(raw: unknown): SiteConfig {
   const modeIn = (MODES as readonly unknown[]).includes(r.defaultMode);
   const themeIn = (THEMES as readonly unknown[]).includes(r.defaultTheme);
 
+  const defaultLocation = normalizePlace(r.defaultLocation);
   return {
-    defaultLocation: normalizePlace(r.defaultLocation),
+    defaultLocation,
     defaultMode: modeIn ? (r.defaultMode as SiteConfig["defaultMode"]) : "auto",
     defaultTheme: themeIn ? (r.defaultTheme as SiteConfig["defaultTheme"]) : "auto",
     // "now" can't be hidden: the loop must never be empty
@@ -316,6 +373,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       evacuation: str(isObj(r.safety) ? r.safety.evacuation : "", 120).trim(),
     },
     wear: r.wear !== false,
+    snowDay: normalizeSnowDay(r.snowDay),
   };
 }
 

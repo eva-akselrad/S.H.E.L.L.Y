@@ -4,6 +4,7 @@ import { handleAndroid } from "./android";
 import { fanOutFcm } from "./fcm";
 import { coords, loadForecast, loadPlace } from "./loaders";
 import { cached, round } from "./cache";
+import { handleSnowDay } from "./snowday";
 import { handleLiveTts, prepareRundownVoice, produceRundown } from "./live";
 import { gradeSummary, runGrading } from "./grade";
 import { pollAlerts } from "./poll";
@@ -40,7 +41,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
 
   if (path === "/api/health") return json({ ok: true, app: "SHELLY", version: "2.0.0" });
 
-  const admin = await handleAdmin(request, env, url);
+  const admin = await handleAdmin(request, env, url, ctx);
   if (admin) return admin;
 
   const push = await handlePush(request, env, url);
@@ -178,6 +179,8 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Pro
     const { data } = await cached(ctx, `hz:${round(c.lat, 2)}:${round(c.lon, 2)}`, 900, () => fetchHazards(env.NWS_USER_AGENT, c.lat, c.lon));
     return json(data, 200, 300);
   }
+
+  if (path === "/api/snowday") return handleSnowDay(env, ctx, url);
 
   if (path === "/api/grade") return json(await gradeSummary(env), 200, 600);
 

@@ -3,6 +3,7 @@ import type { SimEntry } from "../shared/simulate";
 import type { Rundown } from "../shared/live/rundown";
 import { activeControl, type LiveControl } from "../shared/live/blocks";
 import { normalizeProducts, type StudioProduct } from "../shared/studio";
+import { normalizeSnowLog, SNOW_LOG_MAX, type SnowLogEntry } from "../shared/snowday";
 import type { Alert, Announcement } from "../shared/types";
 
 export const ALERTS_KEY = "alerts:active";
@@ -97,4 +98,12 @@ export async function readControl(env: Env): Promise<LiveControl> {
 }
 export async function writeControl(env: Env, c: LiveControl): Promise<void> {
   await env.STATE.put(CONTROL_KEY, JSON.stringify(c));
+}
+
+const SNOW_LOG_KEY = "snowday:log";
+export async function readSnowLog(env: Env): Promise<SnowLogEntry[]> {
+  return normalizeSnowLog(await env.STATE.get(SNOW_LOG_KEY, "json"));
+}
+export async function writeSnowLog(env: Env, list: SnowLogEntry[]): Promise<void> {
+  await env.STATE.put(SNOW_LOG_KEY, JSON.stringify(list.slice(0, SNOW_LOG_MAX)));
 }

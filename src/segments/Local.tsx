@@ -1,5 +1,5 @@
 import { catLabel, catRank } from "../../shared/hazards";
-import { hazards, place, snowDay } from "../state/store";
+import { hazards, place, snowDay, snowOdds } from "../state/store";
 
 /** Rivers, tides, tropical storms and snow-day odds for where you are. */
 export function Local() {
@@ -11,7 +11,7 @@ export function Local() {
 
   return (
     <section class="seg seg-local">
-      {s && (
+      {s && !snowOdds.value?.odds && (
         <div class="snowday">
           <b class="sd-odds">{s.odds}%</b>
           <span>

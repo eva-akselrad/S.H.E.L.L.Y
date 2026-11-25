@@ -157,3 +157,9 @@ textarea.adm-input { resize: vertical; line-height: 1.45; }
 .adm-playlist li::before { content: counter(pl); position: absolute; left: 12px; top: 14px; font-weight: 800; opacity: .5; }
 .adm-playlist li.off { opacity: .5; }
 .adm-row .grow { flex: 1; }
+
+/* snow day admin */
+.adm-plain { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: .92rem; }
+.adm-plain th { text-align: left; color: var(--muted); font-weight: 500; font-size: .8rem; padding: 4px 8px; }
+.adm-plain td { padding: 6px 8px; border-top: 1px solid var(--line, #8883); }
+.adm-card.inner { background: var(--bg); box-shadow: none; margin-bottom: 12px; }
