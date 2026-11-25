@@ -11,8 +11,11 @@ export function Radar() {
   const p = place.value;
   const frames = radar.value;
   const primary = threat.value.rank >= 2 ? threat.value.primary : null;
-  // every active alert that covers you and isn't the urgent one: drawn in amber so you can see where it is
+  // every other active alert that covers you: urgent ones (a second tornado or severe thunderstorm warning) in red,
+  // long-lasting ones (high wind, coastal flood...) in amber underneath, so a big zone never hides a storm polygon
   const others = threat.value.active.filter((a) => a.geometry && a.id !== primary?.id && alertLevel(a) !== "CALM");
+  const urgentOthers = others.filter((a) => alertLevel(a) === "WARNING" || alertLevel(a) === "EMERGENCY");
+  const zoneAlerts = others.filter((a) => !urgentOthers.includes(a));
   const othersKey = others.map((a) => a.id).join("|");
   const reps = reportsNearby.value;
   const near = nearby.value;
@@ -61,8 +64,15 @@ export function Radar() {
           .addTo(map);
       }
 
-      for (const a of others) {
-        L.geoJSON(a.geometry as never, { style: { color: "#ffb020", weight: 2, fillColor: "#ffb020", fillOpacity: 0.1 } })
+      // long-lasting zone alerts sit in their own pane below the warning polygons (default overlay pane is 400)
+      map.createPane("zonePane").style.zIndex = "380";
+      for (const a of zoneAlerts) {
+        L.geoJSON(a.geometry as never, { pane: "zonePane", style: { color: "#ffb020", weight: 2, fillColor: "#ffb020", fillOpacity: 0.1 } })
+          .bindTooltip(a.event)
+          .addTo(map);
+      }
+      for (const a of urgentOthers) {
+        L.geoJSON(a.geometry as never, { style: { color: "#ff3b3b", weight: 2, fillColor: "#ff3b3b", fillOpacity: 0.12 } })
           .bindTooltip(a.event)
           .addTo(map);
       }
